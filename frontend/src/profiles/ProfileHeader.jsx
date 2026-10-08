@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { 
     Box, 
     Typography, 
@@ -24,7 +25,9 @@ const ProfileHeader = ({
     onSendMessage, 
     isNavigating
 }) => {
+    const { t } = useTranslation('profiles');
     const navigate = useNavigate();
+    const tokenBalance = Number(profile.token_balance || 0);
 
     const handleProfileClick = () => {
         navigate(`/profiles/user_profile/${profile.user.id}`);
@@ -74,7 +77,7 @@ const ProfileHeader = ({
                                     to="/profiles/my_profile?section=tokens"
                                     clickable
                                     icon={<TollIcon />}
-                                    label={`${Number(profile.token_balance || 0)} ${Number(profile.token_balance || 0) === 1 ? 'token' : 'tokens'}`}
+                                    label={`${tokenBalance} ${t('tokenUnit', { count: tokenBalance })}`}
                                     color="primary"
                                     variant="outlined"
                                     sx={{ textDecoration: 'none' }}
@@ -94,7 +97,7 @@ const ProfileHeader = ({
                                         startIcon={<PostAddIcon />}
                                         size="small"
                                     >
-                                        Crear publicación
+                                        {t('header.createPublication')}
                                     </Button>
                                     <Button
                                         component={Link}
@@ -104,12 +107,12 @@ const ProfileHeader = ({
                                         startIcon={<EditIcon />}
                                         size="small"
                                     >
-                                        Editar perfil
+                                        {t('header.editProfile')}
                                     </Button>
                                 </>
                             )}
                             {!isOwnProfile && (
-                                <Tooltip title={isAuthenticated ? "Enviar un mensaje" : "Inicia sesión para enviar un mensaje"}>
+                                <Tooltip title={isAuthenticated ? t('header.sendMessage') : t('header.signInToMessage')}>
                                     <Button 
                                         variant="contained"
                                         color="primary"
@@ -122,7 +125,7 @@ const ProfileHeader = ({
                                             }
                                         }}
                                     >
-                                        Enviar mensaje
+                                        {t('header.message')}
                                     </Button>
                                 </Tooltip>
                             )}

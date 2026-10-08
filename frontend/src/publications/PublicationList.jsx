@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Paper, Button, Grid, CircularProgress, Divider, IconButton } from '@mui/material';
 import LinkIcon from '@mui/icons-material/Link';
 import contentApi from '../api/contentApi';
 import ContentDisplay from '../content/ContentDisplay';
 import BookmarkButton from '../bookmarks/BookmarkButton';
 import VoteComponent from '../votes/VoteComponent';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 // ContentDisplay Mode: "preview" - Basic preview for publication list items
 const PublicationList = ({ isOwnProfile = false, userId = null }) => {
+  const { t } = useTranslation('publications');
+  const { intl } = useDateLocales();
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,14 +31,14 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
         setPublications(data);
         setError(null);
       } catch (err) {
-        setError('Error al cargar las publicaciones');
+        setError(t('loadError'));
       } finally {
         setLoading(false);
       }
     };
 
     fetchPublications();
-  }, [isOwnProfile, userId]);
+  }, [isOwnProfile, userId, t]);
 
   const handleLinkClick = (publicationId, event) => {
     event.stopPropagation();
@@ -61,7 +65,7 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
     return (
       <Box sx={{ p: 3 }}>
         <Typography variant="body1" color="text.secondary">
-          No se encontraron publicaciones.
+          {t('empty')}
         </Typography>
       </Box>
     );
@@ -91,7 +95,9 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Box>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Publicado: {new Date(publication.published_at).toLocaleDateString('es-ES')}
+                      {t('published', {
+                        date: new Date(publication.published_at).toLocaleDateString(intl),
+                      })}
                     </Typography>
                   </Box>
                   
@@ -108,7 +114,7 @@ const PublicationList = ({ isOwnProfile = false, userId = null }) => {
                         color="primary"
                         size="small"
                       >
-                        Editar
+                        {t('edit')}
                       </Button>
                     )}
                   </Box>

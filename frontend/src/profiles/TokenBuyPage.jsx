@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Button,
@@ -35,35 +36,38 @@ import {
 import { createTokenPurchase, getTokenPackages, listTokenPurchases } from '../api/paymentsApi';
 import { getUserProfile } from '../api/profilesApi';
 
-const BENEFITS = [
-  {
-    icon: SavingsIcon,
-    title: 'Pagas menos en contenidos de pago',
-    body: 'Cuando el gasto esté activo, los tokens descuentan caminos, consultas de temas, eventos y anclajes a Bitcoin.',
-  },
-  {
-    icon: SchoolIcon,
-    title: 'Caminos de conocimiento',
-    body: 'Desbloquea caminos de pago sin volver a pasar por una pasarela cada vez.',
-  },
-  {
-    icon: ForumIcon,
-    title: 'Consultas de temas',
-    body: 'Usa el saldo para las consultas de un tema cuando el autor las cobre.',
-  },
-  {
-    icon: EventIcon,
-    title: 'Eventos',
-    body: 'Cubre inscripciones de pago con el mismo saldo de la plataforma.',
-  },
-  {
-    icon: VerifiedIcon,
-    title: 'Anclaje de transcripciones',
-    body: 'Paga solicitudes de certificación en Bitcoin con tokens, con descuento.',
-  },
-];
-
 const TokenBuyPage = () => {
+  const { t } = useTranslation('profiles');
+  const benefits = useMemo(
+    () => [
+      {
+        icon: SavingsIcon,
+        title: t('buy.payLessTitle'),
+        body: t('buy.payLessBody'),
+      },
+      {
+        icon: SchoolIcon,
+        title: t('buy.pathsTitle'),
+        body: t('buy.pathsBody'),
+      },
+      {
+        icon: ForumIcon,
+        title: t('buy.topicsTitle'),
+        body: t('buy.topicsBody'),
+      },
+      {
+        icon: EventIcon,
+        title: t('buy.eventsTitle'),
+        body: t('buy.eventsBody'),
+      },
+      {
+        icon: VerifiedIcon,
+        title: t('buy.anchorTitle'),
+        body: t('buy.anchorBody'),
+      },
+    ],
+    [t],
+  );
   const navigate = useNavigate();
   const [packages, setPackages] = useState([]);
   const [purchases, setPurchases] = useState([]);
@@ -92,7 +96,7 @@ const TokenBuyPage = () => {
         if (!cancelled) setError(null);
       })
       .catch((err) => {
-        if (!cancelled) setError(formatApiError(err, 'No se pudieron cargar los paquetes.'));
+        if (!cancelled) setError(formatApiError(err, t('buy.loadError')));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -100,7 +104,7 @@ const TokenBuyPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [load, t]);
 
   const bestValueId = useMemo(() => bestValuePackageId(packages), [packages]);
 
@@ -123,7 +127,7 @@ const TokenBuyPage = () => {
       setPurchases((prev) => [purchase, ...prev]);
       openCheckout(purchase, pkg);
     } catch (err) {
-      setError(formatApiError(err, 'No se pudo iniciar la compra.'));
+      setError(formatApiError(err, t('buy.startError')));
     } finally {
       setBusyPackageId(null);
     }
@@ -134,7 +138,7 @@ const TokenBuyPage = () => {
     try {
       await load();
     } catch (err) {
-      setError(formatApiError(err, 'El pago se acreditó, pero no se pudo actualizar el saldo.'));
+      setError(formatApiError(err, t('buy.balanceRefreshError')));
       return;
     }
     navigate('/profiles/my_profile?section=tokens');
@@ -156,21 +160,18 @@ const TokenBuyPage = () => {
         startIcon={<ArrowBackIcon />}
         sx={{ mb: 2, textTransform: 'none' }}
       >
-        Volver a mi saldo
+        {t('buy.back')}
       </Button>
 
       <Stack spacing={1} sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight={800}>
-          Comprar tokens
+          {t('buy.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 720 }}>
-          Los tokens son créditos de Academia Blockchain. No viven en una blockchain
-          y no se pueden retirar. Sirven para pagar por caminos del conocimiento en la plataforma con descuento, para 
-          generar consultas de LLM sobre los contenidos de los temas de Academia Blockchain y para 
-          enviar hashes de contenido a la blockchain de Bitcoin.
+          {t('buy.intro')}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Saldo actual: <strong>{balance} {balance === 1 ? 'token' : 'tokens'}</strong>
+          {t('buy.balance')} <strong>{balance} {t('tokenUnit', { count: balance })}</strong>
         </Typography>
       </Stack>
 
@@ -182,10 +183,10 @@ const TokenBuyPage = () => {
 
       <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, mb: 4 }}>
         <Typography variant="h6" sx={{ mb: 1 }}>
-          Para qué sirven
+          {t('buy.usesTitle')}
         </Typography>
         <List disablePadding>
-          {BENEFITS.map((item) => {
+          {benefits.map((item) => {
             const Icon = item.icon;
             return (
               <ListItem key={item.title} alignItems="flex-start" sx={{ px: 0 }}>
@@ -204,15 +205,15 @@ const TokenBuyPage = () => {
       </Paper>
 
       <Typography variant="h6" sx={{ mb: 0.5 }}>
-        Elige un paquete
+        {t('buy.choose')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Pagas con Bitcoin Cash o NOWPayments. Monero no está disponible aquí porque no puede acreditar el saldo al instante.
+        {t('buy.payMethods')}
       </Typography>
 
       {packages.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          No hay paquetes disponibles por ahora.
+          {t('buy.none')}
         </Typography>
       ) : (
         <Grid container spacing={2}>
@@ -232,18 +233,20 @@ const TokenBuyPage = () => {
                 >
                   <CardContent sx={{ flexGrow: 1 }}>
                     <Stack direction="row" justifyContent="flex-end" sx={{ minHeight: 28 }}>
-                      {isBest && <Chip size="small" color="primary" label="Mejor valor" />}
+                      {isBest && <Chip size="small" color="primary" label={t('buy.bestValue')} />}
                     </Stack>
                     <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5 }}>
                       {pkg.token_amount}
                       <Typography component="span" variant="body1" color="text.secondary">
-                        {' '}tokens
+                        {' '}{t('buy.tokensWord')}
                       </Typography>
                     </Typography>
                     {Number(pkg.bonus_tokens || 0) > 0 && (
                       <Typography variant="body2" color="success.main" fontWeight={600}>
-                        +{pkg.bonus_tokens} de recompensa →{' '}
-                        {pkg.total_tokens ?? (pkg.token_amount + pkg.bonus_tokens)} en total
+                        {t('buy.reward', {
+                          bonus: pkg.bonus_tokens,
+                          total: pkg.total_tokens ?? (pkg.token_amount + pkg.bonus_tokens),
+                        })}
                       </Typography>
                     )}
                     <Typography variant="h6" color="primary" sx={{ mt: 1 }}>
@@ -252,8 +255,11 @@ const TokenBuyPage = () => {
                     {perToken != null && (
                       <Typography variant="caption" color="text.secondary">
                         {Number(pkg.bonus_tokens || 0) > 0
-                          ? `Pagas ${pkg.token_amount} × $0.01; recibes ${pkg.total_tokens ?? (pkg.token_amount + pkg.bonus_tokens)}`
-                          : `$${perToken.toFixed(2)} por token`}
+                          ? t('buy.payLine', {
+                              amount: pkg.token_amount,
+                              total: pkg.total_tokens ?? (pkg.token_amount + pkg.bonus_tokens),
+                            })
+                          : t('buy.perToken', { price: perToken.toFixed(2) })}
                       </Typography>
                     )}
                   </CardContent>
@@ -263,9 +269,9 @@ const TokenBuyPage = () => {
                       variant="contained"
                       disabled={busyPackageId === pkg.id}
                       onClick={() => handleBuy(pkg)}
-                      aria-label={`Comprar ${packageTitle(pkg)}`}
+                      aria-label={t('buy.buyAria', { title: packageTitle(pkg) })}
                     >
-                      {busyPackageId === pkg.id ? 'Preparando…' : 'Comprar'}
+                      {busyPackageId === pkg.id ? t('buy.preparing') : t('buy.buy')}
                     </Button>
                   </CardActions>
                 </Card>

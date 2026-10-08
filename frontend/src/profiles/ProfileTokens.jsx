@@ -1,5 +1,6 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   Alert,
   Box,
@@ -26,6 +27,7 @@ const statusChipColor = (status) => {
 };
 
 const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
+  const { t } = useTranslation('profiles');
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -46,7 +48,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
         if (!cancelled) setError(null);
       })
       .catch((err) => {
-        if (!cancelled) setError(formatApiError(err, 'No se pudieron cargar los tokens.'));
+        if (!cancelled) setError(formatApiError(err, t('tokens.loadError')));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -54,16 +56,16 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [load, t]);
 
   const handlePaid = async () => {
-    setSuccess('Pago recibido. Los tokens ya están en tu saldo.');
+    setSuccess(t('tokens.paid'));
     setCheckout(null);
     try {
       await load();
       await onBalanceChange?.();
     } catch (err) {
-      setError(formatApiError(err, 'El pago se acreditó, pero no se pudo actualizar el saldo.'));
+      setError(formatApiError(err, t('tokens.balanceRefreshError')));
     }
   };
 
@@ -74,9 +76,9 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
       const updated = await cancelTokenPurchase(purchase.id);
       setPurchases((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
       if (checkout?.purchaseId === purchase.id) setCheckout(null);
-      setSuccess('Orden cancelada.');
+      setSuccess(t('tokens.cancelled'));
     } catch (err) {
-      setError(formatApiError(err, 'No se pudo cancelar la orden.'));
+      setError(formatApiError(err, t('tokens.cancelError')));
     } finally {
       setCancellingId(null);
     }
@@ -97,7 +99,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
     <Box>
       <Stack spacing={1} sx={{ mb: 3 }}>
         <Typography variant="overline" color="text.secondary">
-          Tokens de la plataforma
+          {t('tokens.overline')}
         </Typography>
         <Stack direction="row" spacing={1.5} alignItems="center">
           <TollIcon color="primary" />
@@ -105,13 +107,11 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
             {balance}
           </Typography>
           <Typography variant="h6" color="text.secondary">
-            {balance === 1 ? 'token' : 'tokens'}
+            {t('tokenUnit', { count: balance })}
           </Typography>
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640 }}>
-          Créditos internos de Academia Blockchain. No son una criptomoneda.
-          1 token = $0.01 USD. Sirven para pagar por caminos del conocimiento,
-          eventos, consultas en la plataforma y para anclar transcripciones a Bitcoin con descuento.
+          {t('tokens.description')}
         </Typography>
         <Box>
           <Button
@@ -120,7 +120,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
             variant="contained"
             startIcon={<TollIcon />}
           >
-            Comprar tokens
+            {t('tokens.buy')}
           </Button>
         </Box>
       </Stack>
@@ -138,31 +138,35 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
 
       {balance === 0 && pending.length === 0 && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          Aún no tienes tokens.{' '}
-          <Button
-            component={RouterLink}
-            to="/acbc-tokens"
-            size="small"
-            sx={{ verticalAlign: 'baseline', textTransform: 'none', p: 0, minWidth: 0 }}
-          >
-            Elige un paquete
-          </Button>
-          {' '}para empezar.
+          <Trans
+            t={t}
+            i18nKey="tokens.empty"
+            components={{
+              buy: (
+                <Button
+                  component={RouterLink}
+                  to="/acbc-tokens"
+                  size="small"
+                  sx={{ verticalAlign: 'baseline', textTransform: 'none', p: 0, minWidth: 0 }}
+                />
+              ),
+            }}
+          />
         </Alert>
       )}
 
       {pending.length > 0 && (
         <Alert severity="warning" sx={{ mb: 3 }}>
-          Tienes un pago pendiente. Puedes continuarlo aquí, cancelarlo, o seguir desde la página de compra.
+          {t('tokens.pending')}
         </Alert>
       )}
 
       <Typography variant="h6" sx={{ mb: 1.5 }}>
-        Actividad
+        {t('tokens.activity')}
       </Typography>
       {purchases.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          Todavía no has comprado tokens. Aquí verás tus compras y el uso que le has dado a tus tokens.
+          {t('tokens.noPurchases')}
         </Typography>
       ) : (
         <Stack spacing={1}>
@@ -182,12 +186,14 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
             >
               <Box sx={{ flexGrow: 1 }}>
                 <Typography variant="body2" fontWeight={600}>
-                  {row.package_name || `${row.token_amount} tokens`}
+                  {row.package_name || t('tokens.packageFallback', { amount: row.token_amount })}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {(row.total_tokens ?? row.token_amount)} tokens
-                  {Number(row.bonus_tokens || 0) > 0 ? ` (incl. +${row.bonus_tokens} bonus)` : ''}
-                  {' · '}${Number(row.usd_price).toFixed(2)} USD
+                  {t('tokens.line', { amount: row.total_tokens ?? row.token_amount })}
+                  {Number(row.bonus_tokens || 0) > 0
+                    ? t('tokens.bonus', { bonus: row.bonus_tokens })
+                    : ''}
+                  {t('tokens.price', { price: Number(row.usd_price).toFixed(2) })}
                 </Typography>
               </Box>
               <Chip
@@ -202,7 +208,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
                     variant="outlined"
                     onClick={() => setCheckout(checkoutFromPurchase(row))}
                   >
-                    Continuar pago
+                    {t('tokens.continuePayment')}
                   </Button>
                   <Button
                     size="small"
@@ -210,7 +216,7 @@ const ProfileTokens = ({ tokenBalance = 0, onBalanceChange }) => {
                     disabled={cancellingId === row.id}
                     onClick={() => handleCancel(row)}
                   >
-                    {cancellingId === row.id ? 'Cancelando…' : 'Cancelar orden'}
+                    {cancellingId === row.id ? t('tokens.cancelling') : t('tokens.cancelOrder')}
                   </Button>
                 </Stack>
               )}

@@ -9,10 +9,13 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import bookClubsApi from '../../api/bookClubsApi';
-import { extractApiError, STATUS_LABELS } from '../clubTheme';
+import { extractApiError } from '../clubTheme';
 
 const BookClubAdminLayout = () => {
+  const { t } = useTranslation('nav');
+  const { t: tc } = useTranslation('bookClubs');
   const { slug } = useParams();
   const [club, setClub] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,13 +29,13 @@ const BookClubAdminLayout = () => {
       setError(null);
       return data;
     } catch (err) {
-      setError(extractApiError(err, 'No se pudo cargar el club.'));
+      setError(extractApiError(err, t('bookClub.loadError')));
       if (!silent) setClub(null);
       return null;
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [slug]);
+  }, [slug, t]);
 
   useEffect(() => {
     reload();
@@ -50,7 +53,7 @@ const BookClubAdminLayout = () => {
     return (
       <Box>
         <Button component={RouterLink} to="/dashboard" sx={{ mb: 2 }}>
-          ← Dashboard
+          {tc('dashboardBack')}
         </Button>
         <Alert severity="error">{error}</Alert>
       </Box>
@@ -60,17 +63,17 @@ const BookClubAdminLayout = () => {
   return (
     <Box>
       <Button component={RouterLink} to="/dashboard" sx={{ mb: 2 }}>
-        ← Clubs de lectura
+        {t('bookClub.backToClubs')}
       </Button>
 
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
         <Typography variant="h4" component="h1">
           {club.title}
         </Typography>
-        <Chip size="small" label={STATUS_LABELS[club.status] || club.status} />
+        <Chip size="small" label={tc(`status.${club.status}`, { defaultValue: club.status })} />
       </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        /{club.slug} · Edita el club por secciones
+        /{club.slug} · {t('bookClub.editBySection')}
       </Typography>
 
       <Stack
@@ -93,7 +96,7 @@ const BookClubAdminLayout = () => {
           })}
           sx={{ px: 1.5, py: 1, fontSize: '0.9rem', whiteSpace: 'nowrap', borderColor: 'primary.main' }}
         >
-          General
+          {t('bookClub.general')}
         </Box>
         <Box
           component={NavLink}
@@ -106,7 +109,7 @@ const BookClubAdminLayout = () => {
           })}
           sx={{ px: 1.5, py: 1, fontSize: '0.9rem', whiteSpace: 'nowrap', borderColor: 'primary.main' }}
         >
-          Conexiones
+          {t('bookClub.connections')}
         </Box>
         <Box
           component={NavLink}
@@ -119,7 +122,7 @@ const BookClubAdminLayout = () => {
           })}
           sx={{ px: 1.5, py: 1, fontSize: '0.9rem', whiteSpace: 'nowrap', borderColor: 'primary.main' }}
         >
-          Misiones
+          {t('bookClub.missions')}
         </Box>
         <Box
           component={NavLink}
@@ -132,7 +135,7 @@ const BookClubAdminLayout = () => {
           })}
           sx={{ px: 1.5, py: 1, fontSize: '0.9rem', whiteSpace: 'nowrap', borderColor: 'primary.main' }}
         >
-          Reuniones
+          {t('bookClub.meetings')}
         </Box>
         <Box
           component={NavLink}
@@ -145,7 +148,7 @@ const BookClubAdminLayout = () => {
           })}
           sx={{ px: 1.5, py: 1, fontSize: '0.9rem', whiteSpace: 'nowrap', borderColor: 'primary.main' }}
         >
-          Foro
+          {t('bookClub.forum')}
         </Box>
         <Box
           component={NavLink}
@@ -158,7 +161,7 @@ const BookClubAdminLayout = () => {
           })}
           sx={{ px: 1.5, py: 1, fontSize: '0.9rem', whiteSpace: 'nowrap', borderColor: 'primary.main' }}
         >
-          Miembros
+          {t('bookClub.members')}
         </Box>
         <Button
           size="small"
@@ -166,7 +169,7 @@ const BookClubAdminLayout = () => {
           to={`/club-de-lectura/${club.slug}`}
           sx={{ ml: 'auto', alignSelf: 'center' }}
         >
-          Ver club público
+          {t('bookClub.viewPublic')}
         </Button>
       </Stack>
 

@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import i18n from '../i18n';
 import { getDefaultMediaThumbnail } from './defaultMediaThumbnails';
+
+const contentT = (key) => i18n.t(key, { ns: 'content' });
 
 /**
  * Try thumbnail URLs in order; advance to the next source when the current img fails to load.
@@ -62,7 +65,7 @@ export function buildListingThumbnailSources({
   if (customThumbnailForDisplay) {
     sources.push({
       src: customThumbnailForDisplay,
-      alt: 'Content thumbnail',
+      alt: contentT('listingThumbnail.content'),
     });
   }
 
@@ -71,7 +74,7 @@ export function buildListingThumbnailSources({
     if (imageSrc) {
       sources.push({
         src: imageSrc,
-        alt: title || 'Content image',
+        alt: title || contentT('listingThumbnail.image'),
         onClick: (event) => {
           event.stopPropagation();
           window.open(imageSrc, '_blank');
@@ -83,14 +86,14 @@ export function buildListingThumbnailSources({
   if (fileDetails?.og_image) {
     sources.push({
       src: fileDetails.og_image,
-      alt: 'Website preview',
+      alt: contentT('listingThumbnail.website'),
     });
   }
 
   if (favicon) {
     sources.push({
       src: favicon,
-      alt: 'Site favicon',
+      alt: contentT('listingThumbnail.favicon'),
       objectFit: 'contain',
       style: { width: '32px', height: '32px' },
     });
@@ -100,7 +103,7 @@ export function buildListingThumbnailSources({
   if (defaultMediaThumbnail) {
     sources.push({
       src: defaultMediaThumbnail,
-      alt: 'Content thumbnail',
+      alt: contentT('listingThumbnail.content'),
     });
   }
 
@@ -117,14 +120,14 @@ export function buildMediaPreviewThumbnailSources({
   if (customThumbnailForDisplay) {
     sources.push({
       src: customThumbnailForDisplay,
-      alt: 'Content thumbnail',
+      alt: contentT('listingThumbnail.content'),
     });
   }
 
   if (ogImage) {
     sources.push({
       src: ogImage,
-      alt: 'Content thumbnail',
+      alt: contentT('listingThumbnail.content'),
     });
   }
 
@@ -132,7 +135,7 @@ export function buildMediaPreviewThumbnailSources({
   if (defaultMediaThumbnail) {
     sources.push({
       src: defaultMediaThumbnail,
-      alt: 'Content thumbnail',
+      alt: contentT('listingThumbnail.content'),
     });
   }
 

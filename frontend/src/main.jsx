@@ -2,7 +2,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as Sentry from '@sentry/react';
+import { useTranslation } from 'react-i18next';
 import App from './App.jsx';
+import './i18n';
 import { initMetaPixel } from './utils/metaPixel';
 import { initGoogleAnalytics } from './utils/googleAnalytics';
 import { sentryBeforeSend, shouldEnableSentry } from './utils/sentryEnv';
@@ -37,9 +39,29 @@ if (shouldEnableSentry({ dsn: SENTRY_DSN, mode: viteMode })) {
 initMetaPixel();
 initGoogleAnalytics();
 
+const CrashFallback = ({ error }) => {
+  const { t } = useTranslation();
+  return (
+    <>
+      <p>{t('errors.crash')}</p>
+      {import.meta.env.DEV && error ? (
+        <pre style={{ whiteSpace: 'pre-wrap', padding: '16px', margin: 0 }}>
+          {error.stack || String(error)}
+        </pre>
+      ) : null}
+    </>
+  );
+};
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 const app = (
-  <Sentry.ErrorBoundary fallback={<p>Algo salió mal. Recarga la página o contacta soporte.</p>}>
+  <Sentry.ErrorBoundary
+    fallback={({ error }) => <CrashFallback error={error} />}
+    onError={(error, componentStack) => {
+      console.error(error);
+      console.error(componentStack);
+    }}
+  >
     <App />
   </Sentry.ErrorBoundary>
 );

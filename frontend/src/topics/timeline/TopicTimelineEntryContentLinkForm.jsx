@@ -12,6 +12,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LibrarySelectMultiple from '../../content/LibrarySelectMultiple';
 import UploadContentForm from '../../content/UploadContentForm';
 import { getProfileContentId } from '../../content/ContentSuggestionPicker';
+import { useTranslation } from 'react-i18next';
 import { parseApiValidationErrors } from '../../utils/apiFormErrors';
 import TopicTimelineContentSelector from './TopicTimelineContentSelector';
 
@@ -20,13 +21,13 @@ const buildInitialSelectedIds = (entry) => {
   return links.map((link) => String(link.content?.id)).filter(Boolean);
 };
 
-const getTopicItemTitle = (item) => {
+const getTopicItemTitle = (item, fallback) => {
   const content = item?.content || item;
   return (
     item?.title
     || item?.selected_profile?.title
     || content?.original_title
-    || 'Contenido'
+    || fallback
   );
 };
 
@@ -55,6 +56,7 @@ const TopicTimelineEntryContentLinkForm = ({
   onLinked,
   showSkip = false,
 }) => {
+  const { t } = useTranslation('topics');
   const [sourceMode, setSourceMode] = useState(null);
   const [uploadMode, setUploadMode] = useState('file');
   const [uploadInProgress, setUploadInProgress] = useState(false);
@@ -113,10 +115,10 @@ const TopicTimelineEntryContentLinkForm = ({
     } catch (err) {
       const { fieldErrors, generalError: parsed } = parseApiValidationErrors(
         err,
-        'No se pudieron vincular los contenidos. Inténtalo de nuevo.',
+        t('timeline.linkError'),
       );
       const contentsError = fieldErrors.contents;
-      const message = contentsError || parsed || 'No se pudieron vincular los contenidos. Inténtalo de nuevo.';
+      const message = contentsError || parsed || t('timeline.linkError');
       setGeneralError(message);
       throw err;
     }
@@ -133,7 +135,7 @@ const TopicTimelineEntryContentLinkForm = ({
       (profile) => profile?.id && getProfileContentId(profile),
     );
     if (validProfiles.length === 0) {
-      setGeneralError('Selecciona al menos un contenido para vincular.');
+      setGeneralError(t('timeline.selectAtLeast'));
       return;
     }
 
@@ -153,7 +155,7 @@ const TopicTimelineEntryContentLinkForm = ({
   const handleContentUploaded = async (contentProfile) => {
     setUploadInProgress(false);
     if (!contentProfile?.id || !getProfileContentId(contentProfile)) {
-      setGeneralError('No se pudo obtener el contenido subido. Inténtalo de nuevo.');
+      setGeneralError(t('timeline.uploadMissing'));
       setSourceMode(null);
       return;
     }
@@ -174,7 +176,7 @@ const TopicTimelineEntryContentLinkForm = ({
 
   const handleTopicConfirm = async () => {
     if (selectedContentIds.length === 0) {
-      setGeneralError('Selecciona al menos un contenido del tema, o vuelve atrás.');
+      setGeneralError(t('timeline.selectOrBack'));
       return;
     }
     try {
@@ -199,7 +201,7 @@ const TopicTimelineEntryContentLinkForm = ({
   };
 
   const secondaryAction = showSkip ? onSkip : onCancel;
-  const secondaryLabel = showSkip ? 'Omitir' : 'Volver';
+  const secondaryLabel = showSkip ? t('timeline.skip') : t('common.back');
   const busy = saving || uploadInProgress;
   const errorAlert = (error || generalError) && (
     <Alert severity="error" sx={{ mb: 2 }}>
@@ -217,7 +219,7 @@ const TopicTimelineEntryContentLinkForm = ({
           sx={{ mb: 2, textTransform: 'none' }}
           disabled={busy}
         >
-          Volver
+          {t('common.back')}
         </Button>
         {errorAlert}
         <TopicTimelineContentSelector
@@ -233,7 +235,7 @@ const TopicTimelineEntryContentLinkForm = ({
             disabled={busy}
             sx={{ textTransform: 'none' }}
           >
-            {busy ? 'Vinculando...' : 'Vincular seleccionados'}
+            {busy ? t('timeline.linking') : t('timeline.linkSelected')}
           </Button>
         </Box>
       </Box>
@@ -250,17 +252,17 @@ const TopicTimelineEntryContentLinkForm = ({
           sx={{ mb: 2, textTransform: 'none' }}
           disabled={busy}
         >
-          Volver
+          {t('common.back')}
         </Button>
         {errorAlert}
         <LibrarySelectMultiple
-          title="Seleccionar contenido"
-          description="Al confirmar, el contenido se agregará al tema (si hace falta) y se vincula a esta entrada."
+          title={t('suggestion.selectTitle')}
+          description={t('timeline.libraryConfirmHelp')}
           onCancel={backToChoice}
           onSave={handleLibrarySave}
           filterFunction={filterLibraryContent}
-          confirmLabel="Vincular"
-          confirmingLabel="Vinculando..."
+          confirmLabel={t('timeline.link')}
+          confirmingLabel={t('timeline.linking')}
           compact
         />
       </Box>
@@ -277,14 +279,14 @@ const TopicTimelineEntryContentLinkForm = ({
           sx={{ mb: 2, textTransform: 'none' }}
           disabled={busy}
         >
-          Volver
+          {t('common.back')}
         </Button>
         {errorAlert}
         <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {uploadMode === 'url'
-              ? 'Indica la URL. Al guardar, el contenido se vincula automáticamente a esta entrada.'
-              : 'Sube el archivo. Al guardar, el contenido se vincula automáticamente a esta entrada.'}
+              ? t('timeline.urlLinkHelp')
+              : t('timeline.fileLinkHelp')}
           </Typography>
           <UploadContentForm
             onContentUploaded={handleContentUploaded}
@@ -307,12 +309,12 @@ const TopicTimelineEntryContentLinkForm = ({
 
         <Box>
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            Vincular contenido relacionado a esta entrada en la línea de tiempo
+            {t('timeline.linkRelatedTitle')}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {showSkip
-              ? 'Este paso es opcional. Elige una fuente: al confirmar, el contenido queda vinculado a la entrada.'
-              : 'Elige una fuente: al confirmar, el contenido queda vinculado a la entrada.'}
+              ? t('timeline.linkOptionalHelp')
+              : t('timeline.linkRequiredHelp')}
           </Typography>
         </Box>
 
@@ -323,7 +325,7 @@ const TopicTimelineEntryContentLinkForm = ({
               return (
                 <Chip
                   key={`linked-${id}`}
-                  label={item ? getTopicItemTitle(item) : `Contenido ${id}`}
+                  label={item ? getTopicItemTitle(item, t('common.content')) : t('chat.contentId', { id })}
                   onDelete={busy ? undefined : () => handleRemoveLinkedContent(id)}
                   variant="outlined"
                   size="small"
@@ -340,7 +342,7 @@ const TopicTimelineEntryContentLinkForm = ({
             disabled={busy}
             sx={{ textTransform: 'none', py: 1.5 }}
           >
-            Contenidos del tema
+            {t('timeline.topicContents')}
           </Button>
           <Button
             variant="outlined"
@@ -348,7 +350,7 @@ const TopicTimelineEntryContentLinkForm = ({
             disabled={busy}
             sx={{ textTransform: 'none', py: 1.5 }}
           >
-            Elegir de tu Biblioteca
+            {t('timeline.fromLibrary')}
           </Button>
           <Button
             variant="outlined"
@@ -356,7 +358,7 @@ const TopicTimelineEntryContentLinkForm = ({
             disabled={busy}
             sx={{ textTransform: 'none', py: 1.5 }}
           >
-            Desde URL
+            {t('suggestion.fromUrl')}
           </Button>
           <Button
             variant="outlined"
@@ -364,7 +366,7 @@ const TopicTimelineEntryContentLinkForm = ({
             disabled={busy}
             sx={{ textTransform: 'none', py: 1.5 }}
           >
-            Subir archivo
+            {t('suggestion.uploadFile')}
           </Button>
         </Stack>
       </Stack>

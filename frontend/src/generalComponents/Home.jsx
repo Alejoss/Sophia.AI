@@ -1,4 +1,5 @@
 import React from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { useNavigate, Link } from "react-router-dom";
 import '../styles/home.css';
 import { 
@@ -32,6 +33,7 @@ import HomeHeroBackground from "../components/HomeHeroBackground.jsx";
 const GITHUB_URL = "https://github.com/Alejoss/Sophia.AI";
 
 const Home = () => {
+  const { t } = useTranslation("misc");
   const navigate = useNavigate();
   const { authState } = React.useContext(AuthContext);
   const theme = useTheme();
@@ -83,7 +85,7 @@ const Home = () => {
                 transition: 'all 0.2s ease'
               }}
             >
-              Ir a mi perfil
+              {t("legacyHome.goToProfile")}
             </Button>
           </Box>
           <Container maxWidth="lg">
@@ -124,7 +126,7 @@ const Home = () => {
                     lineHeight: 1.6
                   }}
                 >
-                  Este proyecto está en construcción y se nutre de la comunidad. Aquí encontrarás información sobre el estado del proyecto y cómo participar.
+                  {t("legacyHome.authLead")}
                 </Typography>
               </Box>
             </Box>
@@ -144,18 +146,22 @@ const Home = () => {
                 color: 'text.primary'
               }}
             >
-              Un proyecto en construcción y colaborativo
+              {t("legacyHome.authHeading")}
             </Typography>
             <Box sx={{ maxWidth: '900px', mx: 'auto' }}>
               <Typography variant="body1" sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' }, color: 'text.secondary', mb: 3, lineHeight: 1.8 }}>
-                Academia Blockchain avanza gracias a la participación de la comunidad. Las funcionalidades que ves hoy se irán ampliando con el tiempo; tu uso, feedback y aportes son parte de ese proceso.
+                {t("legacyHome.authBody")}
               </Typography>
               <Typography variant="body1" sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' }, color: 'text.secondary', lineHeight: 1.8 }}>
-                Si eres programador o programadora, puedes contribuir directamente al código: el proyecto es de código abierto. En el{' '}
-                <MuiLink href={GITHUB_URL} target="_blank" rel="noopener noreferrer" color="primary" sx={{ fontWeight: 500 }}>
-                  repositorio de GitHub
-                </MuiLink>
-                {' '}encontrarás el roadmap, issues y la documentación para sumarte al desarrollo.
+                <Trans
+                  t={t}
+                  i18nKey="legacyHome.authContribute"
+                  components={{
+                    github: (
+                      <MuiLink href={GITHUB_URL} target="_blank" rel="noopener noreferrer" color="primary" sx={{ fontWeight: 500 }} />
+                    ),
+                  }}
+                />
               </Typography>
             </Box>
           </Box>
@@ -168,43 +174,42 @@ const Home = () => {
               component="h2"
               sx={{ fontSize: { xs: '1.75rem', md: '2.5rem' }, fontWeight: 600, mb: 4, textAlign: 'center', color: 'text.primary' }}
             >
-              Roadmap en Ideas
+              {t("legacyHome.roadmapTitle")}
             </Typography>
             <Grid container spacing={3}>
               <Grid item xs={12} sm={6} md={6}>
                 <Card sx={{ height: '100%', textAlign: 'center', p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, transition: 'all 0.3s ease', '&:hover': { boxShadow: 4, transform: 'translateY(-4px)' } }}>
                   <CurrencyBitcoinIcon sx={{ fontSize: 48, color: '#FF6B35', mb: 2 }} />
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Pagos</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>{t("legacyHome.paymentsTitle")}</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                    Habilitaremos pagos con criptomonedas para cursos, eventos y caminos del conocimiento. Esto habilitará un acto de profunda resistencia: generar intercambios fuera de la economía fiat. Sin embargo, esta funcionalidad depende de ciertos aspectos regulatorios, y en mi país está prohibido usar criptos como medio de pago. Estamos considerando una empresa en El Salvador o en Paraguay, si eres un conocedor del tema por favor contáctanos.
+                    {t("legacyHome.paymentsBody")}
                   </Typography>
                 </Card>
               </Grid>
               <Grid item xs={12} sm={6} md={6}>
                 <Card sx={{ height: '100%', textAlign: 'center', p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, transition: 'all 0.3s ease', '&:hover': { boxShadow: 4, transform: 'translateY(-4px)' } }}>
                   <LockIcon sx={{ fontSize: 48, color: '#FF6B35', mb: 2 }} />
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Blockchain</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>{t("legacyHome.blockchainTitle")}</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                    Aunque no hemos implementado blockchain para pagos por razones regulatorias, la cadena de bloques es una tecnología que trasciende el uso monetario: El siguiente paso es utilizarla para guardar NFTs, contenido y certificados de educación. Esto será muy valioso en un mundo en el que las noticias falsas amenazan con re escribir el pasado. Un hash en un bloque de Bitcoin nos asegura que "tal documento" existió en ese momento del tiempo.
+                    {t("legacyHome.blockchainBody")}
                   </Typography>
                 </Card>
               </Grid>
               <Grid item xs={12} sm={6} md={6}>
                 <Card sx={{ height: '100%', textAlign: 'center', p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, transition: 'all 0.3s ease', '&:hover': { boxShadow: 4, transform: 'translateY(-4px)' } }}>
                   <FolderIcon sx={{ fontSize: 48, color: '#FF6B35', mb: 2 }} />
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Archivos</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>{t("legacyHome.filesTitle")}</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                    ¿Has notado que las plataformas web más importantes hacen todo lo posible por evitar que tengas acceso al archivo? En Academia Blockchain, siempre que sea posible, los contenidos educativos, documentos y recursos podrán descargarse y guardarse de forma descentralizada. Integraremos tecnologías como IPFS y otras soluciones como FileCoin. Colaborativamente podremos asegurarnos de que un archivo no se borre nunca. 
+                    {t("legacyHome.filesBody")} 
                   </Typography>
                 </Card>
               </Grid>
               <Grid item xs={12} sm={6} md={6}>
                 <Card sx={{ height: '100%', textAlign: 'center', p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, transition: 'all 0.3s ease', '&:hover': { boxShadow: 4, transform: 'translateY(-4px)' } }}>
                   <HubIcon sx={{ fontSize: 48, color: '#FF6B35', mb: 2 }} />
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Conexiones</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>{t("legacyHome.connectionsTitle")}</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                    La plataforma conecta temas, caminos del conocimiento y personas. ¿Has visto que cuando scrolleas en una red social, todo el contenido es igual en jerarquía? Es decir, todo importa lo mismo: No hay un camino. El scroll mantiene la superficialidad de una máquina tragamonedas. 
-                    Por otro lado, el "buscador" hace lo posible por darte una respuesta autoritaria y ocultarte lo demás. En contraste, la investigación en Academia Blockchain es de código abierto. 
+                    {t("legacyHome.connectionsBody")} 
                   </Typography>
                 </Card>
               </Grid>
@@ -252,16 +257,18 @@ const Home = () => {
               }}
             >
               <Typography variant="h2" component="h2" sx={{ fontSize: { xs: '1.5rem', md: '2rem' }, fontWeight: 600, mb: 2, color: 'text.primary' }}>
-                Academia Blockchain no es un negocio
+                {t("legacyHome.notABusiness")}
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ mb: 0, maxWidth: '700px', mx: 'auto', lineHeight: 1.7, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                Los servidores cuestan y los programadores comemos. Es decir, Academia Blockchain debe cubrir sus gastos.
-                Sin embargo, sabemos que aceptar ciertos inversionistas que buscan un retorno económico claro nos limitaría a crear un "modelo de negocio" lo más rentable posible. Este no es el mejor lente si queremos ver descentralización.
-                {' '}
-                Por ello, hay distintas maneras de{' '}
-                <MuiLink href={GITHUB_URL} target="_blank" rel="noopener noreferrer" color="primary" sx={{ fontWeight: 500 }}>
-                  apoyar al proyecto.
-                </MuiLink>
+                <Trans
+                  t={t}
+                  i18nKey="legacyHome.support"
+                  components={{
+                    github: (
+                      <MuiLink href={GITHUB_URL} target="_blank" rel="noopener noreferrer" color="primary" sx={{ fontWeight: 500 }} />
+                    ),
+                  }}
+                />
               </Typography>
             </Box>
           </Container>
@@ -271,7 +278,7 @@ const Home = () => {
           <Container maxWidth="lg">
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: 'center', gap: 2, px: { xs: 2, md: 0 } }}>
               <Typography variant="body2" color="text.secondary" sx={{ textAlign: { xs: 'center', sm: 'left' }, fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                Síguenos en redes sociales
+                {t("legacyHome.follow")}
               </Typography>
               <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: { xs: 'center', sm: 'flex-end' } }}>
                 <Typography variant="body2" component="a" href="https://www.youtube.com/@AcademiaBlockchain" target="_blank" rel="noopener noreferrer" sx={{ color: 'text.secondary', textDecoration: 'none', fontSize: { xs: '1.1rem', md: '1.5rem' }, '&:hover': { color: '#FF6B35' } }}>YouTube</Typography>
@@ -326,7 +333,7 @@ const Home = () => {
                   lineHeight: 1.2
                 }}
               >
-                El Conocimiento es Poder
+                {t("legacyHome.heroTitle")}
               </Typography>
               
               <Typography 
@@ -341,8 +348,7 @@ const Home = () => {
                   lineHeight: 1.6
                 }}
               >
-                Aprende desde la autonomía. 
-                Explora temas creados por la comunidad y construye tu propia red de aprendizaje.
+                {t("legacyHome.heroLead")}
               </Typography>
 
               <Button
@@ -367,22 +373,27 @@ const Home = () => {
                   transition: 'all 0.3s ease'
                 }}
               >
-                Comenzar
+                {t("legacyHome.start")}
               </Button>
 
               <Box sx={{ mt: 2 }}>
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                ¿Ya tienes cuenta?{' '}
-                <Link 
-                  to="/profiles/login" 
-                  style={{ 
-                    color: '#FF6B35', 
-                    textDecoration: 'none',
-                    fontWeight: 500
+                <Trans
+                  t={t}
+                  i18nKey="legacyHome.haveAccount"
+                  components={{
+                    login: (
+                      <Link
+                        to="/profiles/login"
+                        style={{
+                          color: '#FF6B35',
+                          textDecoration: 'none',
+                          fontWeight: 500
+                        }}
+                      />
+                    ),
                   }}
-                >
-                  Inicia sesión
-                </Link>
+                />
               </Typography>
             </Box>
             </Box>
@@ -408,7 +419,7 @@ const Home = () => {
               color: 'text.primary'
             }}
           >
-            ¿Qué es Academia Blockchain?
+            {t("legacyHome.whatTitle")}
           </Typography>
           
           <Box sx={{ maxWidth: '900px', mx: 'auto' }}>
@@ -421,7 +432,7 @@ const Home = () => {
                 lineHeight: 1.8
               }}
             >
-              Academia Blockchain es más que una plataforma: es un territorio intelectual donde el conocimiento es un bien común, no un recurso secuestrado por instituciones, algoritmos o intereses económicos. No somos una academia de trading ni una criptomoneda. Somos un espacio donde la comunidad enlaza saberes, los reorganiza y los libera, como lo hacía el espíritu original de internet.
+              {t("legacyHome.what1")}
             </Typography>
             
             <Typography 
@@ -433,7 +444,7 @@ const Home = () => {
                 lineHeight: 1.8
               }}
             >
-              Surgimos frente a una realidad incómoda: la arquitectura del conocimiento moderno está a la merced de la censura, la manipulación y la concentración del poder. El buscador y la IA que deberían abrir puertas en realidad deciden qué mostrar; la universidad, que debería iluminar, se ha convertido en un club elitista; las revistas científicas, que deberían custodiar la verdad, a menudo se someten a intereses políticos o económicos. En ese ruido, lo esencial se pierde: la capacidad de aprender sin intermediarios, de explorar sin permiso, de saber sin filtros.
+              {t("legacyHome.what2")}
             </Typography>
             
             <Typography 
@@ -444,7 +455,7 @@ const Home = () => {
                 lineHeight: 1.8
               }}
             >
-              En Academia Blockchain, las ideas se conectan entre sí de forma colaborativa mediante caminos del conocimiento creados por la comunidad y temas. Los contenidos podrán relacionarse, descargarse, organizarse y preservarse gracias al uso de tecnologías como IPFS y blockchain, que iremos implementando gradualmente a medida que avance el desarrollo. Éstas garantizarán permanencia, resistencia a la censura y un ecosistema educativo abierto.
+              {t("legacyHome.what3")}
             </Typography>
           </Box>
         </Box>
@@ -467,7 +478,7 @@ const Home = () => {
               color: 'text.primary'
             }}
           >
-            Para quién es
+            {t("legacyHome.audienceTitle")}
           </Typography>
 
           <Grid container spacing={3}>
@@ -487,10 +498,10 @@ const Home = () => {
               }}>
                 <SchoolIcon sx={{ fontSize: 48, color: '#FF6B35', mb: 2 }} />
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                  Estudiantes
+                  {t("legacyHome.students")}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                  Buscas libertad en tu aprendizaje, sin estructuras rígidas.
+                  {t("legacyHome.studentsBody")}
                 </Typography>
               </Card>
             </Grid>
@@ -511,10 +522,10 @@ const Home = () => {
               }}>
                 <WorkIcon sx={{ fontSize: 48, color: '#FF6B35', mb: 2 }} />
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                  Investigadores
+                  {t("legacyHome.researchers")}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                  Buscas expandir tu conocimiento y valoras el aprendizaje autónomo.
+                  {t("legacyHome.researchersBody")}
                 </Typography>
               </Card>
             </Grid>
@@ -535,10 +546,10 @@ const Home = () => {
               }}>
                 <PersonIcon sx={{ fontSize: 48, color: '#FF6B35', mb: 2 }} />
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                  Educadores
+                  {t("legacyHome.educators")}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                  Deseas compartir conocimiento y aportar en una comunidad de investigación.
+                  {t("legacyHome.educatorsBody")}
                 </Typography>
               </Card>
             </Grid>
@@ -559,10 +570,10 @@ const Home = () => {
               }}>
                 <GroupsIcon sx={{ fontSize: 48, color: '#FF6B35', mb: 2 }} />
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                  Comunidad
+                  {t("legacyHome.community")}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' } }}>
-                  La conversación abierta y los archivos descentralizados nos protegen de la censura.
+                  {t("legacyHome.communityBody")}
                 </Typography>
               </Card>
             </Grid>
@@ -586,7 +597,7 @@ const Home = () => {
           <Box
             component="img"
             src="/images/home_image.png"
-            alt="Academia Blockchain"
+            alt={t("legacyHome.imageAlt")}
             sx={{
               width: '100%',
               height: 'auto',
@@ -637,7 +648,7 @@ const Home = () => {
                   color: 'text.primary'
                 }}
               >
-                Descubre temas creados por la comunidad
+                {t("legacyHome.discoverTitle")}
               </Typography>
               
               <Typography 
@@ -651,7 +662,7 @@ const Home = () => {
                   lineHeight: 1.6
                 }}
               >
-                Explora contenido organizado por temas de interés, donde cada tema es moderado y enriquecido por la comunidad.
+                {t("legacyHome.discoverBody")}
               </Typography>
 
               <Box sx={{ my: { xs: 2, md: 3 } }}>
@@ -676,7 +687,7 @@ const Home = () => {
                     transition: 'all 0.3s ease'
                   }}
                 >
-                  Entrar
+                  {t("legacyHome.enter")}
                 </Button>
               </Box>
 
@@ -691,7 +702,7 @@ const Home = () => {
                   color: 'text.primary'
                 }}
               >
-                Explora rutas de aprendizaje estructuradas
+                {t("legacyHome.pathsTitle")}
               </Typography>
               
               <Typography 
@@ -705,7 +716,7 @@ const Home = () => {
                   lineHeight: 1.6
                 }}
               >
-                Los caminos del conocimiento te guían paso a paso a través de una secuencia de contenido diseñada para construir comprensión progresiva.
+                {t("legacyHome.pathsBody")}
               </Typography>
             </Box>
           </Box>
@@ -734,7 +745,7 @@ const Home = () => {
               color="text.secondary"
               sx={{ textAlign: { xs: 'center', sm: 'left' }, fontSize: { xs: '1.1rem', md: '1.5rem' } }}
             >
-              Síguenos en las redes sociales de Academia Blockchain
+              {t("legacyHome.followLong")}
             </Typography>
             <Box sx={{ 
               display: 'flex',

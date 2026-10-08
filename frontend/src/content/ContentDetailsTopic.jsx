@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ShareIcon from '@mui/icons-material/Share';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import CommentSection from '../comments/CommentSection';
 import VoteComponent from '../votes/VoteComponent';
@@ -24,6 +25,7 @@ import { AuthContext } from '../context/AuthContext';
 
 // ContentDisplay Mode: "preview" - Basic preview for topic content detail
 const ContentDetailsTopic = () => {
+    const { t } = useTranslation('content');
     const { contentId, topicId } = useParams();
     const { authState } = useContext(AuthContext);
     const navigate = useNavigate();
@@ -56,13 +58,13 @@ const ContentDetailsTopic = () => {
                     status: err.response?.status,
                     data: err.response?.data
                 });
-                setError('Error al obtener los detalles del contenido o tema');
+                setError(t('detailsTopic.loadError'));
                 setLoading(false);
             }
         };
 
         fetchContentAndTopic();
-    }, [contentId, topicId]);
+    }, [contentId, topicId, t]);
 
     const showSnackbar = (message, severity = 'success') => {
         setSnackbar({ open: true, message, severity });
@@ -77,7 +79,7 @@ const ContentDetailsTopic = () => {
         const shareUrl = `${window.location.origin}${getTopicContentPath(contentId, topicId)}`;
         try {
             await navigator.clipboard.writeText(shareUrl);
-            showSnackbar('URL copiada al portapapeles', 'success');
+            showSnackbar(t('detailsTopic.urlCopied'), 'success');
         } catch (err) {
             console.error('Failed to copy content URL:', err);
             try {
@@ -87,10 +89,10 @@ const ContentDetailsTopic = () => {
                 textArea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
-                showSnackbar('URL copiada al portapapeles', 'success');
+                showSnackbar(t('detailsTopic.urlCopied'), 'success');
             } catch (fallbackErr) {
                 console.error('Fallback copy failed:', fallbackErr);
-                showSnackbar('No se pudo copiar la URL', 'error');
+                showSnackbar(t('detailsTopic.urlCopyError'), 'error');
             }
         }
     };
@@ -119,7 +121,7 @@ const ContentDetailsTopic = () => {
         );
     }
     if (error) return <Typography color="error">{error}</Typography>;
-    if (!content || !topic) return <Typography>Contenido o tema no encontrado</Typography>;
+    if (!content || !topic) return <Typography>{t('detailsTopic.notFound')}</Typography>;
 
     const profileUserId = content?.selected_profile?.user;
     const currentUserId = authState.user?.id;
@@ -128,12 +130,12 @@ const ContentDetailsTopic = () => {
     const mediaTypeRaw = content.media_type || content.content?.media_type || '';
     const mediaType = String(mediaTypeRaw).toLowerCase();
     const mediaTypeLabels = {
-        image: 'Todas las imágenes',
-        video: 'Todos los videos',
-        text: 'Todos los textos',
-        audio: 'Todos los audios',
+        image: t('detailsTopic.allImages'),
+        video: t('detailsTopic.allVideos'),
+        text: t('detailsTopic.allTexts'),
+        audio: t('detailsTopic.allAudio'),
     };
-    const allOfTypeLabel = mediaTypeLabels[mediaType] || `Todos los ${mediaType}s`;
+    const allOfTypeLabel = mediaTypeLabels[mediaType] || t('detailsTopic.allOfType', { type: mediaType });
     const returnTab = normalizeTopicTab(searchParams.get('tab'));
     const backPath = returnTab !== TOPIC_TABS.CONTENT
         ? getTopicDetailPath(topicId, returnTab)
@@ -141,14 +143,14 @@ const ContentDetailsTopic = () => {
             ? `/content/topics/${topicId}/${mediaType}`
             : getTopicDetailPath(topicId);
     const backLabelsByTab = {
-        [TOPIC_TABS.TIMELINE]: 'Regresar a la linea de tiempo',
-        [TOPIC_TABS.COMMENTS]: 'Regresar a los comentarios',
+        [TOPIC_TABS.TIMELINE]: t('detailsTopic.backTimeline'),
+        [TOPIC_TABS.COMMENTS]: t('detailsTopic.backComments'),
     };
     const backLabel = returnTab !== TOPIC_TABS.CONTENT
-        ? (backLabelsByTab[returnTab] || 'Regresar al tema')
+        ? (backLabelsByTab[returnTab] || t('detailsTopic.backTopic'))
         : mediaType
             ? allOfTypeLabel
-            : 'Regresar a la vista principal del tema';
+            : t('detailsTopic.backMain');
 
     return (
         <Box sx={{ pt: 4, px: 3, maxWidth: 1200, mx: 'auto' }}>
@@ -224,7 +226,7 @@ const ContentDetailsTopic = () => {
                         onClick={handleShareContent}
                         sx={{ textTransform: 'none' }}
                     >
-                        Compartir
+                        {t('actions.share')}
                     </Button>
                 </Box>
 

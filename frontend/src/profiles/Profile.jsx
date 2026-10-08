@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
@@ -8,7 +9,9 @@ import { getUserProfile, getProfileById, getNotifications, markNotificationAsRea
 import { useNotifications } from '../context/NotificationsContext.jsx';
 import ProfileHeader from './ProfileHeader';
 import ProfileHeaderSkeleton from '../components/ProfileHeaderSkeleton';
-import ProfileVerticalNavigation from './ProfileVerticalNavigation';
+import ProfileVerticalNavigation, {
+    SHOW_FAVORITE_CRYPTOS_SECTION,
+} from './ProfileVerticalNavigation';
 import PublicationList from '../publications/PublicationList';
 import Notifications from './Notifications';
 import UserEvents from '../events/UserEvents';
@@ -45,25 +48,27 @@ import { passwordField } from '../utils/formSchemas.js';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
 import { bindMuiRhfField } from '../utils/muiRhfField.js';
 
-const changePasswordSchema = yup.object({
-  old_password: yup
-    .string()
-    .required('La contraseña actual es requerida.'),
-  new_password: passwordField().test(
-    'different-from-old',
-    'La nueva contraseña debe ser diferente a la actual.',
-    function differentFromOld(value) {
-      return value !== this.parent.old_password;
-    },
-  ),
-  confirm_password: yup
-    .string()
-    .required('Confirma la nueva contraseña.')
-    .oneOf([yup.ref('new_password')], 'Las contraseñas no coinciden.'),
-});
-
 // Security Section Component
 export const SecuritySection = () => {
+  const { t } = useTranslation('profiles');
+  const changePasswordSchema = useMemo(
+    () =>
+      yup.object({
+        old_password: yup.string().required(() => t('security.currentRequired')),
+        new_password: passwordField().test(
+          'different-from-old',
+          () => t('security.different'),
+          function differentFromOld(value) {
+            return value !== this.parent.old_password;
+          },
+        ),
+        confirm_password: yup
+          .string()
+          .required(() => t('security.confirmRequired'))
+          .oneOf([yup.ref('new_password')], () => t('security.mismatch')),
+      }),
+    [t],
+  );
   const [generalError, setGeneralError] = useState('');
   const [success, setSuccess] = useState(false);
 
@@ -106,7 +111,7 @@ export const SecuritySection = () => {
       const { generalError: parsed } = applyApiErrorsToForm(
         err,
         setError,
-        'Error al cambiar la contraseña. Por favor, intenta nuevamente.',
+        t('security.changeError'),
       );
       if (parsed) {
         setGeneralError(parsed);
@@ -128,18 +133,18 @@ export const SecuritySection = () => {
           fontWeight: 600,
         }}
       >
-        Configuración de seguridad
+        {t('security.title')}
       </Typography>
 
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        Cambia tu contraseña para mantener tu cuenta segura.
+        {t('security.lead')}
       </Typography>
 
       <Paper elevation={1} sx={{ p: 3, maxWidth: 600 }}>
         <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
           {success && (
             <Alert severity="success" sx={{ mb: 2 }}>
-              ¡Contraseña cambiada exitosamente!
+              {t('security.success')}
             </Alert>
           )}
 
@@ -151,7 +156,7 @@ export const SecuritySection = () => {
 
           <TextField
             fullWidth
-            label="Contraseña actual"
+            label={t('security.currentPassword')}
             type="password"
             margin="normal"
             disabled={isSubmitting || success}
@@ -163,19 +168,19 @@ export const SecuritySection = () => {
 
           <TextField
             fullWidth
-            label="Nueva contraseña"
+            label={t('security.newPassword')}
             type="password"
             margin="normal"
             disabled={isSubmitting || success}
             autoComplete="new-password"
             error={!!errors.new_password}
-            helperText={errors.new_password?.message || 'Mínimo 8 caracteres, mayúsculas, minúsculas, números y símbolos'}
+            helperText={errors.new_password?.message || t('security.helper')}
             {...bindMuiRhfField(register('new_password'), newPasswordValue)}
           />
 
           <TextField
             fullWidth
-            label="Confirmar nueva contraseña"
+            label={t('security.confirmPassword')}
             type="password"
             margin="normal"
             disabled={isSubmitting || success}
@@ -193,7 +198,7 @@ export const SecuritySection = () => {
               disabled={isSubmitting || success}
               startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
             >
-              {isSubmitting ? 'Cambiando...' : success ? 'Cambiada' : 'Cambiar contraseña'}
+              {isSubmitting ? t('security.changing') : success ? t('security.changed') : t('security.change')}
             </Button>
           </Box>
         </Box>
@@ -203,6 +208,7 @@ export const SecuritySection = () => {
 };
 
 const Profile = () => {
+    const { t } = useTranslation('profiles');
     const { profileId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -332,12 +338,17 @@ const Profile = () => {
                 'events': 'events',
                 'certificates': 'certificates',
                 'saved-items': 'saved-items',
-                'cryptos': 'cryptos',
+                ...(SHOW_FAVORITE_CRYPTOS_SECTION ? { cryptos: 'cryptos' } : {}),
                 'tokens': 'tokens',
                 'badges': 'badges',
                 'notifications': 'notifications',
                 'security': 'security',
             };
+            if (sectionParam === 'cryptos' && !SHOW_FAVORITE_CRYPTOS_SECTION) {
+                setActiveSection('publications');
+                updateProfileSectionUrl('publications');
+                return;
+            }
             if (sectionMap[sectionParam]) {
                 setActiveSection(sectionMap[sectionParam]);
             }
@@ -362,7 +373,7 @@ const Profile = () => {
             setNotifications(Array.isArray(notifications) ? notifications : []);
             setNotificationsError(null);
         } catch (err) {
-            setNotificationsError('Error al obtener las notificaciones');
+            setNotificationsError(t('page.notificationsError'));
             console.error('Error fetching notifications:', err);
             setNotifications([]);
         } finally {
@@ -413,7 +424,7 @@ const Profile = () => {
                 if (isOwnProfile) {
                     return (
                         <Typography variant="body1" color="text.secondary">
-                            Las colecciones compartidas de otros usuarios se muestran al visitar su perfil.
+                            {t('page.sharedCollectionsOwn')}
                         </Typography>
                     );
                 }
@@ -449,7 +460,7 @@ const Profile = () => {
                 return (
                     <Box>
                         <Typography variant="body1" color="text.secondary">
-                            La actividad reciente se mostrará aquí.
+                            {t('page.recentActivity')}
                         </Typography>
                     </Box>
                 );
@@ -460,6 +471,9 @@ const Profile = () => {
             case 'saved-items':
                 return isOwnProfile ? <Bookmarks /> : null;
             case 'cryptos':
+                if (!SHOW_FAVORITE_CRYPTOS_SECTION) {
+                    return null;
+                }
                 return <FavoriteCryptos isOwnProfile={isOwnProfile} userId={profile?.user?.id} />;
             case 'tokens':
                 return isOwnProfile ? (
@@ -502,7 +516,7 @@ const Profile = () => {
                             color="text.secondary" 
                             sx={{ mb: 3, lineHeight: 1.6, fontStyle: 'italic' }}
                         >
-                            Las insignias reflejan tu recorrido dentro de la red de conocimiento compartido de Academia Blockchain. Se obtienen al aprender, aportar y generar valor real para la comunidad.
+                            {t('page.badgesIntro')}
                         </Typography>
                         {isOwnProfile && (
                             <Box sx={{ mb: 4 }}>
@@ -525,8 +539,8 @@ const Profile = () => {
                         )}
                         <BadgeList 
                             badges={badgesToShow}
-                            title={isOwnProfile ? "Mis Insignias" : "Insignias"}
-                            emptyMessage={isOwnProfile ? "Aún no has obtenido insignias. ¡Sigue aprendiendo y contribuyendo!" : "Este usuario aún no tiene insignias."}
+                            title={isOwnProfile ? t('page.myBadges') : t('page.badges')}
+                            emptyMessage={isOwnProfile ? t('page.emptyBadgesOwn') : t('page.emptyBadgesOther')}
                             loading={badgesLoading}
                             error={badgesError}
                             showEarningTooltip={isOwnProfile}
@@ -549,7 +563,7 @@ const Profile = () => {
     if (error) {
         return (
             <Container maxWidth="xl" sx={{ py: 3 }}>
-                <Typography color="error">Error: {error}</Typography>
+                <Typography color="error">{t('page.error', { message: error })}</Typography>
             </Container>
         );
     }
@@ -557,7 +571,7 @@ const Profile = () => {
     if (!profile) {
         return (
             <Container maxWidth="xl" sx={{ py: 3 }}>
-                <Typography>No se encontró el perfil</Typography>
+                <Typography>{t('page.notFound')}</Typography>
             </Container>
         );
     }

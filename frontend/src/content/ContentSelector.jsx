@@ -1,5 +1,6 @@
 import React, { useState, useCallback, memo } from "react";
 import { Box, Button, Typography, Paper, ToggleButtonGroup, ToggleButton } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import LibrarySelectSingle from "./LibrarySelectSingle";
 import UploadContentForm from "./UploadContentForm";
 import ContentDisplay from "./ContentDisplay";
@@ -15,6 +16,7 @@ const ContentSelector = ({
   onPendingContentChange,
   optional = true,
 }) => {
+  const { t } = useTranslation("content");
   const [showContentOptions, setShowContentOptions] = useState(
     !selectedContent
   );
@@ -98,7 +100,7 @@ const ContentSelector = ({
             mb: 3
           }}>
           
-            {optional ? 'Elegir fuente de contenido (Opcional)' : 'Elegir fuente de contenido'}
+            {optional ? t('selector.chooseSourceOptional') : t('selector.chooseSource')}
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Button
@@ -119,7 +121,7 @@ const ContentSelector = ({
               }
             }}>
             
-              Elegir de la biblioteca
+              {t('selector.fromLibrary')}
             </Button>
             
             {/* Integrated Upload Mode Selection */}
@@ -167,11 +169,11 @@ const ContentSelector = ({
                 }
               }}>
               
-                <ToggleButton value="url" aria-label="subir contenido desde url">
-                  Desde URL
+                <ToggleButton value="url" aria-label={t('selector.fromUrlAria')}>
+                  {t('selector.fromUrl')}
                 </ToggleButton>
-                <ToggleButton value="file" aria-label="subir archivo">
-                  Subir Archivo
+                <ToggleButton value="file" aria-label={t('selector.uploadFileAria')}>
+                  {t('selector.uploadFile')}
                 </ToggleButton>
               </ToggleButtonGroup>
             </Box>
@@ -187,7 +189,7 @@ const ContentSelector = ({
           sx={{ mb: 2, textTransform: 'none' }}
           disabled={isUploading}>
           
-            ← Cancelar
+            {t('selector.cancel')}
           </Button>
           <UploadContentForm
           onContentUploaded={handleContentUpload}

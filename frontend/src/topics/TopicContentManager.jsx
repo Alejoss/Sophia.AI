@@ -18,11 +18,13 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import LibrarySelectMultiple from '../content/LibrarySelectMultiple';
 import UploadContentForm from '../content/UploadContentForm';
 
 const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
+  const { t } = useTranslation('topics');
   const [topicData, setTopicData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -51,14 +53,14 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
           setError(null);
         }
       } catch {
-        if (!cancelled) setError('Error al cargar el contenido del tema');
+        if (!cancelled) setError(t('addContent.loadContentError'));
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
     load();
     return () => { cancelled = true; };
-  }, [refreshContent]);
+  }, [refreshContent, t]);
 
   const handleContentRemove = async (contentId) => {
     try {
@@ -66,7 +68,7 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
       await contentApi.removeContentFromTopic(topicId, [contentId]);
       await refreshContent();
     } catch {
-      setError('Error al eliminar contenido del tema');
+      setError(t('addContent.removeError'));
     } finally {
       setSaving(false);
     }
@@ -79,11 +81,11 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
       setSaving(true);
       await contentApi.addContentToTopic(topicId, [profileId]);
       await refreshContent();
-      setSuccessMessage('Contenido agregado al tema correctamente.');
+      setSuccessMessage(t('addContent.success'));
       setAddSourceMode(null);
       setShowAddContent(false);
     } catch {
-      setError('Error al agregar el contenido al tema');
+      setError(t('addContent.addTheError'));
     } finally {
       setSaving(false);
     }
@@ -94,11 +96,11 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
       setSaving(true);
       await contentApi.addContentToTopic(topicId, selectedContentProfileIds);
       await refreshContent();
-      setSuccessMessage('Contenido agregado al tema correctamente.');
+      setSuccessMessage(t('addContent.success'));
       setAddSourceMode(null);
       setShowAddContent(false);
     } catch {
-      setError('Error al agregar contenido al tema');
+      setError(t('addContent.addError'));
     } finally {
       setSaving(false);
     }
@@ -112,13 +114,13 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
   };
 
   if (loading) {
-    return <Typography color="text.secondary">Cargando contenido...</Typography>;
+    return <Typography color="text.secondary">{t('media.loading')}</Typography>;
   }
   if (error && !topicData) {
     return <Alert severity="error">{error}</Alert>;
   }
   if (!topicData) {
-    return <Alert severity="error">Tema no encontrado</Alert>;
+    return <Alert severity="error">{t('detail.notFound')}</Alert>;
   }
 
   if (showAddContent) {
@@ -132,11 +134,11 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
             sx={{ mb: 2, textTransform: 'none' }}
             disabled={saving}
           >
-            Volver
+            {t('common.back')}
           </Button>
           <LibrarySelectMultiple
-            title={topicTitle ? `Agregar contenido — ${topicTitle}` : 'Agregar contenido'}
-            description="Selecciona contenido de tu biblioteca para agregar a este tema"
+            title={topicTitle ? t('addContent.shortTitle', { title: topicTitle }) : t('addContent.shortTitlePlain')}
+            description={t('addContent.libraryDescription')}
             onCancel={() => setAddSourceMode(null)}
             onSave={handleSaveAdd}
             filterFunction={filterContent}
@@ -156,11 +158,11 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
             sx={{ mb: 2, textTransform: 'none' }}
             disabled={saving}
           >
-            Volver
+            {t('common.back')}
           </Button>
           <Paper variant="outlined" sx={{ p: 3 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {uploadMode === 'url' ? 'Agregar contenido desde URL' : 'Subir archivo'}
+              {uploadMode === 'url' ? t('addContent.fromUrlHelp') : t('suggestion.uploadFile')}
             </Typography>
             <UploadContentForm
               onContentUploaded={handleContentUploaded}
@@ -176,24 +178,24 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
     return (
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 1 }}>
-          Agregar contenido al tema
+          {t('addContent.pageTitle')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Elige de la biblioteca, desde una URL o sube un archivo.
+          {t('addContent.choiceHelp')}
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Button variant="contained" onClick={() => setAddSourceMode('library')} sx={{ textTransform: 'none', py: 1.5 }}>
-            Elegir de la biblioteca
+            {t('suggestion.chooseLibrary')}
           </Button>
           <Button variant="outlined" onClick={() => { setUploadMode('url'); setAddSourceMode('upload'); }} sx={{ textTransform: 'none', py: 1.5 }}>
-            Desde URL
+            {t('suggestion.fromUrl')}
           </Button>
           <Button variant="outlined" onClick={() => { setUploadMode('file'); setAddSourceMode('upload'); }} sx={{ textTransform: 'none', py: 1.5 }}>
-            Subir archivo
+            {t('suggestion.uploadFile')}
           </Button>
         </Box>
         <Button variant="text" onClick={() => setShowAddContent(false)} sx={{ mt: 2, textTransform: 'none' }}>
-          Cancelar
+          {t('common.cancel')}
         </Button>
       </Paper>
     );
@@ -209,7 +211,7 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
         <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Contenido en el tema ({topicData.contents?.length || 0})
+          {t('addContent.inTopicCount', { count: topicData.contents?.length || 0 })}
         </Typography>
         <Button
           variant="contained"
@@ -217,7 +219,7 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
           onClick={() => setShowAddContent(true)}
           sx={{ textTransform: 'none' }}
         >
-          Agregar contenido
+          {t('addContent.shortTitlePlain')}
         </Button>
       </Box>
 
@@ -231,27 +233,27 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
       )}
 
       {(topicData.contents?.length || 0) === 0 ? (
-        <Alert severity="info">Aun no se ha agregado contenido a este tema.</Alert>
+        <Alert severity="info">{t('addContent.emptyInTopic')}</Alert>
       ) : (
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Titulo</TableCell>
-                <TableCell>Tipo</TableCell>
-                <TableCell>Autor</TableCell>
-                <TableCell>Ver</TableCell>
-                <TableCell align="right">Acciones</TableCell>
+                <TableCell>{t('edit.titleLabel')}</TableCell>
+                <TableCell>{t('common.type')}</TableCell>
+                <TableCell>{t('addContent.author')}</TableCell>
+                <TableCell>{t('common.view')}</TableCell>
+                <TableCell align="right">{t('common.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {topicData.contents.map((contentProfile) => (
                 <TableRow key={contentProfile.id} hover>
-                  <TableCell>{contentProfile.title || 'Sin titulo'}</TableCell>
+                  <TableCell>{contentProfile.title || t('common.untitledPlain')}</TableCell>
                   <TableCell>
                     <Chip label={contentProfile.content?.media_type} size="small" color="primary" variant="outlined" />
                   </TableCell>
-                  <TableCell>{contentProfile.author || 'Desconocido'}</TableCell>
+                  <TableCell>{contentProfile.author || t('addContent.unknownAuthor')}</TableCell>
                   <TableCell>
                     <Button
                       component="a"
@@ -262,7 +264,7 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
                       endIcon={<OpenInNewIcon />}
                       sx={{ textTransform: 'none' }}
                     >
-                      Ver
+                      {t('common.view')}
                     </Button>
                   </TableCell>
                   <TableCell align="right">
@@ -274,7 +276,7 @@ const TopicContentManager = ({ topicId, topicTitle: topicTitleProp = '' }) => {
                       disabled={saving}
                       sx={{ textTransform: 'none' }}
                     >
-                      Eliminar
+                      {t('common.delete')}
                     </Button>
                   </TableCell>
                 </TableRow>

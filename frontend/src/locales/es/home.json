@@ -1,0 +1,57 @@
+{
+  "kicker": "Un ecosistema para explorar ideas",
+  "displayLine1": "Comprender",
+  "displayLine2": "es libertad.",
+  "lead": "Explora contenidos, recorre caminos de aprendizaje, investiga temas y conversa con una comunidad que valora las buenas preguntas.",
+  "heroPrimary": "Explorar caminos de conocimiento",
+  "heroSecondary": "Descubrir temas",
+  "heroNote": "Aprende a tu ritmo. Investiga con otros. Conserva tu independencia.",
+  "startIndex": "01 / EL PUNTO DE PARTIDA",
+  "startTitle": "Más información no significa más claridad.",
+  "startP1": "Tenemos acceso a más libros, videos, artículos y respuestas que nunca. Aun así, el conocimiento suele llegar fragmentado y fuera de contexto.",
+  "startP2": "Aprender exige relacionar fuentes, contrastar perspectivas y poner las ideas en conversación.",
+  "startP3": "Academia Blockchain reúne herramientas y personas para que puedas investigar con curiosidad, construir criterio y decidir qué pensar por ti mismo.",
+  "startPrompt": "En lugar de entregarle tu atención a un muro de recomendaciones, puedes volver a explorar con intención.",
+  "startLink": "Descubre por qué aprender sin depender del algoritmo",
+  "aboutIndex": "02 / NUESTRA IDENTIDAD",
+  "aboutTitle": "¿Qué es Academia Blockchain?",
+  "aboutQuote": "El conocimiento es poder.",
+  "aboutP1": "Academia Blockchain es un territorio intelectual donde el conocimiento no es un recurso secuestrado por instituciones, algoritmos o intereses económicos. No somos una academia de trading ni una criptomoneda, utilizamos la blockchain de una manera liberadora. Somos un espacio donde la comunidad enlaza saberes, los reorganiza y los libera, como lo hacía el espíritu original de internet.",
+  "aboutP2": "Surgimos frente a una realidad incómoda: la arquitectura del conocimiento moderno está a la merced de la censura, la manipulación y la concentración del poder. El buscador y la IA que deberían abrir puertas en realidad deciden qué mostrar; la universidad, que debería iluminar, se ha convertido en un club elitista y engañoso; las revistas científicas, que deberían custodiar la verdad, a menudo se someten a intereses políticos o económicos. En ese ruido, lo esencial se pierde: la capacidad de comprender un mundo cada vez más complejo.",
+  "aboutP3": "En Academia Blockchain, las ideas se conectan entre sí de forma colaborativa mediante caminos del conocimiento y temas. Los contenidos pueden relacionarse, descargarse, organizarse y preservarse gracias al uso de tecnologías como IPFS (próximamente) y blockchain. Además, puedes utilizar la IA para interactuar con las transcripciones de los temas que investigas.",
+  "aboutPrompt": "Conservar un archivo cambia tu relación con el conocimiento.",
+  "aboutLink": "Conoce por qué puedes descargarlo y ayudar a preservarlo",
+  "doIndex": "03 / LO QUE PUEDES HACER",
+  "doTitle": "Aprende, investiga y participa.",
+  "doLead": "La plataforma combina recursos, recorridos y espacios sociales. Elige una puerta de entrada y construye tu propia experiencia.",
+  "principleIndex": "NUESTRO PRINCIPIO",
+  "principleTitle": "La tecnología debe amplificar el juicio humano, no reemplazarlo.",
+  "principleCopy": "Las consultas con fuentes, los caminos, los quizzes y las herramientas comunitarias acompañan tu proceso. Tu criterio sigue siendo el centro.",
+  "finalIndex": "COMPRENDER EL MUNDO TE DARÁ PAZ MENTAL",
+  "finalTitle": "Sigue tu curiosidad.",
+  "finalAction": "Explorar la biblioteca",
+  "footerMission": "Claridad. Curiosidad. Independencia.",
+  "socialNav": "Redes sociales",
+  "ecosystem": {
+    "library": {
+      "title": "Biblioteca y colecciones",
+      "copy": "Encuentra libros, videos, audios, textos e imágenes. Guarda favoritos, crea colecciones y organiza tu propia biblioteca. Puedes enviar el hash de una transcripción a la blockchain de Bitcoin, inmortalizándolo. Y, lo más importante: eres libre de descargar el contenido.",
+      "action": "Explorar la biblioteca"
+    },
+    "topics": {
+      "title": "Temas e investigación",
+      "copy": "Sigue líneas de tiempo, crea temas, nombra moderadores y relaciona contenido colaborativamente. Vota a favor del contenido que resulta más valioso. También puedes consultar transcripciones con inteligencia artificial.",
+      "action": "Investigar temas"
+    },
+    "paths": {
+      "title": "Caminos de conocimiento",
+      "copy": "Recorre contenidos en secuencia, registra tu progreso, responde quizzes y solicita certificados como NFTs. También, puedes compartir tu conocimiento creando tus propios caminos",
+      "action": "Ver caminos"
+    },
+    "events": {
+      "title": "Eventos",
+      "copy": "Descubre y organiza encuentros educativos para llevar las ideas de la pantalla a la conversación en vivo. Y, cómo no, puedes pagar utilizando criptomonedas (dinero libre).",
+      "action": "Ver eventos"
+    }
+  }
+}

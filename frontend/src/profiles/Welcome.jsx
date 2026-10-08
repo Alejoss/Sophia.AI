@@ -1,15 +1,17 @@
 import React, { useEffect, useContext, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { setUserInLocalStorage, setAuthenticationStatus, clearUserFromLocalStorage, clearAuthenticationStatus } from '../context/localStorageUtils.js';
 import { checkAuth } from '../api/profilesApi.js';
 import { Alert, Box, Button, Container, Paper, Stack, Typography } from '@mui/material';
 
 const Welcome = () => {
+  const { t } = useTranslation('public');
   const location = useLocation();
   const navigate = useNavigate();
   const { authState, setAuthState } = useContext(AuthContext);
-  const [message, setMessage] = useState('Verificando tu sesión...');
+  const [message, setMessage] = useState(() => t('welcome.checking'));
   const [isVerified, setIsVerified] = useState(false);
 
   useEffect(() => {
@@ -32,12 +34,12 @@ const Welcome = () => {
             isAuthenticated: true,
             user,
           });
-          setMessage(`¡Bienvenido, ${user.username}! Tu cuenta está activa y ya has iniciado sesión.`);
+          setMessage(t('welcome.active', { username: user.username }));
           setIsVerified(true);
         } else if (backendAuthenticated && !userDataFromState && authState.isAuthenticated) {
           // This case might happen if user refreshes /welcome or navigates directly with a valid cookie
           // but without registration state. AuthContext might already be populated.
-          setMessage(`¡Bienvenido de nuevo, ${authState.user?.username || 'Usuario'}! Has iniciado sesión.`);
+          setMessage(t('welcome.again', { username: authState.user?.username || t('welcome.fallbackName') }));
           setIsVerified(true);
         } else {
           // Verification failed or user data is missing where it's expected
@@ -47,7 +49,7 @@ const Welcome = () => {
             isAuthenticated: false,
             user: null,
           });
-          setMessage('La verificación de sesión falló. Por favor intenta iniciar sesión.');
+          setMessage(t('welcome.failed'));
           setIsVerified(false);
           // Optional: Redirect to login after a delay
           // setTimeout(() => navigate('/profiles/login'), 3000);
@@ -60,7 +62,7 @@ const Welcome = () => {
           isAuthenticated: false,
           user: null,
         });
-        setMessage('Ocurrió un error durante la verificación de sesión. Por favor intenta iniciar sesión.');
+        setMessage(t('welcome.error'));
         setIsVerified(false);
       }
     };
@@ -71,7 +73,7 @@ const Welcome = () => {
         // If no state is passed (e.g. direct navigation or refresh), rely on AuthContext's initial check or redirect
         // For now, we'll check auth again, or guide to login if authState isn't set.
         if (authState.isAuthenticated) {
-            setMessage(`¡Bienvenido de nuevo, ${authState.user?.username || 'Usuario'}! Has iniciado sesión.`);
+            setMessage(t('welcome.again', { username: authState.user?.username || t('welcome.fallbackName') }));
             setIsVerified(true);
         } else {
             // If no user data passed via state and context not authed, check with backend
@@ -79,14 +81,14 @@ const Welcome = () => {
         }
     }
 
-  }, [location.state, setAuthState, navigate, authState.isAuthenticated, authState.user]);
+  }, [location.state, setAuthState, navigate, authState.isAuthenticated, authState.user, t]);
 
   return (
     <Container maxWidth="sm" sx={{ py: 4 }}>
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Stack spacing={2}>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            ¡Bienvenido!
+            {t('welcome.title')}
           </Typography>
           <Alert severity={isVerified ? 'success' : 'error'}>
             {message}
@@ -95,17 +97,17 @@ const Welcome = () => {
       {isVerified && authState.user && (
         <Box>
           <Typography variant="body2" sx={{ mb: 1.5 }}>
-            ¿Qué te gustaría hacer ahora?
+            {t('welcome.next')}
           </Typography>
           <Button component={Link} to="/profiles/my_profile" variant="contained">
-            Ver tu perfil
+            {t('welcome.profile')}
           </Button>
         </Box>
       )}
       {!isVerified && (
         <Box>
           <Button component={Link} to="/profiles/login" variant="outlined">
-            Ir a iniciar sesión
+            {t('welcome.login')}
           </Button>
         </Box>
       )}

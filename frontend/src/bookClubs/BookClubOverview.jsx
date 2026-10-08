@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Box,
@@ -55,10 +56,11 @@ const PrimaryCta = ({ to, href, children, onClick }) => (
 );
 
 const BookClubOverview = () => {
+  const { t } = useTranslation('bookClubs');
   const { slug, hub, club, isGuest, canParticipate } = useBookClub();
   const guest = getGuestSession(slug);
   const accountCta = {
-    label: 'Crear cuenta para participar →',
+    label: t('overview.accountCta'),
     to: guest?.token
       ? guestCompleteAccountUrl(slug, guest.token)
       : `/profiles/register?next=${encodeURIComponent(`/club-de-lectura/${slug}`)}`,
@@ -90,22 +92,23 @@ const BookClubOverview = () => {
   const hero = (() => {
     if (isGuest) {
       return {
-        eyebrow: phase === 'pre' ? 'Próximamente' : `Semana ${week.weekNum}`,
+        eyebrow: phase === 'pre' ? t('overview.comingSoon') : t('overview.week', { week: week.weekNum }),
         title: nextMission?.title || club.title,
-        body:
-          'Explora el club en solo lectura. Crea tu cuenta para completar misiones y unirte al foro.',
+        body: t('overview.guestBody'),
         cta: accountCta,
       };
     }
     if (phase === 'pre') {
       return {
-        eyebrow: daysToStart != null && daysToStart > 0 ? `Comenzamos en ${daysToStart} día${daysToStart === 1 ? '' : 's'}` : 'Estamos preparando el ciclo',
-        title: 'Tu viaje de lectura está por empezar',
+        eyebrow: daysToStart != null && daysToStart > 0
+          ? t('overview.startsIn', { count: daysToStart })
+          : t('overview.preparingCycle'),
+        title: t('overview.journeyTitle'),
         body:
           pulse.member_count > 1
-            ? `${pulse.member_count} lectores ya se han unido. Presenta quién eres y prepárate para la primera misión.`
-            : 'Prepárate: pronto abrimos la primera misión y el foro colectivo.',
-        cta: { label: 'Preséntate al club →', to: 'presentate' },
+            ? t('overview.membersJoined', { count: pulse.member_count })
+            : t('overview.prepareSoon'),
+        cta: { label: t('overview.introduceCta'), to: 'presentate' },
       };
     }
     if (phase === 'finished') {
@@ -117,54 +120,50 @@ const BookClubOverview = () => {
         '&:hover': { color: CLUB_ACCENT_HOVER },
       };
       return {
-        eyebrow: 'Ciclo completado',
-        title: 'Terminaste con la lectura, excelente.',
+        eyebrow: t('overview.cycleDone'),
+        title: t('overview.finishedTitle'),
         body: (
-          <>
-            Ahora visita el{' '}
-            <Box component={RouterLink} to="foro" sx={hubLinkSx}>
-              Foro
-            </Box>
-            , o la{' '}
-            <Box component={RouterLink} to="investigacion" sx={hubLinkSx}>
-              Investigación Abierta
-            </Box>
-            , y si no lo has hecho, súmate al grupo de{' '}
-            <Box component={RouterLink} to="comunidad" sx={hubLinkSx}>
-              Telegram
-            </Box>
-            . Será un gusto conversar.
-          </>
+          <Trans
+            t={t}
+            i18nKey="overview.finishedBody"
+            components={{
+              forum: <Box component={RouterLink} to="foro" sx={hubLinkSx} />,
+              research: <Box component={RouterLink} to="investigacion" sx={hubLinkSx} />,
+              telegram: <Box component={RouterLink} to="comunidad" sx={hubLinkSx} />,
+            }}
+          />
         ),
         cta: null,
       };
     }
     if (phase === 'between') {
       return {
-        eyebrow: 'Vas al día',
-        title: 'Mientras llega lo siguiente…',
+        eyebrow: t('overview.onTrack'),
+        title: t('overview.whileNext'),
         body: weeklyQuestion
-          ? 'Descubre qué están pensando otros lectores en el foro abierto.'
-          : 'Entra a la comunidad o al grupo de Telegram mientras se abre la próxima misión.',
+          ? t('overview.forumThoughts')
+          : t('overview.communityMeanwhile'),
         cta: weeklyQuestion
           ? {
-              label: 'Entrar al foro →',
+              label: t('overview.enterForum'),
               to: `/club-de-lectura/${slug}/foro/${weeklyQuestion.id}`,
             }
           : telegramUrl
-            ? { label: 'Ir al grupo de Telegram →', to: telegramUrl, external: true }
-            : { label: 'Ver comunidad →', to: 'comunidad' },
+            ? { label: t('overview.telegramGroup'), to: telegramUrl, external: true }
+            : { label: t('overview.viewCommunity'), to: 'comunidad' },
       };
     }
     // active
     if (nextMission && !nextMission.locked) {
       const first = (hub.progress?.completed_nodes || 0) === 0;
       return {
-        eyebrow: `Semana ${week.weekNum} · ${first ? 'Empezamos' : 'Continúa'}`,
+        eyebrow: first
+          ? t('overview.weekStart', { week: week.weekNum })
+          : t('overview.weekContinue', { week: week.weekNum }),
         title: nextMission.title,
         body:
           nextMission.description?.trim() ||
-          'Sigue la lectura de esta misión y vuelve al foro.',
+          t('overview.followMission'),
         preserveBodyWhitespace: Boolean(nextMission.description?.trim()),
         missionMeta: canParticipate
           ? {
@@ -175,8 +174,8 @@ const BookClubOverview = () => {
           : null,
         cta: {
           label: first
-            ? `Comenzar misión ${nextMission.order} →`
-            : `Continuar misión ${nextMission.order} →`,
+            ? t('overview.startMission', { order: nextMission.order })
+            : t('overview.continueMission', { order: nextMission.order }),
           to: missionHref,
         },
       };
@@ -184,32 +183,34 @@ const BookClubOverview = () => {
     if (nextMission?.locked) {
       const collectiveMessage = nextMission.club_schedule_locked
         ? nextMission.opens_at
-          ? `Se desbloquea para todo el club el ${formatClubDate(nextMission.opens_at, {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}.`
-          : 'Esta misión todavía no está disponible según el calendario del club.'
-        : 'Completa la misión anterior para continuar.';
+          ? t('overview.unlocksAt', {
+              date: formatClubDate(nextMission.opens_at, {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+            })
+          : t('overview.notOnCalendar')
+        : t('overview.completePrevious');
       return {
-        eyebrow: 'Próxima misión',
+        eyebrow: t('overview.nextMission'),
         title: nextMission.title,
         body: collectiveMessage,
         cta: weeklyQuestion
           ? {
-              label: 'Entrar al foro →',
+              label: t('overview.enterForum'),
               to: `/club-de-lectura/${slug}/foro/${weeklyQuestion.id}`,
             }
-          : { label: 'Ver misiones →', to: 'misiones' },
+          : { label: t('overview.viewMissions'), to: 'misiones' },
       };
     }
     return {
-      eyebrow: 'El club está activo',
-      title: 'Las misiones se están preparando',
-      body: 'Cuando el staff publique la primera lectura, aparecerá aquí como tu acción principal.',
-      cta: { label: 'Explorar el club →', to: 'comunidad' },
+      eyebrow: t('overview.clubActive'),
+      title: t('overview.missionsPreparing'),
+      body: t('overview.missionsPreparingBody'),
+      cta: { label: t('overview.exploreClub'), to: 'comunidad' },
     };
   })();
 
@@ -253,8 +254,11 @@ const BookClubOverview = () => {
         {hero.missionMeta && (
           <Box sx={{ mt: 2, maxWidth: 280 }}>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.45)' }}>
-              Misión {hero.missionMeta.order} de {hero.missionMeta.total || '—'} · tu progreso{' '}
-              {hero.missionMeta.progressPct}%
+              {t('overview.missionProgress', {
+                order: hero.missionMeta.order,
+                total: hero.missionMeta.total || '—',
+                percent: hero.missionMeta.progressPct,
+              })}
             </Typography>
             <LinearProgress
               variant="determinate"
@@ -281,11 +285,14 @@ const BookClubOverview = () => {
 
       {/* Nivel 2 — El club esta semana */}
       <Box>
-        <SectionLabel>El club esta semana</SectionLabel>
+        <SectionLabel>{t('overview.thisWeek')}</SectionLabel>
         {pulse.member_count ? (
           <>
             <Typography sx={{ fontWeight: 600, mb: 1 }}>
-              {pulse.active_readers_7d || 0} lectores activos · {pulse.member_count} en el club
+              {t('overview.activeReaders', {
+                active: pulse.active_readers_7d || 0,
+                members: pulse.member_count,
+              })}
             </Typography>
             <LinearProgress
               variant="determinate"
@@ -299,35 +306,30 @@ const BookClubOverview = () => {
               }}
             />
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.55)', mb: 0.5 }}>
-              {pulse.path_completion_pct || 0}% del camino recorrido en conjunto
+              {t('overview.pathTogether', { percent: pulse.path_completion_pct || 0 })}
             </Typography>
             <Stack spacing={0.5} sx={{ mt: 1.5, color: 'rgba(255,255,255,0.75)' }}>
               <Typography variant="body2">
-                {pulse.first_mission_completions}{' '}
-                {pulse.first_mission_completions === 1 ? 'persona terminó' : 'personas terminaron'}{' '}
-                la Misión 1
+                {t('overview.finishedMission1', { count: pulse.first_mission_completions })}
               </Typography>
               <Typography variant="body2">
-                {pulse.total_answers}{' '}
-                {pulse.total_answers === 1 ? 'respuesta' : 'respuestas'} en hilos abiertos
+                {t('overview.answersOpen', { count: pulse.total_answers })}
               </Typography>
               <Typography variant="body2">
-                {pulse.open_debates}{' '}
-                {pulse.open_debates === 1 ? 'hilo activo' : 'hilos activos'}
+                {t('overview.activeThreads', { count: pulse.open_debates })}
               </Typography>
             </Stack>
           </>
         ) : (
           <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>
-            La conversación colectiva arranca cuando más lectores se unan y completen la primera
-            misión.
+            {t('overview.collectiveStarts')}
           </Typography>
         )}
       </Box>
 
       {/* Nivel 2 — Pregunta de la semana */}
       <Box>
-        <SectionLabel>Pregunta de la semana</SectionLabel>
+        <SectionLabel>{t('overview.questionOfWeek')}</SectionLabel>
         {weeklyQuestion ? (
           <Box>
             <Typography
@@ -337,26 +339,25 @@ const BookClubOverview = () => {
               “{weeklyQuestion.body}”
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mt: 1 }}>
-              {weeklyQuestion.answer_count}{' '}
-              {weeklyQuestion.answer_count === 1 ? 'respuesta' : 'respuestas'}
+              {t('overview.answers', { count: weeklyQuestion.answer_count })}
             </Typography>
             <Button
               component={RouterLink}
               to={`/club-de-lectura/${slug}/foro/${weeklyQuestion.id}`}
               sx={{ mt: 1.5, color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
             >
-              {canParticipate ? 'Entrar al foro →' : 'Leer la pregunta →'}
+              {canParticipate ? t('overview.enterForum') : t('overview.readQuestion')}
             </Button>
           </Box>
         ) : (
           <Box>
             <Typography sx={{ color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>
-              El foro todavía no está disponible
+              {t('overview.forumUnavailable')}
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.75, maxWidth: 480 }}>
               {nextMission
-                ? `La primera pregunta se abrirá después de avanzar en la Misión ${nextMission.order}. Completa tu lectura para entrar al foro.`
-                : 'Cuando el staff abra la primera pregunta del foro, aparecerá aquí.'}
+                ? t('overview.forumAfterMission', { order: nextMission.order })
+                : t('overview.forumWhenStaff')}
             </Typography>
             {nextMission && !nextMission.locked && (
               <Button
@@ -364,18 +365,20 @@ const BookClubOverview = () => {
                 to={missionHref}
                 sx={{ mt: 1.5, color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
               >
-                Completar mi lectura →
+                {t('overview.completeReading')}
               </Button>
             )}
           </Box>
         )}
         {club.can_manage && (
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.4)', mt: 2 }}>
-            ¿Quieres abrir una pregunta? Hazlo desde{' '}
-            <Box component={RouterLink} to="foro" sx={{ color: CLUB_ACCENT }}>
-              Foro
-            </Box>
-            .
+            <Trans
+              t={t}
+              i18nKey="overview.openQuestionPrompt"
+              components={{
+                forum: <Box component={RouterLink} to="foro" sx={{ color: CLUB_ACCENT }} />,
+              }}
+            />
           </Typography>
         )}
       </Box>
@@ -383,9 +386,9 @@ const BookClubOverview = () => {
       {/* Nivel 2 — Grupo de Telegram */}
       {telegramUrl && (
         <Box>
-          <SectionLabel>Grupo de Telegram</SectionLabel>
+          <SectionLabel>{t('overview.telegramSection')}</SectionLabel>
           <Typography sx={{ color: 'rgba(255,255,255,0.75)' }}>
-            Conversación rápida del ciclo: avisos, dudas y compañía mientras lees.
+            {t('overview.telegramBlurb')}
           </Typography>
           <Button
             component="a"
@@ -394,14 +397,14 @@ const BookClubOverview = () => {
             rel="noopener noreferrer"
             sx={{ mt: 1.5, color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
           >
-            Unirme al grupo →
+            {t('overview.joinGroup')}
           </Button>
         </Box>
       )}
 
       {/* Nivel 2 — Próximo encuentro */}
       <Box>
-        <SectionLabel>Próximo encuentro</SectionLabel>
+        <SectionLabel>{t('overview.nextMeeting')}</SectionLabel>
         {hub.next_event && !hub.next_event.is_past ? (
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -414,9 +417,9 @@ const BookClubOverview = () => {
                 month: 'long',
                 hour: '2-digit',
                 minute: '2-digit',
-              }) || 'Fecha por confirmar'}
+              }) || t('dates.unconfirmed')}
               {daysToEvent != null && daysToEvent >= 0
-                ? ` · en ${daysToEvent} día${daysToEvent === 1 ? '' : 's'}`
+                ? t('overview.inDays', { count: daysToEvent })
                 : ''}
             </Typography>
             <Button
@@ -424,23 +427,23 @@ const BookClubOverview = () => {
               to={`/events/${hub.next_event.event_id}`}
               sx={{ mt: 1.5, color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
             >
-              Ver encuentro →
+              {t('overview.viewMeeting')}
             </Button>
           </Box>
         ) : (
           <Box>
             <Typography sx={{ color: 'rgba(255,255,255,0.75)' }}>
-              El próximo encuentro vivo aún no está en el calendario.
+              {t('overview.noLiveYet')}
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.55)', mt: 0.75 }}>
-              Mientras tanto, avanza en tu misión y participa en el foro.
+              {t('overview.meanwhileMission')}
             </Typography>
             <Button
               component={RouterLink}
               to="reuniones"
               sx={{ mt: 1.5, color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
             >
-              Ver reuniones →
+              {t('overview.viewMeetings')}
             </Button>
           </Box>
         )}
@@ -448,14 +451,23 @@ const BookClubOverview = () => {
 
       {/* Nivel 3 — Eco reciente (comentarios abiertos del tema vinculado) */}
       <Box>
-        <SectionLabel>Eco reciente</SectionLabel>
+        <SectionLabel>{t('overview.recentEcho')}</SectionLabel>
         {topicActivity.length ? (
           <Stack spacing={1.5}>
             {topicActivity.slice(0, 5).map((item) => (
               <Box key={`${item.type}-${item.comment_id}`}>
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-                  <strong>{item.author}</strong> comentó en el tema
-                  {item.body_preview ? `: “${item.body_preview.slice(0, 80)}${item.body_preview.length > 80 ? '…' : ''}”` : ''}
+                  <Trans
+                    t={t}
+                    i18nKey="overview.commented"
+                    values={{ author: item.author }}
+                    components={{ strong: <strong /> }}
+                  />
+                  {item.body_preview
+                    ? t('overview.commentPreview', {
+                        preview: `${item.body_preview.slice(0, 80)}${item.body_preview.length > 80 ? '…' : ''}`,
+                      })
+                    : ''}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>
                   {formatClubDate(item.created_at)}
@@ -467,16 +479,16 @@ const BookClubOverview = () => {
               to="investigacion"
               sx={{ alignSelf: 'flex-start', color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
             >
-              Ver investigación →
+              {t('overview.viewInvestigation')}
             </Button>
           </Stack>
         ) : (
           <Box>
             <Typography sx={{ color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>
-              La conversación está por comenzar
+              {t('overview.conversationStarting')}
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.55)', mt: 0.75, maxWidth: 480 }}>
-              Cuando los lectores comenten en el tema de investigación, sus aportes aparecerán aquí.
+              {t('overview.commentsWillAppear')}
             </Typography>
             {nextMission && !nextMission.locked && (
               <Button
@@ -484,7 +496,7 @@ const BookClubOverview = () => {
                 to={missionHref}
                 sx={{ mt: 1.5, color: CLUB_ACCENT, fontWeight: 700, px: 0 }}
               >
-                Sé de los primeros en completar la Misión {nextMission.order} →
+                {t('overview.beFirst', { order: nextMission.order })}
               </Button>
             )}
           </Box>
@@ -498,7 +510,7 @@ const BookClubOverview = () => {
           to="/"
           sx={{ color: 'rgba(255,255,255,0.55)', px: 0 }}
         >
-          Acerca de Academia Blockchain
+          {t('overview.about')}
         </Button>
       </Box>
     </Stack>

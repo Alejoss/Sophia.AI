@@ -5,8 +5,9 @@ import { DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-import 'dayjs/locale/es';
 import { combineEventDateTime, DEFAULT_EVENT_TIME, splitEventDateTime } from '../utils/dateUtils';
+import { useTranslation } from 'react-i18next';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 const EventDateTimeField = ({
   label,
@@ -17,6 +18,8 @@ const EventDateTimeField = ({
   dateHelperText,
   minDate,
 }) => {
+  const { t } = useTranslation('events');
+  const { dayjs: dayjsLocale } = useDateLocales();
   const { date, time } = splitEventDateTime(value);
   const dateValue = date ? dayjs(date) : null;
   const timeValue = date
@@ -41,13 +44,13 @@ const EventDateTimeField = ({
   };
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={dayjsLocale}>
       <Stack spacing={1.5}>
         <Typography variant="subtitle2" color={error ? 'error' : 'text.primary'}>
           {label}
         </Typography>
         <DatePicker
-          label="Fecha"
+          label={t('fields.date')}
           value={dateValue}
           onChange={handleDateChange}
           minDate={minDate ? dayjs(minDate) : undefined}
@@ -61,7 +64,7 @@ const EventDateTimeField = ({
           }}
         />
         <TimePicker
-          label="Hora (opcional)"
+          label={t('fields.timeOptional')}
           value={timeValue}
           onChange={handleTimeChange}
           disabled={!date}
@@ -70,7 +73,7 @@ const EventDateTimeField = ({
             textField: {
               fullWidth: true,
               error: Boolean(error),
-              helperText: '12:00 pm por defecto si no se indica hora',
+              helperText: t('fields.defaultTimeHelper'),
             },
             field: { clearable: true },
           }}

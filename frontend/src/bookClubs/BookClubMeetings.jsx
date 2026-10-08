@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -14,6 +15,7 @@ import { useBookClub } from './BookClubLayout';
 import { CLUB_ACCENT, formatClubDate } from './clubTheme';
 
 const BookClubMeetings = () => {
+  const { t } = useTranslation('bookClubs');
   const { slug } = useParams();
   const { guestToken } = useBookClub();
   const [events, setEvents] = useState([]);
@@ -27,11 +29,11 @@ const BookClubMeetings = () => {
       setEvents(data);
       setError('');
     } catch (err) {
-      setError(err?.response?.data?.detail || 'No se pudieron cargar las reuniones.');
+      setError(err?.response?.data?.detail || t('errors.loadMeetings'));
     } finally {
       setLoading(false);
     }
-  }, [slug, guestToken]);
+  }, [slug, guestToken, t]);
 
   useEffect(() => {
     load();
@@ -48,10 +50,10 @@ const BookClubMeetings = () => {
   return (
     <Box>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-        Reuniones
+        {t('meetings.title')}
       </Typography>
       <Typography sx={{ color: 'rgba(255,255,255,0.65)', mb: 3 }}>
-        Encuentros en vivo vinculados a este ciclo del club.
+        {t('meetings.intro')}
       </Typography>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -60,7 +62,7 @@ const BookClubMeetings = () => {
       )}
       {!events.length ? (
         <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>
-          Todavía no hay reuniones vinculadas a este club.
+          {t('meetings.empty')}
         </Typography>
       ) : (
         <Stack spacing={2}>
@@ -82,7 +84,7 @@ const BookClubMeetings = () => {
                   <Typography sx={{ fontWeight: 600 }}>{ev.title}</Typography>
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.65)', mt: 0.5 }}>
                     {formatClubDate(ev.date_start, { dateStyle: 'full', timeStyle: 'short' }) ||
-                      'Fecha por confirmar'}
+                      t('dates.unconfirmed')}
                   </Typography>
                   {ev.schedule_description && (
                     <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.55)', mt: 1 }}>
@@ -95,7 +97,7 @@ const BookClubMeetings = () => {
                     to={`/events/${ev.event_id}`}
                     sx={{ mt: 1.5, color: CLUB_ACCENT }}
                   >
-                    Ver evento
+                    {t('meetings.viewEvent')}
                   </Button>
                 </Box>
                 {imageUrl && (

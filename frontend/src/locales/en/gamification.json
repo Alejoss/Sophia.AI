@@ -1,0 +1,58 @@
+{
+  "errors": {
+    "load": "Could not load badges",
+    "loadAvailable": "Could not load available badges",
+    "saveFeatured": "Could not save the featured badge"
+  },
+  "featured": {
+    "empty": "You don't have any badges yet. Keep participating to earn them!",
+    "title": "Featured Badge",
+    "hint": "Choose a badge to show next to your username.",
+    "saved": "Featured badge updated",
+    "saving": "Saving...",
+    "remove": "Remove Badge",
+    "choose": "Choose Featured Badge",
+    "unsaved": "You have unsaved changes"
+  },
+  "list": {
+    "defaultTitle": "Badges",
+    "empty": "No badges yet",
+    "howEarned": "How you earned it:",
+    "earnedOn": "Earned on {{date}}"
+  },
+  "notification": {
+    "unlocked": "New Badge Unlocked!",
+    "points_one": "+{{count}} point",
+    "points_other": "+{{count}} points"
+  },
+  "earning": {
+    "pathCompletedNamed": "You completed the knowledge path \"{{title}}\"",
+    "pathCompleted": "You completed your first knowledge path",
+    "quizMasterCount_one": "You completed {{count}} quiz with a perfect score",
+    "quizMasterCount_other": "You completed {{count}} quizzes with a perfect score",
+    "quizMaster": "You completed 5 quizzes with a perfect score",
+    "nodesCount_one": "You completed {{count}} knowledge node",
+    "nodesCount_other": "You completed {{count}} knowledge nodes",
+    "nodes": "You completed 20 knowledge nodes",
+    "firstComment": "You posted your first comment",
+    "pathCreatedNamed": "You created the knowledge path \"{{title}}\"",
+    "pathCreated": "You created your first knowledge path with 2+ nodes",
+    "contentCreatorCount_one": "You created {{count}} piece of content with 5+ votes",
+    "contentCreatorCount_other": "You created {{count}} pieces of content with 5+ votes each",
+    "contentCreator": "You created 3 pieces of content with 5+ votes each",
+    "commentVotes_one": "One of your comments reached {{count}} upvote",
+    "commentVotes_other": "One of your comments reached {{count}} upvotes",
+    "commentVotesDefault": "One of your comments reached 5+ upvotes",
+    "contentVotes_one": "One of your pieces of content reached {{count}} upvote",
+    "contentVotes_other": "One of your pieces of content reached {{count}} upvotes",
+    "contentVotesDefault": "One of your pieces of content reached 10+ upvotes",
+    "communityVotes_one": "You accumulated {{count}} vote across your comments",
+    "communityVotes_other": "You accumulated {{count}} votes across your comments",
+    "communityVotesDefault": "You accumulated 20+ votes across your comments",
+    "topicCuratorNamed": "You created the topic \"{{title}}\" with {{contents}} pieces of content, {{withVotes}} of them with upvotes",
+    "topicCurator": "You created a topic with 5+ pieces of content, 2+ with upvotes",
+    "topicArchitectNamed": "The topic \"{{title}}\" earned broad recognition: {{withVotes}} pieces of content with votes, {{totalVotes}} total votes, {{voters}} unique voters",
+    "topicArchitect": "You created a topic with broad community recognition",
+    "default": "Badge earned for taking part in the community"
+  }
+}

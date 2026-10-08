@@ -8,6 +8,7 @@ import {
     TablePagination,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import ContentDisplay from './ContentDisplay';
 import { AuthContext } from '../context/AuthContext';
@@ -15,6 +16,7 @@ import { AuthContext } from '../context/AuthContext';
 const DEFAULT_PAGE_SIZE = 24;
 
 const Collection = () => {
+    const { t } = useTranslation('content');
     const { collectionId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -35,19 +37,19 @@ const Collection = () => {
         const fetchCollectionMeta = async () => {
             try {
                 const collectionInfo = await contentApi.getCollection(collectionId);
-                setCollectionName(collectionInfo.name || 'Colección sin título');
+                setCollectionName(collectionInfo.name || t('collections.untitled'));
                 setCollectionDescription(collectionInfo.description || '');
                 setIsOwner(!!collectionInfo.is_owner);
                 setOwnerUsername(collectionInfo.owner_username || '');
             } catch (err) {
                 console.error('Error fetching collection metadata:', err);
-                setError(err.response?.data?.error || 'Error al obtener la colección');
+                setError(err.response?.data?.error || t('collections.fetchError'));
                 setLoading(false);
             }
         };
 
         fetchCollectionMeta();
-    }, [collectionId]);
+    }, [collectionId, t]);
 
     const loadContentPage = useCallback(async () => {
         try {
@@ -69,12 +71,12 @@ const Collection = () => {
         } catch (err) {
             console.error('Error fetching collection content:', err);
             setError(
-                err.response?.data?.error || 'Error al obtener el contenido de la colección'
+                err.response?.data?.error || t('collections.fetchContentError')
             );
         } finally {
             setLoading(false);
         }
-    }, [collectionId, page, rowsPerPage]);
+    }, [collectionId, page, rowsPerPage, t]);
 
     useEffect(() => {
         loadContentPage();
@@ -90,7 +92,7 @@ const Collection = () => {
     };
 
     if (loading && content.length === 0 && !error) {
-        return <Typography>Cargando contenido de la colección...</Typography>;
+        return <Typography>{t('collections.loadingContent')}</Typography>;
     }
     if (error) return <Typography color="error">{error}</Typography>;
 
@@ -124,12 +126,12 @@ const Collection = () => {
                     )}
                     {!isOwner && ownerUsername && (
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                            Colección de {ownerUsername}
+                            {t('collections.byOwner', { name: ownerUsername })}
                         </Typography>
                     )}
                     {totalCount > 0 && (
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                            {totalCount} elementos
+                            {t('collections.elementCount', { value: totalCount })}
                         </Typography>
                     )}
                 </Box>
@@ -143,7 +145,7 @@ const Collection = () => {
                             })
                         }
                     >
-                        Editar Colección
+                        {t('collections.edit')}
                     </Button>
                 ) : isAuthenticated ? (
                     <Button
@@ -151,7 +153,7 @@ const Collection = () => {
                         color="primary"
                         onClick={() => navigate('/content/collections')}
                     >
-                        Mis colecciones
+                        {t('collections.mineButton')}
                     </Button>
                 ) : null}
             </Box>
@@ -178,7 +180,7 @@ const Collection = () => {
 
             {content.length === 0 && !loading && (
                 <Typography variant="body1" color="text.secondary" align="center" sx={{ mt: 4 }}>
-                    Esta colección no tiene contenido todavía.
+                    {t('collections.emptyContent')}
                 </Typography>
             )}
 
@@ -191,7 +193,7 @@ const Collection = () => {
                     rowsPerPage={rowsPerPage}
                     onRowsPerPageChange={handleChangeRowsPerPage}
                     rowsPerPageOptions={[24, 48, 96]}
-                    labelRowsPerPage="Filas por página"
+                    labelRowsPerPage={t('pagination.rowsPerPage')}
                     sx={{ mt: 2 }}
                 />
             )}

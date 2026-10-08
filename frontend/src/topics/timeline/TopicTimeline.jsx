@@ -4,6 +4,7 @@ import AddIcon from '@mui/icons-material/Add';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../../api/contentApi';
 import TopicTimelineEntryCard from './TopicTimelineEntryCard';
 import { hasTimelineDate, sortTimelineEntries } from './timelineUtils';
@@ -27,6 +28,7 @@ const TopicTimeline = ({
   returnContext = 'detail',
 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation('topics');
   const [timeline, setTimeline] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -44,11 +46,11 @@ const TopicTimeline = ({
       const data = await contentApi.getTopicTimeline(topicId);
       setTimeline(data);
     } catch (err) {
-      setError(getErrorMessage(err, 'Error al cargar la linea de tiempo.'));
+      setError(getErrorMessage(err, t('timeline.loadError')));
     } finally {
       setLoading(false);
     }
-  }, [topicId]);
+  }, [topicId, t]);
 
   useEffect(() => {
     loadTimeline();
@@ -65,13 +67,13 @@ const TopicTimeline = ({
   };
 
   const handleDelete = async (entry) => {
-    const confirmed = window.confirm(`Eliminar "${entry.title}" de la linea de tiempo?`);
+    const confirmed = window.confirm(t('timeline.deleteConfirm', { title: entry.title }));
     if (!confirmed) return;
     try {
       await contentApi.deleteTopicTimelineEntry(topicId, entry.id);
       await loadTimeline();
     } catch (err) {
-      setError(getErrorMessage(err, 'No se pudo eliminar la entrada.'));
+      setError(getErrorMessage(err, t('timeline.deleteError')));
     }
   };
 
@@ -97,7 +99,7 @@ const TopicTimeline = ({
       await contentApi.reorderTopicTimeline(topicId, nextIds);
       await loadTimeline();
     } catch (err) {
-      setError(getErrorMessage(err, 'No se pudo reordenar la linea de tiempo.'));
+      setError(getErrorMessage(err, t('timeline.reorderError')));
       await loadTimeline();
     }
   };
@@ -106,7 +108,7 @@ const TopicTimeline = ({
     return (
       <Stack alignItems="center" spacing={1.5} sx={{ py: 5 }}>
         <CircularProgress size={28} />
-        <Typography color="text.secondary">Cargando linea de tiempo...</Typography>
+        <Typography color="text.secondary">{t('timeline.loading')}</Typography>
       </Stack>
     );
   }
@@ -118,16 +120,16 @@ const TopicTimeline = ({
           <Stack direction="row" spacing={1} alignItems="center">
             <TimelineIcon color="primary" />
             <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              Linea de tiempo
+              {t('timeline.title')}
             </Typography>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Una narrativa curada del tema con videos, audios, imagenes y textos relacionados.
+            {t('timeline.intro')}
           </Typography>
         </Box>
         {canEdit && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={handleCreate}>
-            Agregar entrada
+            {t('timeline.addEntry')}
           </Button>
         )}
         {canSuggest && (
@@ -136,7 +138,7 @@ const TopicTimeline = ({
             startIcon={<LightbulbIcon />}
             onClick={() => navigate(`/content/topics/${topicId}/timeline/suggest`)}
           >
-            Sugerir entrada
+            {t('timeline.suggestEntry')}
           </Button>
         )}
       </Stack>
@@ -156,15 +158,14 @@ const TopicTimeline = ({
         >
           <TimelineIcon color="disabled" sx={{ fontSize: 48, mb: 1 }} />
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Este tema todavia no tiene linea de tiempo
+            {t('timeline.emptyTopic')}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 560, mx: 'auto' }}>
-            La linea de tiempo permite organizar el contenido como una historia: etapas, contexto,
-            explicaciones y materiales principales o complementarios.
+            {t('timeline.emptyHelp')}
           </Typography>
           {canEdit && (
             <Button variant="contained" startIcon={<AddIcon />} onClick={handleCreate} sx={{ mt: 3 }}>
-              Crear primera entrada
+              {t('timeline.createFirst')}
             </Button>
           )}
         </Paper>

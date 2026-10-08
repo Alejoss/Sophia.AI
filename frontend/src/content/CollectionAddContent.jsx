@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import LibrarySelectMultiple from './LibrarySelectMultiple';
 import contentApi from '../api/contentApi';
 
 const CollectionAddContent = () => {
+  const { t } = useTranslation('content');
   const { collectionId } = useParams();
   const navigate = useNavigate();
 
@@ -42,8 +44,8 @@ const CollectionAddContent = () => {
 
   return (
     <LibrarySelectMultiple
-      title="Add Content to Collection"
-      description="Select content from your library to add to this collection"
+      title={t('librarySelect.addToCollectionTitle')}
+      description={t('librarySelect.addToCollectionDescription')}
       onCancel={handleCancel}
       onSave={handleSave}
       filterFunction={filterContent} />);

@@ -2,9 +2,11 @@ import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
 import { Box, Button, Container, Typography } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import '../styles/not-found.css';
 
 const NotFound = () => {
+  const { t } = useTranslation('public');
   return (
     <Box className="not-found-page" component="main">
       <div className="not-found-orbit" aria-hidden="true" />
@@ -18,11 +20,10 @@ const NotFound = () => {
             404
           </Typography>
           <Typography component="h1" className="not-found-title">
-            No encontramos esta página
+            {t('notFound.title')}
           </Typography>
           <Typography component="p" className="not-found-lead">
-            El camino que buscas no existe, se movió, o nunca estuvo aquí.
-            Vuelve al inicio y sigue explorando con intención.
+            {t('notFound.lead')}
           </Typography>
           <Box className="not-found-actions">
             <Button
@@ -32,7 +33,7 @@ const NotFound = () => {
               endIcon={<ArrowForwardIcon />}
               className="not-found-button not-found-button-primary"
             >
-              Volver al inicio
+              {t('notFound.home')}
             </Button>
             <Button
               component={RouterLink}
@@ -40,7 +41,7 @@ const NotFound = () => {
               variant="text"
               className="not-found-button not-found-button-secondary"
             >
-              Explorar caminos
+              {t('notFound.paths')}
             </Button>
           </Box>
         </Box>

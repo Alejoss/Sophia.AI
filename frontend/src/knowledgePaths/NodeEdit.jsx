@@ -15,28 +15,31 @@ import {
     Paper,
 } from '@mui/material';
 import QuizIcon from '@mui/icons-material/Quiz';
+import { useTranslation } from 'react-i18next';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import quizzesApi from '../api/quizzesApi';
 import ContentSelector from '../content/ContentSelector';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import i18n from '../i18n';
 
 const schema = yup.object({
     title: yup
         .string()
         .trim()
-        .required('El título es requerido.'),
+        .required(() => i18n.t('paths:common.titleRequired')),
     description: yup.string().trim().default(''),
     content_profile_id: yup
         .mixed()
         .nullable()
         .test(
             'required',
-            'Debes seleccionar un contenido.',
+            () => i18n.t('paths:common.contentRequired'),
             (value) => value != null && value !== '',
         ),
 });
 
 const NodeEdit = () => {
+    const { t } = useTranslation('paths');
     const { pathId, nodeId } = useParams();
     const navigate = useNavigate();
     const [knowledgePath, setKnowledgePath] = useState(null);
@@ -111,14 +114,14 @@ const NodeEdit = () => {
                 }
             } catch (err) {
                 console.error('Failed to load data:', err);
-                setLoadError('Error al cargar los datos');
+                setLoadError(t('nodeEdit.loadError'));
             } finally {
                 setLoading(false);
             }
         };
 
         fetchData();
-    }, [pathId, nodeId, reset]);
+    }, [pathId, nodeId, reset, t]);
 
     const handleContentSelected = useCallback(
         (contentProfile) => {
@@ -156,7 +159,7 @@ const NodeEdit = () => {
             const { generalError: parsed } = applyApiErrorsToForm(
                 err,
                 setError,
-                'Error al actualizar el nodo.',
+                t('nodeEdit.updateError'),
                 {
                     title: 'title',
                     description: 'description',
@@ -191,10 +194,10 @@ const NodeEdit = () => {
         <Container sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
             <Box sx={{ maxWidth: '800px', mx: 'auto' }}>
                 <Typography variant="h5" component="h1" sx={{ mb: 1 }}>
-                    Editar Nodo de Contenido
+                    {t('nodeEdit.title')}
                 </Typography>
                 <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                    en el Camino de Conocimiento: {knowledgePath?.title}
+                    {t('nodeEdit.subtitle', { title: knowledgePath?.title })}
                 </Typography>
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -213,7 +216,7 @@ const NodeEdit = () => {
                                 <Stack direction="row" spacing={1} alignItems="center">
                                     <QuizIcon color="secondary" />
                                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                                        {nodeQuiz.title || 'Cuestionario'}
+                                        {nodeQuiz.title || t('nodeEdit.quizFallback')}
                                     </Typography>
                                 </Stack>
                                 <Button
@@ -223,7 +226,7 @@ const NodeEdit = () => {
                                     color="secondary"
                                     sx={{ textTransform: 'none' }}
                                 >
-                                    Editar cuestionario
+                                    {t('nodeEdit.editQuiz')}
                                 </Button>
                             </Stack>
                         </Paper>
@@ -246,7 +249,7 @@ const NodeEdit = () => {
                         <TextField
                             fullWidth
                             id="title"
-                            label="Título del Nodo"
+                            label={t('nodeEdit.nodeTitle')}
                             {...register('title')}
                             error={!!errors.title}
                             helperText={errors.title?.message}
@@ -257,7 +260,7 @@ const NodeEdit = () => {
                         <TextField
                             fullWidth
                             id="description"
-                            label="Descripción"
+                            label={t('common.description')}
                             {...register('description')}
                             error={!!errors.description}
                             helperText={errors.description?.message}
@@ -274,7 +277,7 @@ const NodeEdit = () => {
                                 disabled={isSubmitting || hasPendingContent}
                                 sx={{ minWidth: { xs: '100%', md: 'auto' } }}
                             >
-                                {isSubmitting ? 'Guardando...' : 'Guardar Cambios'}
+                                {isSubmitting ? t('nodeEdit.saving') : t('nodeEdit.submit')}
                             </Button>
                             <Button
                                 type="button"
@@ -284,7 +287,7 @@ const NodeEdit = () => {
                                 disabled={isSubmitting}
                                 sx={{ minWidth: { xs: '100%', md: 'auto' } }}
                             >
-                                Cancelar
+                                {t('common.cancel')}
                             </Button>
                         </Stack>
                     </Box>

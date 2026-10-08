@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -24,6 +25,7 @@ const schema = yup.object({
 });
 
 const ForgotPassword = () => {
+  const { t } = useTranslation('auth');
   const [generalError, setGeneralError] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
@@ -50,7 +52,7 @@ const ForgotPassword = () => {
       const { generalError: parsed } = applyApiErrorsToForm(
         error,
         setError,
-        "No se pudo enviar el correo. Inténtalo de nuevo.",
+        t('forgot.sendError'),
       );
       if (parsed) setGeneralError(parsed);
     }
@@ -68,22 +70,25 @@ const ForgotPassword = () => {
         }}
       >
         <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, textAlign: "center" }}>
-          ¿Olvidaste tu contraseña?
+          {t('forgot.title')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: "center" }}>
-          Introduce el correo de tu cuenta y te enviaremos un enlace para restablecerla.
+          {t('forgot.lead')}
         </Typography>
 
         {submitted ? (
           <Stack spacing={2}>
             <Alert severity="success">
-              Si existe una cuenta con el correo{" "}
-              <strong>{getValues("email")}</strong>, recibirás un enlace para
-              restablecer tu contraseña. Revisa también la carpeta de spam.
+              <Trans
+                t={t}
+                i18nKey="forgot.sent"
+                values={{ email: getValues("email") }}
+                components={{ strong: <strong /> }}
+              />
             </Alert>
             <Typography variant="body2" sx={{ textAlign: "center" }}>
               <MuiLink component={Link} to="/profiles/login" underline="hover">
-                Volver a iniciar sesión
+                {t('forgot.backToLogin')}
               </MuiLink>
             </Typography>
           </Stack>
@@ -93,7 +98,7 @@ const ForgotPassword = () => {
               {generalError && <Alert severity="error">{generalError}</Alert>}
 
               <TextField
-                label="Correo electrónico"
+                label={t('forgot.email')}
                 type="email"
                 {...bindMuiRhfField(register("email"), emailValue)}
                 error={!!errors.email}
@@ -104,12 +109,12 @@ const ForgotPassword = () => {
               />
 
               <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
-                {isSubmitting ? "Enviando..." : "Enviar enlace"}
+                {isSubmitting ? t('forgot.submitting') : t('forgot.submit')}
               </Button>
 
               <Typography variant="body2" sx={{ textAlign: "center" }}>
                 <MuiLink component={Link} to="/profiles/login" underline="hover">
-                  Volver a iniciar sesión
+                  {t('forgot.backToLogin')}
                 </MuiLink>
               </Typography>
             </Stack>

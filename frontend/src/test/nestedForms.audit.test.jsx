@@ -126,7 +126,7 @@ describe('nested HTML forms audit (UploadContentForm / ContentSuggestionPicker)'
       return /from ['"].*UploadContentForm['"]/.test(source) || /<UploadContentForm[\s/>]/.test(source);
     });
 
-    const relative = files.map((f) => path.relative(SRC_ROOT, f)).sort();
+    const relative = files.map((f) => path.relative(SRC_ROOT, f).split(path.sep).join('/')).sort();
 
     // Keep inventory intentional: if a new consumer is added, update this list after
     // confirming it does not wrap UploadContentForm in a parent <form>.
@@ -150,7 +150,7 @@ describe('nested HTML forms audit (UploadContentForm / ContentSuggestionPicker)'
         || /<ContentSuggestionPicker[\s/>]/.test(source);
     });
 
-    const relative = files.map((f) => path.relative(SRC_ROOT, f)).sort();
+    const relative = files.map((f) => path.relative(SRC_ROOT, f).split(path.sep).join('/')).sort();
 
     expect(relative).toEqual([
       'topics/timeline/TopicTimelineEntryContentSuggestionForm.jsx',

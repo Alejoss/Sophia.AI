@@ -1,0 +1,49 @@
+{
+  "validation": {
+    "empty": "El comentario no puede estar vacío",
+    "writeBeforePost": "Escribe un comentario antes de publicar."
+  },
+  "edit": {
+    "saving": "Guardando...",
+    "save": "Guardar",
+    "cancel": "Cancelar"
+  },
+  "reply": {
+    "placeholder": "Escriba una respuesta...",
+    "sending": "Enviando...",
+    "send": "Enviar",
+    "cancel": "Cancelar",
+    "addFailed": "Error al agregar la respuesta. Por favor, inténtelo de nuevo."
+  },
+  "comment": {
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "confirmDelete": "¿Está seguro de que desea eliminar este comentario?",
+    "deleteFailed": "Error al eliminar el comentario. Por favor, inténtelo de nuevo.",
+    "editFailed": "Error al editar el comentario. Por favor, inténtelo de nuevo.",
+    "edited": " (editado)",
+    "reply": "Responder",
+    "hideReplies": "Ocultar Respuestas",
+    "showReplies_one": "Mostrar {{count}} Respuesta",
+    "showReplies_other": "Mostrar {{count}} Respuestas"
+  },
+  "section": {
+    "title": "Comentarios",
+    "placeholder": "Escriba un comentario...",
+    "submit": "Publicar Comentario",
+    "submitting": "Publicando...",
+    "empty": "No hay comentarios todavía.",
+    "loadFailed": "Error al cargar los comentarios",
+    "loginToComment": "Debe iniciar sesión para comentar",
+    "addFailed": "Error al agregar el comentario. Por favor, inténtelo de nuevo.",
+    "deleteFailed": "Error al eliminar el comentario",
+    "updateFailed": "Error al actualizar el comentario",
+    "loginToReply": "Debe iniciar sesión para responder",
+    "loading": "Cargando comentarios...",
+    "closed": "Esta conversación está cerrada.",
+    "closedHidden": " Publica tu respuesta cuando esté abierta para ver las de los demás.",
+    "closedReadable": " Puedes leer las respuestas.",
+    "loginPrompt": "Por favor, inicie sesión para dejar un comentario.",
+    "lockedEmpty": "Publica tu respuesta para ver las de los demás miembros."
+  }
+}

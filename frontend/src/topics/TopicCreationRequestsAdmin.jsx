@@ -28,15 +28,18 @@ import {
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
+import i18n from '../i18n';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 const approveSchema = yup.object({
     approvedTitle: yup
         .string()
         .trim()
-        .required('El título es requerido.'),
+        .required(() => i18n.t('topics:requestsAdmin.titleRequired')),
     approvedDescription: yup.string().default(''),
 });
 
@@ -44,15 +47,18 @@ const rejectSchema = yup.object({
     rejectionReason: yup
         .string()
         .trim()
-        .required('El motivo del rechazo es requerido.'),
+        .required(() => i18n.t('topics:requestsAdmin.rejectReasonRequired')),
 });
 
-const STATUS_LABELS = {
-    PENDING: 'Pendiente',
-    APPROVED: 'Aprobada',
-    REJECTED: 'Rechazada',
-    COMPLETED: 'Tema creado',
-    CANCELLED: 'Cancelada',
+const statusLabel = (status, t) => {
+    const labels = {
+        PENDING: t('creation.statusPending'),
+        APPROVED: t('creation.statusApproved'),
+        REJECTED: t('creation.statusRejected'),
+        COMPLETED: t('creation.statusCompleted'),
+        CANCELLED: t('creation.statusCancelled'),
+    };
+    return labels[status] || status;
 };
 
 const STATUS_COLORS = {
@@ -63,14 +69,16 @@ const STATUS_COLORS = {
     CANCELLED: 'default',
 };
 
-const formatRequestDate = (value) =>
-    new Date(value).toLocaleDateString(undefined, {
+const formatRequestDate = (value, intl) =>
+    new Date(value).toLocaleDateString(intl, {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
     });
 
 const TopicCreationRequestsAdmin = ({ embedded = false }) => {
+    const { t } = useTranslation('topics');
+    const { intl } = useDateLocales();
     const { authState, authInitialized } = useContext(AuthContext);
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -118,7 +126,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
             setRequests(Array.isArray(data) ? data : []);
             setError(null);
         } catch (err) {
-            setError('Error al cargar las solicitudes de creación de temas');
+            setError(t('requestsAdmin.loadError'));
             console.error(err);
         } finally {
             setLoading(false);
@@ -179,7 +187,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
             const { generalError } = applyApiErrorsToForm(
                 err,
                 setApproveFormError,
-                'Error al aprobar la solicitud',
+                t('requestsAdmin.approveError'),
                 {
                     approved_title: 'approvedTitle',
                     approved_description: 'approvedDescription',
@@ -215,7 +223,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
             const { generalError } = applyApiErrorsToForm(
                 err,
                 setRejectFormError,
-                'Error al rechazar la solicitud',
+                t('requestsAdmin.rejectError'),
                 { rejection_reason: 'rejectionReason' },
             );
             if (generalError) {
@@ -237,7 +245,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
             await contentApi.finalizeTopicCreationRequest(request.id);
             await fetchRequests();
         } catch (err) {
-            setError(err.response?.data?.error || 'Error al publicar el tema');
+            setError(err.response?.data?.error || t('requestsAdmin.publishError'));
         } finally {
             setProcessingIds((prev) => {
                 const next = new Set(prev);
@@ -263,7 +271,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                 >
                     <Box>
                         <Typography variant="caption" color="text.secondary" display="block">
-                            Solicitante
+                            {t('requestsAdmin.requester')}
                         </Typography>
                         <MuiLink
                             component={Link}
@@ -277,19 +285,19 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                     </Box>
                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                         <Chip
-                            label={STATUS_LABELS[request.status] || request.status}
+                            label={statusLabel(request.status, t)}
                             color={STATUS_COLORS[request.status] || 'default'}
                             size="small"
                         />
                         <Typography variant="caption" color="text.secondary">
-                            {formatRequestDate(request.created_at)}
+                            {formatRequestDate(request.created_at, intl)}
                         </Typography>
                     </Stack>
                 </Box>
 
                 <Box>
                     <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                        Título propuesto
+                        {t('requestsAdmin.proposedTitle')}
                     </Typography>
                     <Typography variant="h6" component="p" sx={{ fontSize: '1.05rem', fontWeight: 600 }}>
                         {request.proposed_title}
@@ -298,14 +306,14 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
 
                 <Box>
                     <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                        Descripción propuesta
+                        {t('requestsAdmin.proposedDescription')}
                     </Typography>
                     <Typography
                         variant="body2"
                         color={request.proposed_description ? 'text.primary' : 'text.secondary'}
                         sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }}
                     >
-                        {request.proposed_description || 'Sin descripción.'}
+                        {request.proposed_description || t('requestsAdmin.noDescription')}
                     </Typography>
                 </Box>
 
@@ -321,7 +329,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                         }}
                     >
                         <Typography variant="caption" color="success.dark" display="block" gutterBottom>
-                            Versión aprobada
+                            {t('requestsAdmin.approvedVersion')}
                         </Typography>
                         <Typography variant="subtitle2" fontWeight={600}>
                             {request.approved_title}
@@ -340,7 +348,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                 {request.status === 'REJECTED' && request.rejection_reason && (
                     <Alert severity="error" sx={{ py: 0.5 }}>
                         <Typography variant="caption" display="block" fontWeight={600}>
-                            Motivo del rechazo
+                            {t('requestsAdmin.rejectReason')}
                         </Typography>
                         <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                             {request.rejection_reason}
@@ -363,7 +371,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                                         onClick={() => openRejectDialog(request)}
                                         disabled={processingIds.has(request.id)}
                                     >
-                                        Rechazar
+                                        {t('requestsAdmin.reject')}
                                     </Button>
                                     <Button
                                         variant="contained"
@@ -372,7 +380,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                                         onClick={() => openApproveDialog(request)}
                                         disabled={processingIds.has(request.id)}
                                     >
-                                        Aprobar y publicar
+                                        {t('requestsAdmin.approvePublish')}
                                     </Button>
                                 </>
                             )}
@@ -383,7 +391,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                                     onClick={() => handleFinalize(request)}
                                     disabled={processingIds.has(request.id)}
                                 >
-                                    Publicar tema
+                                    {t('requestsAdmin.finalize')}
                                 </Button>
                             )}
                             {request.status === 'COMPLETED' && request.topic_id && (
@@ -392,7 +400,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                                     to={`/content/topics/${request.topic_id}`}
                                     variant="outlined"
                                 >
-                                    Ver tema creado
+                                    {t('requestsAdmin.viewCreated')}
                                 </Button>
                             )}
                         </Stack>
@@ -407,16 +415,16 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
             {!embedded && (
                 <>
                     <Typography variant="h4" gutterBottom>
-                        Solicitudes de creación de temas
+                        {t('requestsAdmin.pageTitle')}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                        Revisa las propuestas de los usuarios. Puedes ajustar el título y la descripción antes de aprobar.
+                        {t('requestsAdmin.intro')}
                     </Typography>
                 </>
             )}
             {embedded && (
                 <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                    Solicitudes de creación de temas
+                    {t('requestsAdmin.pageTitle')}
                 </Typography>
             )}
 
@@ -428,22 +436,22 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
 
             <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
                 <FormControl size="small" sx={{ minWidth: 180 }}>
-                    <InputLabel>Estado</InputLabel>
+                    <InputLabel>{t('common.status')}</InputLabel>
                     <Select
                         value={filterStatus}
-                        label="Estado"
+                        label={t('common.status')}
                         onChange={(e) => setFilterStatus(e.target.value)}
                     >
-                        <MenuItem value="all">Todos</MenuItem>
-                        <MenuItem value="PENDING">Pendientes</MenuItem>
-                        <MenuItem value="APPROVED">Aprobadas</MenuItem>
-                        <MenuItem value="REJECTED">Rechazadas</MenuItem>
-                        <MenuItem value="CANCELLED">Canceladas</MenuItem>
-                        <MenuItem value="COMPLETED">Completadas</MenuItem>
+                        <MenuItem value="all">{t('common.all')}</MenuItem>
+                        <MenuItem value="PENDING">{t('requestsAdmin.filterPending')}</MenuItem>
+                        <MenuItem value="APPROVED">{t('requestsAdmin.filterApproved')}</MenuItem>
+                        <MenuItem value="REJECTED">{t('requestsAdmin.filterRejected')}</MenuItem>
+                        <MenuItem value="CANCELLED">{t('requestsAdmin.filterCancelled')}</MenuItem>
+                        <MenuItem value="COMPLETED">{t('requestsAdmin.filterCompleted')}</MenuItem>
                     </Select>
                 </FormControl>
                 {filterStatus === 'PENDING' && pendingCount > 0 && (
-                    <Chip label={`${pendingCount} pendiente(s)`} color="warning" />
+                    <Chip label={t('requestsAdmin.pending', { count: pendingCount })} color="warning" />
                 )}
             </Box>
 
@@ -452,7 +460,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                     <CircularProgress />
                 </Box>
             ) : requests.length === 0 ? (
-                <Alert severity="info">No hay solicitudes con el filtro seleccionado.</Alert>
+                <Alert severity="info">{t('requestsAdmin.emptyFilter')}</Alert>
             ) : (
                 <Stack spacing={2} component={Paper} variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
                     {requests.map(renderRequestCard)}
@@ -466,7 +474,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                 fullWidth
             >
                 <Box component="form" onSubmit={handleApproveSubmit(onApproveSubmit)} noValidate>
-                    <DialogTitle>Aprobar solicitud de tema</DialogTitle>
+                    <DialogTitle>{t('requestsAdmin.approveDialogTitle')}</DialogTitle>
                     <DialogContent>
                         {approveGeneralError && (
                             <Alert severity="error" sx={{ mb: 2 }}>
@@ -476,7 +484,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                         {selectedRequest && (
                             <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                                 <Typography variant="caption" color="text.secondary" display="block">
-                                    Propuesta de {selectedRequest.requested_by?.username}
+                                    {t('requestsAdmin.proposalBy', { user: selectedRequest.requested_by?.username })}
                                 </Typography>
                                 <Typography variant="subtitle2" sx={{ mt: 0.5 }}>
                                     {selectedRequest.proposed_title}
@@ -493,11 +501,11 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                             </Box>
                         )}
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Ajusta el título y la descripción finales. Al aprobar, el tema se publicará de inmediato.
+                            {t('requestsAdmin.approveHelp')}
                         </Typography>
                         <TextField
                             fullWidth
-                            label="Título aprobado"
+                            label={t('requestsAdmin.approvedTitle')}
                             error={!!approveErrors.approvedTitle}
                             helperText={approveErrors.approvedTitle?.message}
                             disabled={isApproveSubmitting}
@@ -506,7 +514,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                         />
                         <TextField
                             fullWidth
-                            label="Descripción aprobada"
+                            label={t('requestsAdmin.approvedDescription')}
                             multiline
                             minRows={4}
                             error={!!approveErrors.approvedDescription}
@@ -517,7 +525,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={() => setApproveDialogOpen(false)} disabled={isApproveSubmitting}>
-                            Cancelar
+                            {t('common.cancel')}
                         </Button>
                         <Button
                             type="submit"
@@ -525,7 +533,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                             color="success"
                             disabled={isApproveSubmitting || processingIds.has(selectedRequest?.id)}
                         >
-                            {isApproveSubmitting ? 'Aprobando...' : 'Aprobar y publicar'}
+                            {isApproveSubmitting ? t('requestsAdmin.approving') : t('requestsAdmin.approvePublish')}
                         </Button>
                     </DialogActions>
                 </Box>
@@ -538,7 +546,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                 fullWidth
             >
                 <Box component="form" onSubmit={handleRejectSubmit(onRejectSubmit)} noValidate>
-                    <DialogTitle>Rechazar solicitud de tema</DialogTitle>
+                    <DialogTitle>{t('requestsAdmin.rejectDialogTitle')}</DialogTitle>
                     <DialogContent>
                         {rejectGeneralError && (
                             <Alert severity="error" sx={{ mb: 2 }}>
@@ -548,7 +556,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                         {selectedRequest && (
                             <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                                 <Typography variant="caption" color="text.secondary" display="block">
-                                    Propuesta de {selectedRequest.requested_by?.username}
+                                    {t('requestsAdmin.proposalBy', { user: selectedRequest.requested_by?.username })}
                                 </Typography>
                                 <Typography variant="subtitle2" sx={{ mt: 0.5 }}>
                                     {selectedRequest.proposed_title}
@@ -566,20 +574,20 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                         )}
                         <TextField
                             fullWidth
-                            label="Motivo del rechazo"
+                            label={t('requestsAdmin.rejectReason')}
                             multiline
                             minRows={3}
                             error={!!rejectErrors.rejectionReason}
                             helperText={rejectErrors.rejectionReason?.message}
                             disabled={isRejectSubmitting}
                             sx={{ mt: 1 }}
-                            placeholder="Ej.: El título es demasiado amplio. Intenta enfocarlo en un aspecto concreto."
+                            placeholder={t('requestsAdmin.rejectPlaceholder')}
                             {...registerReject('rejectionReason')}
                         />
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={() => setRejectDialogOpen(false)} disabled={isRejectSubmitting}>
-                            Cancelar
+                            {t('common.cancel')}
                         </Button>
                         <Button
                             type="submit"
@@ -587,7 +595,7 @@ const TopicCreationRequestsAdmin = ({ embedded = false }) => {
                             color="error"
                             disabled={isRejectSubmitting || processingIds.has(selectedRequest?.id)}
                         >
-                            {isRejectSubmitting ? 'Rechazando...' : 'Rechazar'}
+                            {isRejectSubmitting ? t('requestsAdmin.rejecting') : t('requestsAdmin.reject')}
                         </Button>
                     </DialogActions>
                 </Box>

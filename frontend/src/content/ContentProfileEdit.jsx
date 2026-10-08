@@ -25,7 +25,9 @@ import {
 import DownloadIcon from '@mui/icons-material/Download';
 import { formatDate } from '../utils/dateUtils';
 import { resolveMediaUrl } from '../utils/fileUtils';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
+import i18n from '../i18n';
 import { AuthContext } from '../context/AuthContext';
 import ContentDisplay from './ContentDisplay';
 import OwnerContentFileUploadDialog from './OwnerContentFileUploadDialog';
@@ -35,7 +37,7 @@ const schema = yup.object({
   title: yup
     .string()
     .trim()
-    .required('El título es requerido.'),
+    .required(() => i18n.t('content:profileEdit.titleRequired')),
   author: yup.string().trim().default(''),
   personal_note: yup.string().default(''),
   is_visible: yup.boolean().default(true),
@@ -43,6 +45,7 @@ const schema = yup.object({
 });
 
 const ContentProfileEdit = () => {
+  const { t } = useTranslation('content');
   const { contentId } = useParams();
   const navigate = useNavigate();
   const [content, setContent] = useState(null);
@@ -105,12 +108,12 @@ const ContentProfileEdit = () => {
         );
         setLoadError('');
       } catch (err) {
-        setLoadError('Error al cargar el contenido');
+        setLoadError(t('profileEdit.loadError'));
         console.error(err);
       }
     };
     fetchContent();
-  }, [contentId, authState?.user?.id, reset]);
+  }, [contentId, authState?.user?.id, reset, t]);
 
   const reloadContent = async () => {
     const data = await contentApi.getContentDetails(contentId, 'library', authState?.user?.id);
@@ -132,7 +135,7 @@ const ContentProfileEdit = () => {
         setUrlSaveBlocked(true);
         setUrlDialogError(
           check?.message ||
-          'No se puede modificar la fuente porque otros usuarios tienen este contenido en su biblioteca.',
+          t('profileEdit.sourceBlocked'),
         );
         return false;
       }
@@ -142,7 +145,7 @@ const ContentProfileEdit = () => {
       setUrlDialogError(
         err.response?.data?.error ||
         err.message ||
-        'No se pudo comprobar si se permite modificar la fuente.',
+        t('profileEdit.sourceCheckError'),
       );
       return false;
     } finally {
@@ -170,14 +173,14 @@ const ContentProfileEdit = () => {
       await contentApi.updateContent(contentId, { url: null });
       await reloadContent();
       setClearUrlDialogOpen(false);
-      setAttachFileSuccess('URL del contenido eliminada. El archivo adjunto se mantiene.');
+      setAttachFileSuccess(t('profileEdit.urlCleared'));
     } catch (err) {
       const msg =
         err.response?.data?.error ||
         (typeof err.response?.data === 'string' ? err.response.data : null) ||
         err.message ||
-        'No se pudo eliminar la URL.';
-      setUrlDialogError(typeof msg === 'string' ? msg : 'No se pudo eliminar la URL.');
+        t('profileEdit.urlClearError');
+      setUrlDialogError(typeof msg === 'string' ? msg : t('profileEdit.urlClearError'));
     } finally {
       setUrlDialogSaveLoading(false);
     }
@@ -186,7 +189,7 @@ const ContentProfileEdit = () => {
   const handleSaveContentUrl = async () => {
     const trimmed = (urlDraft || '').trim();
     if (!trimmed) {
-      setUrlDialogError('La URL no puede estar vacía.');
+      setUrlDialogError(t('profileEdit.urlEmpty'));
       return;
     }
     setUrlDialogSaveLoading(true);
@@ -195,14 +198,14 @@ const ContentProfileEdit = () => {
       await contentApi.updateContent(contentId, { url: trimmed });
       await reloadContent();
       setEditUrlDialogOpen(false);
-      setAttachFileSuccess('URL del contenido actualizada correctamente.');
+      setAttachFileSuccess(t('profileEdit.urlUpdated'));
     } catch (err) {
       const msg =
         err.response?.data?.error ||
         (typeof err.response?.data === 'string' ? err.response.data : null) ||
         err.message ||
-        'No se pudo guardar la URL.';
-      setUrlDialogError(typeof msg === 'string' ? msg : 'No se pudo guardar la URL.');
+        t('profileEdit.urlSaveError');
+      setUrlDialogError(typeof msg === 'string' ? msg : t('profileEdit.urlSaveError'));
     } finally {
       setUrlDialogSaveLoading(false);
     }
@@ -213,7 +216,7 @@ const ContentProfileEdit = () => {
 
     try {
       if (!content.selected_profile?.id) {
-        setSubmitError('No se encontró el perfil de contenido');
+        setSubmitError(t('profileEdit.profileMissing'));
         return;
       }
 
@@ -233,13 +236,13 @@ const ContentProfileEdit = () => {
       navigate(`/content/${contentId}/library?context=library&id=${authState?.user?.id}`);
     } catch (err) {
       const producerMsg = err.response?.data?.error?.includes?.('producer')
-        ? 'Debes reclamar ser el productor para cambiar la visibilidad'
+        ? t('profileEdit.producerVisibility')
         : null;
 
       const { generalError } = applyApiErrorsToForm(
         err,
         setError,
-        producerMsg || 'Error al actualizar el contenido',
+        producerMsg || t('profileEdit.updateError'),
       );
       setSubmitError(generalError);
       console.error(err);
@@ -252,7 +255,7 @@ const ContentProfileEdit = () => {
       await contentApi.deleteContent(contentId);
       navigate('/content/library_user');
     } catch (err) {
-      setDeleteError('Error al eliminar el contenido');
+      setDeleteError(t('profileEdit.deleteError'));
       console.error(err);
     }
   };
@@ -263,7 +266,7 @@ const ContentProfileEdit = () => {
         {loadError ? (
           <Alert severity="error">{loadError}</Alert>
         ) : (
-          <Typography>Cargando...</Typography>
+          <Typography>{t('common.loading')}</Typography>
         )}
       </Box>
     );
@@ -276,7 +279,7 @@ const ContentProfileEdit = () => {
     <Box sx={{ maxWidth: 1400, margin: '0 auto', padding: 2, pt: 12 }}>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" gutterBottom>
-          Editar perfil de contenido
+          {t('profileEdit.title')}
         </Typography>
       </Box>
 
@@ -308,23 +311,23 @@ const ContentProfileEdit = () => {
         <Grid item xs={12} md={6}>
           <Card sx={{ padding: 3, height: 'fit-content' }}>
             <Typography variant="h6" gutterBottom>
-              Información del perfil de contenido
+              {t('profileEdit.profileInfo')}
             </Typography>
 
             <Box sx={{ mb: 2 }}>
               <Chip
-                label={content.media_type || content.content?.media_type || 'DESCONOCIDO'}
+                label={content.media_type || content.content?.media_type || t('profileEdit.unknownType')}
                 color="primary"
                 sx={{ mr: 1 }}
               />
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Subido: {formatDate(content.created_at)}
+                {t('profileEdit.uploaded', { date: formatDate(content.created_at) })}
               </Typography>
             </Box>
 
             <Box sx={{ mb: 2 }}>
               <Typography variant="subtitle2" gutterBottom>
-                Miniatura (thumbnail)
+                {t('profileEdit.thumbnail')}
               </Typography>
 
               {thumbnailPreviewUrl ? (
@@ -343,7 +346,7 @@ const ContentProfileEdit = () => {
                 >
                   <img
                     src={thumbnailPreviewUrl}
-                    alt="Miniatura actual"
+                    alt={t('profileEdit.thumbnailAlt')}
                     style={{
                       width: '100%',
                       height: '100%',
@@ -354,7 +357,7 @@ const ContentProfileEdit = () => {
                 </Box>
               ) : (
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  No hay miniatura disponible.
+                  {t('profileEdit.noThumbnail')}
                 </Typography>
               )}
 
@@ -364,7 +367,7 @@ const ContentProfileEdit = () => {
                 size="small"
                 sx={{ textTransform: 'none' }}
               >
-                Cambiar miniatura
+                {t('profileEdit.changeThumbnail')}
                 <input
                   type="file"
                   accept="image/*"
@@ -375,7 +378,7 @@ const ContentProfileEdit = () => {
 
                     const maxBytes = 3 * 1024 * 1024;
                     if (file.size > maxBytes) {
-                      setSubmitError('La miniatura no debe superar 3 MB.');
+                      setSubmitError(t('profileEdit.thumbnailTooLarge'));
                       e.target.value = '';
                       return;
                     }
@@ -394,7 +397,7 @@ const ContentProfileEdit = () => {
               </Button>
 
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                Se reemplazará la miniatura actual de este contenido.
+                {t('profileEdit.thumbnailReplace')}
               </Typography>
             </Box>
 
@@ -411,7 +414,7 @@ const ContentProfileEdit = () => {
                   }}
                 >
                   <Typography variant="subtitle2" component="div" sx={{ m: 0 }}>
-                    {hasAttachedFile ? 'Detalles del archivo:' : 'No hay archivo relacionado'}
+                    {hasAttachedFile ? t('profileEdit.fileDetails') : t('profileEdit.noRelatedFile')}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     {canAttachFileAsOwner && (
@@ -423,7 +426,7 @@ const ContentProfileEdit = () => {
                           setAttachFileDialogOpen(true);
                         }}
                       >
-                        Subir archivo
+                        {t('profileEdit.uploadFile')}
                       </Button>
                     )}
                     {content?.can_suggest_file && (
@@ -436,7 +439,7 @@ const ContentProfileEdit = () => {
                           )
                         }
                       >
-                        Sugerir archivo
+                        {t('profileEdit.suggestFile')}
                       </Button>
                     )}
                   </Box>
@@ -444,7 +447,7 @@ const ContentProfileEdit = () => {
                 {content.file_details && hasAttachedFile && (
                   <>
                     <Typography variant="body2">
-                      Tamaño:{' '}
+                      {t('profileEdit.size')}{' '}
                       {content.file_details.file_size != null
                         ? `${(content.file_details.file_size / 1024 / 1024).toFixed(2)} MB`
                         : '—'}
@@ -463,7 +466,7 @@ const ContentProfileEdit = () => {
                           download
                           sx={{ mt: 1 }}
                         >
-                          Descargar archivo
+                          {t('profileEdit.downloadFile')}
                         </Button>
                       ) : null;
                     })()}
@@ -475,7 +478,7 @@ const ContentProfileEdit = () => {
             {content.url && content.is_original_uploader && (
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle2" gutterBottom>
-                  URL del contenido
+                  {t('profileEdit.contentUrl')}
                 </Typography>
                 <Typography
                   variant="body2"
@@ -491,11 +494,11 @@ const ContentProfileEdit = () => {
                     color="warning"
                     onClick={openClearUrlDialog}
                   >
-                    Borrar URL
+                    {t('profileEdit.clearUrl')}
                   </Button>
                 ) : (
                   <Button variant="outlined" size="small" onClick={openEditUrlDialog}>
-                    Cambiar URL
+                    {t('profileEdit.changeUrl')}
                   </Button>
                 )}
               </Box>
@@ -506,7 +509,7 @@ const ContentProfileEdit = () => {
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
               <TextField
                 fullWidth
-                label="Título"
+                label={t('common.title')}
                 margin="normal"
                 error={!!errors.title}
                 helperText={errors.title?.message}
@@ -515,19 +518,19 @@ const ContentProfileEdit = () => {
 
               <TextField
                 fullWidth
-                label="Autor"
+                label={t('common.author')}
                 margin="normal"
                 error={!!errors.author}
                 helperText={
                   errors.author?.message ||
-                  (content.original_author && `Autor original: ${content.original_author}`)
+                  (content.original_author && t('profileEdit.originalAuthor', { name: content.original_author }))
                 }
                 {...register('author')}
               />
 
               <TextField
                 fullWidth
-                label="Nota personal"
+                label={t('profileEdit.personalNote')}
                 margin="normal"
                 multiline
                 rows={4}
@@ -548,7 +551,7 @@ const ContentProfileEdit = () => {
                         name="is_producer"
                       />
                     }
-                    label="He producido este contenido"
+                    label={t('upload.iProduced')}
                     sx={{ mt: 2 }}
                   />
                 )}
@@ -568,13 +571,13 @@ const ContentProfileEdit = () => {
                             name="is_visible"
                           />
                         }
-                        label="Visible en los resultados de búsqueda"
+                        label={t('upload.visibleInSearch')}
                         sx={{ mt: 1, ml: 4 }}
                       />
                     )}
                   />
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 5 }}>
-                    Nota: Solo el productor del contenido puede hacerlo invisible en los resultados de búsqueda.
+                    {t('upload.producerVisibilityNote')}
                   </Typography>
                 </>
               )}
@@ -585,7 +588,7 @@ const ContentProfileEdit = () => {
                   color="error"
                   onClick={() => setDeleteDialogOpen(true)}
                 >
-                  Eliminar contenido
+                  {t('profileEdit.deleteContent')}
                 </Button>
                 <Box>
                   <Button
@@ -595,7 +598,7 @@ const ContentProfileEdit = () => {
                     }
                     sx={{ mr: 1 }}
                   >
-                    Cancelar
+                    {t('actions.cancel')}
                   </Button>
                   <Button
                     variant="contained"
@@ -606,10 +609,10 @@ const ContentProfileEdit = () => {
                     {isSubmitting ? (
                       <>
                         <CircularProgress size={20} sx={{ mr: 1 }} />
-                        Guardando...
+                        {t('common.saving')}
                       </>
                     ) : (
-                      'Guardar cambios'
+                      t('profileEdit.saveChanges')
                     )}
                   </Button>
                 </Box>
@@ -621,7 +624,7 @@ const ContentProfileEdit = () => {
         <Grid item xs={12} md={6}>
           <Card sx={{ padding: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Vista previa del contenido
+              {t('profileEdit.preview')}
             </Typography>
             <ContentDisplay
               content={content}
@@ -634,14 +637,14 @@ const ContentProfileEdit = () => {
       </Grid>
 
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>Confirmar eliminación</DialogTitle>
+        <DialogTitle>{t('profileEdit.confirmDeleteTitle')}</DialogTitle>
         <DialogContent>
-          ¿Estás seguro de que deseas eliminar este contenido? Esta acción no se puede deshacer.
+          {t('profileEdit.confirmDeleteBody')}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
+          <Button onClick={() => setDeleteDialogOpen(false)}>{t('actions.cancel')}</Button>
           <Button onClick={handleDelete} color="error">
-            Eliminar
+            {t('actions.remove')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -654,12 +657,10 @@ const ContentProfileEdit = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Borrar URL del contenido</DialogTitle>
+        <DialogTitle>{t('profileEdit.clearUrlTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Se quitará el enlace externo del registro compartido. El archivo adjunto
-            seguirá disponible para descarga. Si otras personas usan este ítem, el
-            cambio las afecta.
+            {t('profileEdit.clearUrlBody')}
           </Typography>
           {urlDialogCheckLoading && (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
@@ -677,7 +678,7 @@ const ContentProfileEdit = () => {
             onClick={() => setClearUrlDialogOpen(false)}
             disabled={urlDialogSaveLoading}
           >
-            Cancelar
+            {t('actions.cancel')}
           </Button>
           <Button
             variant="contained"
@@ -689,7 +690,7 @@ const ContentProfileEdit = () => {
               urlSaveBlocked
             }
           >
-            {urlDialogSaveLoading ? 'Eliminando…' : 'Borrar URL'}
+            {urlDialogSaveLoading ? t('profileEdit.clearing') : t('profileEdit.clearUrl')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -702,11 +703,10 @@ const ContentProfileEdit = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Cambiar URL del contenido</DialogTitle>
+        <DialogTitle>{t('profileEdit.changeUrlTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            La URL vive en el registro del contenido (no en tu perfil de biblioteca). Si otras
-            personas usan el mismo ítem, el cambio las afecta. Por favor, asegúrate que la url no esté rota.
+            {t('profileEdit.changeUrlBody')}
           </Typography>
           {urlDialogCheckLoading && (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
@@ -722,7 +722,7 @@ const ContentProfileEdit = () => {
               )}
               <TextField
                 fullWidth
-                label="URL"
+                label={t('common.url')}
                 value={urlDraft}
                 onChange={(e) => setUrlDraft(e.target.value)}
                 margin="normal"
@@ -738,7 +738,7 @@ const ContentProfileEdit = () => {
             onClick={() => setEditUrlDialogOpen(false)}
             disabled={urlDialogSaveLoading}
           >
-            Cancelar
+            {t('actions.cancel')}
           </Button>
           <Button
             variant="contained"
@@ -749,7 +749,7 @@ const ContentProfileEdit = () => {
               urlSaveBlocked
             }
           >
-            {urlDialogSaveLoading ? 'Guardando…' : 'Guardar'}
+            {urlDialogSaveLoading ? t('common.savingEllipsis') : t('actions.save')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -758,11 +758,11 @@ const ContentProfileEdit = () => {
         open={attachFileDialogOpen}
         onClose={() => setAttachFileDialogOpen(false)}
         contentId={contentId}
-        dialogTitle="Subir archivo correspondiente"
-        submitLabel="Adjuntar archivo"
-        introText="Este contenido tiene URL pero aún no tiene archivo descargable. Al adjuntar un archivo, quedará vinculado a este ítem."
+        dialogTitle={t('ownerUpload.matchingTitle')}
+        submitLabel={t('ownerUpload.submit')}
+        introText={t('ownerUpload.matchingIntro')}
         onSuccess={async () => {
-          setAttachFileSuccess('Archivo adjuntado correctamente.');
+          setAttachFileSuccess(t('ownerUpload.attached'));
           setAttachFileDialogOpen(false);
           try {
             await reloadContent();

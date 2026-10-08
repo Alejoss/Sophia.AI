@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useDateLocales } from '../hooks/useDateLocales';
 import {
   fetchEventById,
   peekEventDetailCache,
@@ -42,13 +44,9 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
 
-const PAYMENT_LABELS = {
-  PENDING: 'Pago pendiente',
-  PAID: 'Pago completado',
-  REFUNDED: 'Reembolsado',
-};
-
 const EventDetail = () => {
+  const { t } = useTranslation('events');
+  const { intl } = useDateLocales();
   const { eventId } = useParams();
   const { authState } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -67,7 +65,7 @@ const EventDetail = () => {
   const [error, setError] = useState(() => {
     const session = getEventDetailSessionSnapshot(eventId);
     return session.status === 'error'
-      ? getErrorMessage(session.error, 'Error al cargar el evento. Por favor, inténtelo de nuevo.')
+      ? getErrorMessage(session.error, t('errors.loadEvent'))
       : null;
   });
   const [actionError, setActionError] = useState(null);
@@ -76,7 +74,8 @@ const EventDetail = () => {
   const [registrationLoading, setRegistrationLoading] = useState(false);
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [shareButtonText, setShareButtonText] = useState('Compartir Evento');
+  const [shareCopied, setShareCopied] = useState(false);
+  const shareButtonText = shareCopied ? t('registration.urlCopied') : t('registration.share');
   const [userRegistration, setUserRegistration] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -103,7 +102,7 @@ const EventDetail = () => {
 
     if (session.status === 'error') {
       setEvent(null);
-      setError(getErrorMessage(session.error, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
+      setError(getErrorMessage(session.error, t('errors.loadEvent')));
       setLoading(false);
       return undefined;
     }
@@ -120,7 +119,7 @@ const EventDetail = () => {
       })
       .catch((err) => {
         if (cancelled || err?.code === 'ERR_CANCELED') return;
-        setError(getErrorMessage(err, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
+        setError(getErrorMessage(err, t('errors.loadEvent')));
         console.error('Error loading event:', err);
       })
       .finally(() => {
@@ -220,8 +219,8 @@ const EventDetail = () => {
   }, [event?.image]);
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Por determinar';
-    return new Date(dateString).toLocaleDateString('es-ES', {
+    if (!dateString) return t('toBeDetermined');
+    return new Date(dateString).toLocaleDateString(intl, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -230,21 +229,14 @@ const EventDetail = () => {
     });
   };
 
-  const getEventTypeLabel = (eventType) => {
-    const typeMap = {
-      LIVE_COURSE: 'Curso en Vivo',
-      LIVE_CERTIFICATION: 'Certificación en Vivo',
-      LIVE_MASTER_CLASS: 'Clase Magistral en Vivo',
-    };
-    return typeMap[eventType] || eventType;
-  };
+  const getEventTypeLabel = (eventType) => t(`eventTypes.${eventType}`, { defaultValue: eventType });
 
   const getPlatformLabel = (platform) => {
+    if (platform === 'other') return t('platforms.other');
     const platformMap = {
       google_meet: 'Google Meet',
       jitsi: 'Jitsi',
       microsoft_teams: 'Microsoft Teams',
-      other: 'Otra',
       telegram: 'Telegram',
       tox: 'Tox',
       twitch: 'Twitch',
@@ -273,11 +265,11 @@ const EventDetail = () => {
     setActionError(null);
     setActionSuccess(null);
     if (!authState.isAuthenticated) {
-      setActionError('Por favor, inicie sesión para registrarse en eventos');
+      setActionError(t('registration.loginRequired'));
       return;
     }
     if (isEventStarted()) {
-      setActionError('No se puede registrar en eventos que ya han comenzado');
+      setActionError(t('registration.alreadyStarted'));
       return;
     }
     setShowRegistrationModal(true);
@@ -295,10 +287,10 @@ const EventDetail = () => {
         setActionSuccess(null);
         setShowPaymentModal(true);
       } else {
-        setActionSuccess('¡Inscripción confirmada!');
+        setActionSuccess(t('registration.confirmed'));
       }
     } catch (err) {
-      const errorMessage = err.error || err.detail || 'Error al registrarse en el evento';
+      const errorMessage = err.error || err.detail || t('registration.registerError');
       setActionError(errorMessage);
     } finally {
       setRegistrationLoading(false);
@@ -312,7 +304,7 @@ const EventDetail = () => {
   const handlePaymentComplete = () => {
     setUserRegistration((prev) => (prev ? { ...prev, payment_status: 'PAID' } : prev));
     setShowPaymentModal(false);
-    setActionSuccess('¡Pago completado! Tu lugar está confirmado.');
+    setActionSuccess(t('registration.paid'));
   };
 
   const handleCancelRegistration = async () => {
@@ -323,9 +315,9 @@ const EventDetail = () => {
       setIsRegistered(false);
       setUserRegistration(null);
       setShowCancelDialog(false);
-      setActionSuccess('Inscripción cancelada correctamente.');
+      setActionSuccess(t('registration.cancelled'));
     } catch (err) {
-      const errorMessage = err.error || err.detail || 'Error al cancelar la inscripción';
+      const errorMessage = err.error || err.detail || t('registration.cancelError');
       setActionError(errorMessage);
     } finally {
       setRegistrationLoading(false);
@@ -336,8 +328,8 @@ const EventDetail = () => {
     try {
       const eventUrl = `${window.location.origin}/events/${eventId}`;
       await navigator.clipboard.writeText(eventUrl);
-      setShareButtonText('¡URL Copiada!');
-      setTimeout(() => setShareButtonText('Compartir Evento'), 2000);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
     } catch {
       const eventUrl = `${window.location.origin}/events/${eventId}`;
       const textArea = document.createElement('textarea');
@@ -346,8 +338,8 @@ const EventDetail = () => {
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      setShareButtonText('¡URL Copiada!');
-      setTimeout(() => setShareButtonText('Compartir Evento'), 2000);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
     }
   };
 
@@ -363,8 +355,8 @@ const EventDetail = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={1.5} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>Detalles del Evento</Typography>
-          <Typography color="text.secondary">Cargando evento...</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>{t('detailsTitle')}</Typography>
+          <Typography color="text.secondary">{t('loadingEvent')}</Typography>
         </Stack>
       </Container>
     );
@@ -389,14 +381,14 @@ const EventDetail = () => {
                     setError(null);
                   })
                   .catch((err) => {
-                    setError(getErrorMessage(err, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
+                    setError(getErrorMessage(err, t('errors.loadEvent')));
                   })
                   .finally(() => setLoading(false));
               }}
             >
-              Reintentar
+              {t('retryShort')}
             </Button>
-            <Button component={Link} to="/events" variant="outlined">Volver a Eventos</Button>
+            <Button component={Link} to="/events" variant="outlined">{t('backToEvents')}</Button>
           </Stack>
         </Stack>
       </Container>
@@ -407,8 +399,8 @@ const EventDetail = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={2} alignItems="center">
-          <Alert severity="warning">Evento no encontrado.</Alert>
-          <Button component={Link} to="/events" variant="contained">Volver a Eventos</Button>
+          <Alert severity="warning">{t('notFound')}</Alert>
+          <Button component={Link} to="/events" variant="contained">{t('backToEvents')}</Button>
         </Stack>
       </Container>
     );
@@ -418,7 +410,7 @@ const EventDetail = () => {
     <Container maxWidth="lg" sx={{ py: 3 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} spacing={1.5} sx={{ mb: 2.5 }}>
         <Button component={Link} to="/events" variant="outlined" color="inherit">
-          ← Volver a Eventos
+          {t('backToEventsArrow')}
         </Button>
         <Typography variant="h4" sx={{ fontWeight: 600 }}>{event.title}</Typography>
         <Chip color="primary" variant="outlined" label={getEventTypeLabel(event.event_type)} />
@@ -442,29 +434,29 @@ const EventDetail = () => {
               </Box>
             )}
 
-            <Typography variant="h6" sx={{ mb: 1 }}>Descripción</Typography>
+            <Typography variant="h6" sx={{ mb: 1 }}>{t('card.description')}</Typography>
             <Typography variant="body1" sx={{ mb: 2 }}>{event.description}</Typography>
 
             <Stack spacing={1.2}>
               <Typography variant="body2">
-                <strong>Anfitrión:</strong>{' '}
+                <strong>{t('card.host')}</strong>{' '}
                 <MuiLink component={Link} to={`/profiles/user_profile/${event.owner.id}`} underline="hover">
                   {event.owner.username}
                 </MuiLink>
               </Typography>
               {event.platform && (
                 <Typography variant="body2">
-                  <strong>Plataforma:</strong> {getPlatformLabel(event.platform)}
+                  <strong>{t('card.platform')}</strong> {getPlatformLabel(event.platform)}
                   {event.platform === 'other' && event.other_platform && ` (${event.other_platform})`}
                 </Typography>
               )}
-              <Typography variant="body2"><strong>Creado:</strong> {formatDate(event.date_created)}</Typography>
-              <Typography variant="body2"><strong>Fecha de Inicio:</strong> {formatDate(event.date_start)}</Typography>
+              <Typography variant="body2"><strong>{t('card.created')}</strong> {formatDate(event.date_created)}</Typography>
+              <Typography variant="body2"><strong>{t('card.startDate')}</strong> {formatDate(event.date_start)}</Typography>
               {event.date_end && (
-                <Typography variant="body2"><strong>Fecha de Fin:</strong> {formatDate(event.date_end)}</Typography>
+                <Typography variant="body2"><strong>{t('card.endDate')}</strong> {formatDate(event.date_end)}</Typography>
               )}
               {event.schedule_description && (
-                <Typography variant="body2"><strong>Horario:</strong> {event.schedule_description}</Typography>
+                <Typography variant="body2"><strong>{t('card.schedule')}</strong> {event.schedule_description}</Typography>
               )}
             </Stack>
           </CardContent>
@@ -480,7 +472,7 @@ const EventDetail = () => {
               bgcolor: isPaidEvent ? 'action.hover' : 'background.paper',
             }}
           >
-            <Typography variant="overline" color="text.secondary">Precio del evento</Typography>
+            <Typography variant="overline" color="text.secondary">{t('card.eventPrice')}</Typography>
             {isPaidEvent ? (
               <>
                 <Typography variant="h4" fontWeight={800} color="primary.main" sx={{ mt: 0.5 }}>
@@ -493,7 +485,7 @@ const EventDetail = () => {
               </>
             ) : (
               <Typography variant="h5" fontWeight={700} color="success.main" sx={{ mt: 0.5 }}>
-                Gratis
+                {t('free')}
               </Typography>
             )}
           </Paper>
@@ -508,13 +500,15 @@ const EventDetail = () => {
                 <Paper variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: 'action.hover' }}>
                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                     <CheckCircleIcon color="success" fontSize="small" />
-                    <Typography variant="subtitle2" fontWeight={700}>Estás inscrito</Typography>
+                    <Typography variant="subtitle2" fontWeight={700}>{t('registration.enrolled')}</Typography>
                   </Stack>
                   {isPaidEvent && (
                     <Chip
                       size="small"
                       icon={needsPayment ? <PendingActionsIcon /> : <CheckCircleIcon />}
-                      label={PAYMENT_LABELS[userRegistration?.payment_status] || userRegistration?.payment_status}
+                      label={t(`registration.payment.${userRegistration?.payment_status}`, {
+                        defaultValue: userRegistration?.payment_status,
+                      })}
                       color={userRegistration?.payment_status === 'PAID' ? 'success' : 'warning'}
                       variant="outlined"
                       sx={{ mb: needsPayment ? 1 : 0 }}
@@ -522,18 +516,18 @@ const EventDetail = () => {
                   )}
                   {needsPayment && (
                     <Typography variant="caption" color="text.secondary" display="block">
-                      Completa el pago para confirmar tu lugar.
+                      {t('registration.completePaymentHint')}
                     </Typography>
                   )}
                 </Paper>
               )}
 
-              <Typography variant="h6" sx={{ mb: 1.5 }}>Acciones</Typography>
+              <Typography variant="h6" sx={{ mb: 1.5 }}>{t('registration.actions')}</Typography>
               <Stack spacing={1.2}>
                 {isEventCreator() && (
                   <>
-                    <Button component={Link} to={`/events/${eventId}/edit`} variant="contained">Editar Evento</Button>
-                    <Button component={Link} to={`/events/${eventId}/manage`} variant="outlined">Gestionar Evento</Button>
+                    <Button component={Link} to={`/events/${eventId}/edit`} variant="contained">{t('editEvent')}</Button>
+                    <Button component={Link} to={`/events/${eventId}/manage`} variant="outlined">{t('manageEvent')}</Button>
                   </>
                 )}
 
@@ -546,7 +540,7 @@ const EventDetail = () => {
                         variant="contained"
                         size="large"
                       >
-                        {registrationLoading ? 'Procesando...' : isEventStarted() ? 'Evento iniciado' : 'Inscribirme al evento'}
+                        {registrationLoading ? t('processing') : isEventStarted() ? t('registration.started') : t('registration.register')}
                       </Button>
                     ) : (
                       <>
@@ -557,7 +551,7 @@ const EventDetail = () => {
                             startIcon={<PaymentsIcon />}
                             onClick={() => setShowPaymentModal(true)}
                           >
-                            Completar pago
+                            {t('registration.completePayment')}
                           </Button>
                         )}
                         <Button
@@ -565,7 +559,7 @@ const EventDetail = () => {
                           color="inherit"
                           onClick={handleContactCreator}
                         >
-                          Contactar al anfitrión
+                          {t('registration.contactHost')}
                         </Button>
                         <Button
                           onClick={() => setShowCancelDialog(true)}
@@ -574,7 +568,7 @@ const EventDetail = () => {
                           color="error"
                           size="small"
                         >
-                          Cancelar inscripción
+                          {t('registration.cancel')}
                         </Button>
                       </>
                     )}
@@ -583,7 +577,7 @@ const EventDetail = () => {
 
                 {!authState.isAuthenticated && (
                   <Button component={Link} to="/profiles/login" variant="contained" size="large">
-                    Iniciar sesión para inscribirme
+                    {t('registration.loginToRegister')}
                   </Button>
                 )}
 
@@ -607,19 +601,24 @@ const EventDetail = () => {
       />
 
       <Dialog open={showCancelDialog} onClose={() => !registrationLoading && setShowCancelDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>¿Cancelar inscripción?</DialogTitle>
+        <DialogTitle>{t('registration.cancelTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            Perderás tu lugar en <strong>{event.title}</strong>.
-            {needsPayment && ' Si ya iniciaste un pago, podrás volver a inscribirte más tarde.'}
+            <Trans
+              t={t}
+              i18nKey="registration.loseSpot"
+              values={{ title: event.title }}
+              components={{ strong: <strong /> }}
+            />
+            {needsPayment && t('registration.paymentRestart')}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowCancelDialog(false)} disabled={registrationLoading}>
-            Volver
+            {t('back')}
           </Button>
           <Button onClick={handleCancelRegistration} disabled={registrationLoading} color="error" variant="contained">
-            {registrationLoading ? 'Cancelando...' : 'Sí, cancelar'}
+            {registrationLoading ? t('registration.cancelling') : t('registration.yesCancel')}
           </Button>
         </DialogActions>
       </Dialog>

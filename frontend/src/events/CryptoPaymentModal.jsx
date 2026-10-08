@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Box,
@@ -25,18 +26,6 @@ import { getPaymentStatus } from '../api/paymentsApi';
 import { resolveNowpaymentsHandlers } from '../payments/nowpaymentsTarget';
 import { resolvePaymentTarget } from '../payments/productCatalog';
 
-const STATUS_LABELS = {
-  waiting: 'Esperando pago',
-  confirming: 'Confirmando en la red',
-  confirmed: 'Confirmado en la red',
-  sending: 'Procesando',
-  partially_paid: 'Pago parcial',
-  finished: 'Pago completado',
-  failed: 'Pago fallido',
-  refunded: 'Reembolsado',
-  expired: 'Expirado',
-};
-
 const STATUS_COLORS = {
   waiting: 'warning',
   confirming: 'info',
@@ -57,19 +46,6 @@ const OPEN_PAYMENT_STATUSES = new Set([
   'partially_paid',
 ]);
 
-const MSG = {
-  invoiceInfo:
-    'En NOWPayments podrás elegir con qué criptomoneda pagar. '
-    + 'La pasarela acepta decenas de criptos (con un pequeño cargo por conversión).',
-  payAddress: 'Dirección de pago',
-  expired: 'Este pago expiró. Cierra y vuelve a intentarlo.',
-  confirming: 'Pago detectado en la red. Esperando confirmación final...',
-  polling: 'El estado se actualiza automáticamente cuando completes el pago en NOWPayments.',
-  initError: 'No se pudo iniciar el pago',
-  copyError: 'No se pudo copiar al portapapeles',
-  preparing: 'Preparando la pasarela de pago...',
-};
-
 const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
   if (typeof msg === 'string') return msg;
@@ -77,7 +53,9 @@ const formatApiError = (err, fallback) => {
   return fallback;
 };
 
-const CopyField = ({ label, value, onCopy, copied }) => (
+const CopyField = ({ label, value, onCopy, copied }) => {
+  const { t } = useTranslation('events');
+  return (
   <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'background.default' }}>
     <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
       {label}
@@ -86,14 +64,15 @@ const CopyField = ({ label, value, onCopy, copied }) => (
       <Typography variant="body2" sx={{ wordBreak: 'break-all', flex: 1, fontFamily: 'monospace' }}>
         {value}
       </Typography>
-      <Tooltip title={copied ? 'Copiado' : 'Copiar'}>
-        <IconButton size="small" onClick={onCopy} aria-label={`Copiar ${label}`}>
+      <Tooltip title={copied ? t('copied') : t('copy')}>
+        <IconButton size="small" onClick={onCopy} aria-label={t('copyField', { label })}>
           <ContentCopyIcon fontSize="small" />
         </IconButton>
       </Tooltip>
     </Stack>
   </Paper>
-);
+  );
+};
 
 /**
  * NOWPayments invoice UI.
@@ -111,10 +90,11 @@ const CryptoPaymentModal = ({
   title,
   eventTitle,
   priceUsd,
-  productLabel = 'evento',
+  productLabel,
   onPaymentComplete,
   onBackToMethods,
 }) => {
+  const { t } = useTranslation('events');
   const [payment, setPayment] = useState(null);
   const [initializing, setInitializing] = useState(false);
   const [error, setError] = useState(null);
@@ -186,7 +166,7 @@ const CryptoPaymentModal = ({
         if (!cancelled) setPayment(data);
       } catch (err) {
         if (!cancelled) {
-          setError(formatApiError(err, MSG.initError));
+          setError(formatApiError(err, t('crypto.initError')));
         }
       } finally {
         if (!cancelled) setInitializing(false);
@@ -219,16 +199,24 @@ const CryptoPaymentModal = ({
       setCopiedFlag(true);
       setTimeout(() => setCopiedFlag(false), 2000);
     } catch {
-      setError(MSG.copyError);
+      setError(t('crypto.copyError'));
     }
   };
 
-  const statusLabel = STATUS_LABELS[payment?.payment_status] || payment?.payment_status;
+  const statusLabel = payment?.payment_status
+    ? t(`crypto.statuses.${payment.payment_status}`, { defaultValue: payment.payment_status })
+    : payment?.payment_status;
   const statusColor = STATUS_COLORS[payment?.payment_status] || 'default';
   const busy = initializing;
   const hasInvoice = Boolean(payment?.invoice_url);
   const hasOnChainDetails = Boolean(payment?.pay_address);
-  const headerTitle = handlers.headerTitle || `Pago del ${productLabel}`;
+  const resolvedProduct = productLabel || t('payments:catalog.event.productLabel');
+  const headerTitle = (targetKind === 'path' || targetKind === 'anchor')
+    ? t(`payments:nowpayments.header.${targetKind}`)
+    : t('crypto.payFor', { product: resolvedProduct });
+  const successText = targetKind
+    ? t(`payments:nowpayments.success.${targetKind}`, { defaultValue: handlers.successMessage })
+    : handlers.successMessage;
   const handleDismiss = () => {
     if (onBackToMethods && !payment?.is_paid) {
       onBackToMethods();
@@ -251,7 +239,7 @@ const CryptoPaymentModal = ({
       >
         <IconButton
           onClick={handleDismiss}
-          aria-label="Cerrar"
+          aria-label={t('close')}
           size="small"
           sx={{
             position: 'absolute',
@@ -287,7 +275,7 @@ const CryptoPaymentModal = ({
           <Stack alignItems="center" spacing={1} sx={{ py: 3 }}>
             <CircularProgress size={28} />
             <Typography variant="body2" color="text.secondary">
-              {MSG.preparing}
+              {t('crypto.preparing')}
             </Typography>
           </Stack>
         )}
@@ -296,7 +284,7 @@ const CryptoPaymentModal = ({
           <Stack spacing={2}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Typography variant="subtitle2" color="text.secondary">
-                Estado del pago
+                {t('crypto.status')}
               </Typography>
               <Chip label={statusLabel} color={statusColor} size="small" />
             </Stack>
@@ -307,7 +295,7 @@ const CryptoPaymentModal = ({
 
             {!payment.is_paid && hasInvoice && (
               <Alert severity="info" variant="outlined">
-                {MSG.invoiceInfo}
+                {t('crypto.invoiceInfo')}
               </Alert>
             )}
 
@@ -315,7 +303,7 @@ const CryptoPaymentModal = ({
               <>
                 <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: 'action.hover' }}>
                   <Typography variant="caption" color="text.secondary">
-                    Monto exacto a enviar
+                    {t('crypto.exactAmount')}
                   </Typography>
                   <Typography variant="h5" fontWeight={800} sx={{ mt: 0.5 }}>
                     {payment.pay_amount}{' '}
@@ -326,7 +314,7 @@ const CryptoPaymentModal = ({
                 </Paper>
 
                 <CopyField
-                  label={MSG.payAddress}
+                  label={t('crypto.payAddress')}
                   value={payment.pay_address}
                   copied={copiedAddress}
                   onCopy={() => copyText(payment.pay_address, setCopiedAddress)}
@@ -345,28 +333,28 @@ const CryptoPaymentModal = ({
 
             {payment.payment_status === 'partially_paid' && (
               <Alert severity="warning">
-                El monto recibido es insuficiente. Completa el pago en NOWPayments.
+                {t('crypto.partial')}
               </Alert>
             )}
             {payment.payment_status === 'expired' && (
               <Alert severity="warning">
-                {MSG.expired}
+                {t('crypto.expired')}
               </Alert>
             )}
             {payment.payment_status === 'confirmed' && !payment.is_paid && (
               <Alert severity="info">
-                {MSG.confirming}
+                {t('crypto.confirming')}
               </Alert>
             )}
             {payment.is_paid && (
               <Alert severity="success" icon={<CheckCircleOutlineIcon />}>
-                {handlers.successMessage}
+                {successText}
               </Alert>
             )}
 
             <Divider />
             <Typography variant="caption" color="text.secondary">
-              {MSG.polling}
+              {t('crypto.polling')}
             </Typography>
           </Stack>
         )}
@@ -382,17 +370,17 @@ const CryptoPaymentModal = ({
             onClick={openInvoice}
             disabled={busy}
           >
-            Pagar en NOWPayments
+            {t('crypto.payNow')}
           </Button>
         )}
         {payment?.is_paid && (
           <Button onClick={onClose} variant="contained" fullWidth>
-            Listo
+            {t('ready')}
           </Button>
         )}
         {onBackToMethods && !payment?.is_paid && (
           <Button onClick={onBackToMethods} fullWidth>
-            Elegir otro método
+            {t('crypto.otherMethod')}
           </Button>
         )}
       </DialogActions>

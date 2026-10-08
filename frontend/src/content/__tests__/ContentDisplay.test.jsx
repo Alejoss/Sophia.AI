@@ -126,7 +126,7 @@ describe('ContentDisplay', () => {
 
     renderContentDisplay(content);
 
-    const img = screen.getByAltText('Content thumbnail');
+    const img = screen.getByAltText('Miniatura del contenido');
     expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute('src', 'https://cdn.example.com/cover-preview.webp');
     expect(screen.queryByText(/no hay contenido de texto disponible/i)).not.toBeInTheDocument();

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -12,10 +13,11 @@ import {
 import bookClubsApi from '../api/bookClubsApi';
 import CommentSection from '../comments/CommentSection';
 import { useBookClub } from './BookClubLayout';
-import { CLUB_ACCENT, CLUB_NESTED_FIELDS_SX, QUESTION_STATUS_LABELS } from './clubTheme';
+import { CLUB_ACCENT, CLUB_NESTED_FIELDS_SX } from './clubTheme';
 import { getGuestSession, guestCompleteAccountUrl } from './guestStorage';
 
 const DiscussionQuestionDetail = () => {
+  const { t } = useTranslation('bookClubs');
   const { slug, questionId } = useParams();
   const { guestToken, canParticipate } = useBookClub();
   const [question, setQuestion] = useState(null);
@@ -32,12 +34,12 @@ const DiscussionQuestionDetail = () => {
       });
       setQuestion(data);
     } catch (err) {
-      setError(err?.response?.data?.detail || 'No se pudo cargar la pregunta.');
+      setError(err?.response?.data?.detail || t('errors.loadQuestion'));
       setQuestion(null);
     } finally {
       setLoading(false);
     }
-  }, [slug, questionId, guestToken]);
+  }, [slug, questionId, guestToken, t]);
 
   useEffect(() => {
     load();
@@ -49,7 +51,7 @@ const DiscussionQuestionDetail = () => {
       const data = await bookClubsApi.updateDiscussionQuestion(slug, questionId, { status });
       setQuestion(data);
     } catch (err) {
-      setError(err?.response?.data?.detail || 'No se pudo actualizar.');
+      setError(err?.response?.data?.detail || t('errors.updateQuestion'));
     } finally {
       setUpdating(false);
     }
@@ -89,7 +91,7 @@ const DiscussionQuestionDetail = () => {
           to={`/club-de-lectura/${slug}/foro`}
           sx={{ color: CLUB_ACCENT, px: 0, minWidth: 0, flexShrink: 0 }}
         >
-          ← Todas las preguntas del foro
+          {t('forum.allQuestions')}
         </Button>
         {question.mission_label && (
           <Typography
@@ -102,7 +104,7 @@ const DiscussionQuestionDetail = () => {
               pt: 0.75,
             }}
           >
-            Después de {question.mission_label}
+            {t('forum.afterMission', { label: question.mission_label })}
           </Typography>
         )}
       </Stack>
@@ -119,17 +121,17 @@ const DiscussionQuestionDetail = () => {
           sx={{ mb: 2, bgcolor: 'rgba(255,107,53,0.1)', color: '#fff' }}
           action={
             <Button component={RouterLink} to={accountUrl} sx={{ color: CLUB_ACCENT, fontWeight: 700 }}>
-              Crear cuenta
+              {t('createAccount')}
             </Button>
           }
         >
-          Puedes leer la pregunta. Para responder y ver las respuestas de los demás, crea tu cuenta.
+          {t('forum.readOnly')}
         </Alert>
       )}
 
       {canParticipate && !canSeeAnswers && canAnswer && (
         <Alert severity="info" sx={{ mb: 2, bgcolor: 'rgba(255,107,53,0.1)', color: '#fff' }}>
-          Publica tu respuesta para desbloquear las respuestas de los demás miembros.
+          {t('forum.postToUnlock')}
         </Alert>
       )}
 
@@ -139,16 +141,16 @@ const DiscussionQuestionDetail = () => {
       <Stack direction="row" spacing={1} sx={{ mb: 3 }} flexWrap="wrap" useFlexGap>
         <Chip
           label={
-            QUESTION_STATUS_LABELS[question.effective_status || question.status] ||
-            question.effective_status ||
-            question.status
+            t(`questionStatus.${question.effective_status || question.status}`, {
+              defaultValue: question.effective_status || question.status,
+            })
           }
           size="small"
           sx={{ bgcolor: 'rgba(255,107,53,0.2)', color: CLUB_ACCENT }}
         />
         {canSeeAnswers && question.answer_count != null && (
           <Chip
-            label={`${question.answer_count} respuesta${question.answer_count === 1 ? '' : 's'}`}
+            label={t('overview.answers', { count: question.answer_count })}
             size="small"
             variant="outlined"
             sx={{ borderColor: 'rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.8)' }}
@@ -166,7 +168,7 @@ const DiscussionQuestionDetail = () => {
               onClick={() => setStatus('open')}
               sx={{ bgcolor: CLUB_ACCENT }}
             >
-              Abrir
+              {t('forum.open')}
             </Button>
           )}
           {question.status === 'open' && (
@@ -177,7 +179,7 @@ const DiscussionQuestionDetail = () => {
               onClick={() => setStatus('closed')}
               sx={{ borderColor: CLUB_ACCENT, color: CLUB_ACCENT }}
             >
-              Cerrar conversación
+              {t('forum.closeThread')}
             </Button>
           )}
         </Stack>
@@ -203,13 +205,13 @@ const DiscussionQuestionDetail = () => {
           readOnly={!canAnswer || closed}
           hideComments={!canSeeAnswers}
           hideForm={Boolean(question.has_answered)}
-          hideFormNotice="Ya publicaste tu respuesta. Puedes editarla abajo o responder a otros miembros."
+          hideFormNotice={t('forum.alreadyPosted')}
           onAfterMutate={load}
-          title="Respuestas del foro"
-          placeholder="Comparte tu respuesta. Las de los demás se desbloquean cuando publiques la tuya."
-          submitLabel="Publicar respuesta"
-          emptyLabel="Aún no hay respuestas. Sé el primero."
-          lockedEmptyLabel="Publica tu respuesta para ver las de los demás miembros."
+          title={t('forum.answersTitle')}
+          placeholder={t('forum.answerPlaceholder')}
+          submitLabel={t('forum.publish')}
+          emptyLabel={t('forum.emptyAnswers')}
+          lockedEmptyLabel={t('forum.lockedEmpty')}
         />
       </Box>
     </Box>

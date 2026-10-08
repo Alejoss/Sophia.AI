@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, NavLink, Outlet, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
@@ -45,12 +46,12 @@ export const useBookClub = () => {
 };
 
 const NAV_ITEMS = [
-  { to: '.', end: true, label: 'Inicio' },
-  { to: 'misiones', label: 'Misiones' },
-  { to: 'foro', label: 'Foro' },
-  { to: 'comunidad', label: 'Comunidad' },
-  { to: 'investigacion', label: 'Investigación' },
-  { to: 'reuniones', label: 'Reuniones' },
+  { to: '.', end: true, labelKey: 'bookClub.home' },
+  { to: 'misiones', labelKey: 'bookClub.missions' },
+  { to: 'foro', labelKey: 'bookClub.forum' },
+  { to: 'comunidad', labelKey: 'bookClub.community' },
+  { to: 'investigacion', labelKey: 'bookClub.investigation' },
+  { to: 'reuniones', labelKey: 'bookClub.meetings' },
 ];
 
 const WeekDots = ({ total, completed }) => {
@@ -83,6 +84,7 @@ const emailGateSchema = yup.object({
 });
 
 const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
+  const { t } = useTranslation('bookClubs');
   const clubPath = clubSlug ? `/club-de-lectura/${clubSlug}` : window.location.pathname;
   const loginNext = encodeURIComponent(clubPath);
   const {
@@ -104,14 +106,13 @@ const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
           variant="overline"
           sx={{ color: CLUB_ACCENT, letterSpacing: 2, fontWeight: 700 }}
         >
-          Club de Lectura
+          {t('brand')}
         </Typography>
         <Typography variant="h4" sx={{ fontWeight: 700, mt: 1, mb: 1 }}>
-          {clubTitle || 'Entra al club'}
+          {clubTitle || t('enterClub')}
         </Typography>
         <Typography sx={{ color: 'rgba(255,255,255,0.7)', mb: 3 }}>
-          Deja tu correo para explorar el club en solo lectura, o regístrate con Google para
-          participar de inmediato. Con el correo te enviaremos un enlace para crear tu cuenta.
+          {t('gateIntro')}
         </Typography>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -127,7 +128,7 @@ const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
           <TextField
             type="email"
             fullWidth
-            label="Tu correo"
+            label={t('yourEmail')}
             {...bindMuiRhfField(register('email'), emailValue)}
             error={Boolean(errors.email)}
             helperText={errors.email?.message}
@@ -151,7 +152,7 @@ const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
                 py: 1.1,
               }}
             >
-              {busy ? 'Entrando…' : 'Entrar con mi correo'}
+              {busy ? t('entering') : t('enterWithEmail')}
             </Button>
             <Typography
               variant="body2"
@@ -162,7 +163,7 @@ const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
                 display: { xs: 'none', sm: 'block' },
               }}
             >
-              o
+              {t('or')}
             </Typography>
             <Box
               sx={{
@@ -182,16 +183,16 @@ const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
             variant="body2"
             sx={{ color: 'rgba(255,255,255,0.45)', display: { xs: 'block', sm: 'none' }, textAlign: 'center' }}
           >
-            — o regístrate con Google arriba —
+            {t('orGoogle')}
           </Typography>
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.45)' }}>
-            ¿Ya tienes cuenta?{' '}
+            {t('alreadyAccount')}{' '}
             <Box
               component={RouterLink}
               to={`/profiles/login?next=${loginNext}`}
               sx={{ color: CLUB_ACCENT }}
             >
-              Inicia sesión
+              {t('logIn')}
             </Box>
           </Typography>
         </Stack>
@@ -206,6 +207,8 @@ const EmailGate = ({ clubTitle, clubSlug, onSubmit, loading, error }) => {
 const clubDarkTheme = createTheme(createThemeConfig('dark'));
 
 const BookClubLayoutInner = () => {
+  const { t } = useTranslation('nav');
+  const { t: tc } = useTranslation('bookClubs');
   const { slug } = useParams();
   const { authState, authInitialized } = useContext(AuthContext);
   const [hub, setHub] = useState(null);
@@ -249,7 +252,7 @@ const BookClubLayoutInner = () => {
       }
     } catch (err) {
       const code = err?.response?.data?.code;
-      const detail = err?.response?.data?.detail || 'No se pudo cargar el club.';
+      const detail = err?.response?.data?.detail || tc('errors.loadClub');
       if (code === 'email_required' || err?.response?.status === 401) {
         setNeedsEmail(true);
         setHub(null);
@@ -285,9 +288,9 @@ const BookClubLayoutInner = () => {
     } catch (err) {
       const { generalError } = parseApiValidationErrors(
         err,
-        'No se pudo registrar el correo. Inténtalo de nuevo.',
+        tc('errors.registerEmail'),
       );
-      setGateError(generalError || 'No se pudo registrar el correo. Inténtalo de nuevo.');
+      setGateError(generalError || tc('errors.registerEmail'));
     } finally {
       setGateLoading(false);
     }
@@ -336,7 +339,7 @@ const BookClubLayoutInner = () => {
             {error}
           </Alert>
           <Button component={RouterLink} to="/club-de-lectura" sx={{ color: CLUB_ACCENT }}>
-            Volver
+            {tc('back')}
           </Button>
         </Container>
       </Box>
@@ -361,8 +364,8 @@ const BookClubLayoutInner = () => {
   const descriptionNeedsExpand = clubDescriptionNeedsExpand(fullDescription);
   const descriptionText =
     descriptionExpanded || !descriptionNeedsExpand
-      ? fullDescription || shortTagline('')
-      : shortTagline(fullDescription);
+      ? fullDescription || shortTagline('', tc('taglineFallback'))
+      : shortTagline(fullDescription, tc('taglineFallback'));
   const coverUrl = resolveMediaUrl(club.cover_image);
   const showCover = Boolean(coverUrl) && !coverBroken;
   const cycleDates = formatClubDateRange(club.starts_at, club.ends_at);
@@ -405,13 +408,13 @@ const BookClubLayoutInner = () => {
                     to={completeUrl}
                     sx={{ fontWeight: 700, color: CLUB_ACCENT }}
                   >
-                    Crear cuenta
+                    {tc('createAccount')}
                   </Button>
                 }
               >
-                Estás explorando en solo lectura
-                {hub.guest_email ? ` (${hub.guest_email})` : ''}. Para comentar, completar misiones y
-                unirte de verdad, crea tu cuenta — te enviamos el enlace también por correo.
+                {hub.guest_email
+                  ? tc('guestBannerEmail', { email: hub.guest_email })
+                  : tc('guestBanner')}
               </Alert>
             )}
 
@@ -419,7 +422,7 @@ const BookClubLayoutInner = () => {
               variant="overline"
               sx={{ color: CLUB_ACCENT, letterSpacing: 2, fontWeight: 700 }}
             >
-              Club de Lectura
+              {tc('brand')}
             </Typography>
 
             <Stack
@@ -444,7 +447,7 @@ const BookClubLayoutInner = () => {
                   <Box
                     component="img"
                     src={coverUrl}
-                    alt={`Portada de ${club.title}`}
+                    alt={tc('coverAlt', { title: club.title })}
                     onError={() => setCoverBroken(true)}
                     sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                   />
@@ -498,7 +501,7 @@ const BookClubLayoutInner = () => {
                       '&:hover': { bgcolor: 'transparent', color: CLUB_ACCENT_HOVER },
                     }}
                   >
-                    {descriptionExpanded ? 'Ver menos' : 'Ver más'}
+                    {descriptionExpanded ? tc('seeLess') : tc('seeMore')}
                   </Button>
                 )}
                 {cycleDates && (
@@ -506,7 +509,7 @@ const BookClubLayoutInner = () => {
                     variant="body2"
                     sx={{ color: 'rgba(255,255,255,0.55)', mt: 1, fontWeight: 600 }}
                   >
-                    Ciclo: {cycleDates}
+                    {tc('cycle', { dates: cycleDates })}
                   </Typography>
                 )}
                 {(hub.is_member || hub.is_guest) && (
@@ -515,9 +518,9 @@ const BookClubLayoutInner = () => {
                       variant="body2"
                       sx={{ color: 'rgba(255,255,255,0.5)', mt: 1.5, fontWeight: 600 }}
                     >
-                      Semana {week.weekNum} de {week.weeksTotal}
+                      {tc('weekOf', { week: week.weekNum, total: week.weeksTotal })}
                       {hub.club_pulse?.member_count
-                        ? ` · ${hub.club_pulse.member_count} lectores`
+                        ? tc('readersSuffix', { count: hub.club_pulse.member_count })
                         : ''}
                     </Typography>
                     <WeekDots
@@ -542,7 +545,7 @@ const BookClubLayoutInner = () => {
             >
               {NAV_ITEMS.map((item) => (
                 <Box
-                  key={item.label}
+                  key={item.labelKey}
                   component={NavLink}
                   to={item.to}
                   end={item.end}
@@ -563,7 +566,7 @@ const BookClubLayoutInner = () => {
                     '&:hover': { color: `${CLUB_ACCENT} !important` },
                   }}
                 >
-                  {item.label}
+                  {t(item.labelKey)}
                 </Box>
               ))}
             </Stack>

@@ -11,7 +11,9 @@ import {
   TextField,
 } from '@mui/material';
 import dayjs from 'dayjs';
+import { useTranslation } from 'react-i18next';
 import { applyApiErrorsToForm } from '../../utils/apiFormErrors';
+import i18n from '../../i18n';
 import TopicTimelineDateFields from './TopicTimelineDateFields';
 
 const buildInitialValues = (entry) => ({
@@ -25,7 +27,7 @@ const schema = yup.object({
   title: yup
     .string()
     .trim()
-    .required('El título es requerido.'),
+    .required(() => i18n.t('topics:timeline.titleRequired')),
   description: yup.string().default(''),
   start_date: yup.string().default(''),
   end_date: yup
@@ -33,7 +35,7 @@ const schema = yup.object({
     .default('')
     .test(
       'date-range',
-      'La fecha final no puede ser anterior a la fecha inicial.',
+      () => i18n.t('topics:timeline.dateRangeError'),
       function dateRange(value) {
         const { start_date: startDate } = this.parent;
         if (!value || !startDate) return true;
@@ -49,6 +51,7 @@ const TopicTimelineEntryForm = ({
   onSubmit,
   submitLabel,
 }) => {
+  const { t } = useTranslation('topics');
   const [generalError, setGeneralError] = useState('');
   const {
     register,
@@ -86,7 +89,7 @@ const TopicTimelineEntryForm = ({
       const { generalError: parsed } = applyApiErrorsToForm(
         err,
         setError,
-        'No se pudo guardar la entrada. Inténtalo de nuevo.',
+        t('timeline.saveError'),
       );
       if (parsed) setGeneralError(parsed);
     }
@@ -104,15 +107,15 @@ const TopicTimelineEntryForm = ({
         {generalError && <Alert severity="error">{generalError}</Alert>}
 
         <TextField
-          label="Título"
+          label={t('common.title')}
           {...register('title')}
           error={Boolean(errors.title)}
           helperText={errors.title?.message}
           fullWidth
         />
         <TextField
-          label="Descripción narrativa"
-          placeholder="Descripción narrativa para la línea de tiempo"
+          label={t('timeline.narrative')}
+          placeholder={t('timeline.narrativePlaceholder')}
           {...register('description')}
           error={Boolean(errors.description)}
           helperText={errors.description?.message}
@@ -152,7 +155,7 @@ const TopicTimelineEntryForm = ({
         }}
       >
         <Button type="button" onClick={onCancel} disabled={pending}>
-          Cancelar
+          {t('common.cancel')}
         </Button>
         <Button
           type="submit"
@@ -160,8 +163,8 @@ const TopicTimelineEntryForm = ({
           disabled={pending || !isValid}
         >
           {pending
-            ? 'Guardando...'
-            : (submitLabel || 'Guardar')}
+            ? t('common.saving')
+            : (submitLabel || t('common.save'))}
         </Button>
       </Box>
     </Paper>

@@ -33,7 +33,7 @@ describe('CommentSection form', () => {
     const user = userEvent.setup();
     renderWithProviders(<CommentSection topicId={5} />);
 
-    await screen.findByText(/aún no hay comentarios/i);
+    await screen.findByText(/no hay comentarios todavía/i);
     await user.click(screen.getByRole('button', { name: /publicar comentario/i }));
 
     expect(
@@ -47,7 +47,7 @@ describe('CommentSection form', () => {
     mockAddTopicComment.mockResolvedValue({});
     renderWithProviders(<CommentSection topicId={5} />);
 
-    await screen.findByText(/aún no hay comentarios/i);
+    await screen.findByText(/no hay comentarios todavía/i);
     await user.type(
       screen.getByPlaceholderText(/escriba un comentario/i),
       'Muy buen tema',
@@ -69,7 +69,7 @@ describe('CommentSection form', () => {
     });
     renderWithProviders(<CommentSection topicId={5} />);
 
-    await screen.findByText(/aún no hay comentarios/i);
+    await screen.findByText(/no hay comentarios todavía/i);
     await user.type(
       screen.getByPlaceholderText(/escriba un comentario/i),
       'Muy buen tema',

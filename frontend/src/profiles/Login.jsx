@@ -1,5 +1,6 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useMemo } from "react";
 import { useNavigate, useLocation, useSearchParams, Link } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import * as yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -34,16 +35,6 @@ import {
   Typography } from
 "@mui/material";
 
-const loginSchema = yup.object({
-  username: yup
-    .string()
-    .trim()
-    .required("El usuario o correo es requerido."),
-  password: yup
-    .string()
-    .required("La contraseña es requerida."),
-});
-
 const LOGIN_COVER_IMAGES = [
   "/images/login_cover/login_lucidity_1.png",
   "/images/login_cover/login_lucidity_2.png",
@@ -58,6 +49,18 @@ const LOGIN_COVER_IMAGES = [
  * Handles traditional username/email and password login
  */
 const Login = () => {
+  const { t } = useTranslation('auth');
+  const loginSchema = useMemo(
+    () =>
+      yup.object({
+        username: yup
+          .string()
+          .trim()
+          .required(() => t('login.usernameRequired')),
+        password: yup.string().required(() => t('login.passwordRequired')),
+      }),
+    [t],
+  );
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -175,16 +178,14 @@ const Login = () => {
         return;
       }
 
-      setGeneralError(
-        "No se recibió un token de acceso. Inténtalo de nuevo o contacta soporte.",
-      );
+      setGeneralError(t('login.noToken'));
     } catch (error) {
       console.error("Login error:", error);
       const { generalError: parsed } = parseApiValidationErrors(
         error,
-        "Error al iniciar sesión. Inténtalo de nuevo.",
+        t('login.error'),
       );
-      setGeneralError(parsed || "Error al iniciar sesión. Inténtalo de nuevo.");
+      setGeneralError(parsed || t('login.error'));
     }
   };
 
@@ -194,7 +195,7 @@ const Login = () => {
       <Box sx={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Stack spacing={2} alignItems="center">
           <CircularProgress size={28} />
-          <Typography>Restaurando sesión...</Typography>
+          <Typography>{t('login.restoring')}</Typography>
         </Stack>
       </Box>);
 
@@ -205,11 +206,16 @@ const Login = () => {
     return (
       <Container maxWidth="sm" sx={{ py: 4 }}>
         <Alert severity="info">
-          Ya has iniciado sesión como {sessionUsername || "usuario"}, ¿deseas
-          <MuiLink component={Link} to="/profiles/logout" underline="hover" sx={{ ml: 0.5 }}>
-            cerrar sesión
-          </MuiLink>
-          ?
+          <Trans
+            t={t}
+            i18nKey="login.alreadySignedIn"
+            values={{ name: sessionUsername || t('login.fallbackUser') }}
+            components={{
+              logout: (
+                <MuiLink component={Link} to="/profiles/logout" underline="hover" sx={{ ml: 0.5 }} />
+              ),
+            }}
+          />
         </Alert>
       </Container>);
 
@@ -243,13 +249,13 @@ const Login = () => {
         <Box sx={{ p: { xs: 3, md: 4 }, display: "flex", alignItems: "center" }}>
           <Paper elevation={0} sx={{ width: "100%" }}>
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 3, textAlign: "center" }}>
-              Iniciar sesión
+              {t('login.title')}
             </Typography>
 
             <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
               <Stack spacing={2.5}>
                 <TextField
-                  label="Usuario o correo electrónico"
+                  label={t('login.usernameLabel')}
                   {...bindMuiRhfField(register("username"), usernameValue)}
                   error={!!errors.username}
                   helperText={errors.username?.message}
@@ -257,7 +263,7 @@ const Login = () => {
                   autoComplete="username" />
                 
                 <TextField
-                  label="Contraseña"
+                  label={t('login.passwordLabel')}
                   type={showPassword ? "text" : "password"}
                   {...bindMuiRhfField(register("password"), passwordValue)}
                   error={!!errors.password}
@@ -270,7 +276,7 @@ const Login = () => {
                         <IconButton
                         edge="end"
                         onClick={() => setShowPassword(!showPassword)}
-                        aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}>
+                        aria-label={showPassword ? t('hidePassword') : t('showPassword')}>
                         
                           {showPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                         </IconButton>
@@ -285,34 +291,39 @@ const Login = () => {
                     underline="hover"
                     variant="body2"
                   >
-                    ¿Olvidaste tu contraseña?
+                    {t('login.forgotPassword')}
                   </MuiLink>
                 </Box>
 
                 {generalError && <Alert severity="error">{generalError}</Alert>}
 
                 <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
-                  {isSubmitting ? "Iniciando sesión..." : "Iniciar sesión"}
+                  {isSubmitting ? t('login.submitting') : t('login.submit')}
                 </Button>
               </Stack>
             </Box>
 
-            <Divider sx={{ my: 3 }}>O continúa con</Divider>
+            <Divider sx={{ my: 3 }}>{t('login.orContinue')}</Divider>
             <SocialLogin />
 
             <Typography variant="body2" sx={{ textAlign: "center", mt: 3 }}>
-              ¿No tienes cuenta?{" "}
-              <MuiLink
-                component={Link}
-                to={
-                  authNext
-                    ? `/profiles/register?next=${encodeURIComponent(authNext)}`
-                    : "/profiles/register"
-                }
-                underline="hover"
-              >
-                Regístrate
-              </MuiLink>
+              <Trans
+                t={t}
+                i18nKey="login.noAccount"
+                components={{
+                  register: (
+                    <MuiLink
+                      component={Link}
+                      to={
+                        authNext
+                          ? `/profiles/register?next=${encodeURIComponent(authNext)}`
+                          : "/profiles/register"
+                      }
+                      underline="hover"
+                    />
+                  ),
+                }}
+              />
             </Typography>
           </Paper>
         </Box>

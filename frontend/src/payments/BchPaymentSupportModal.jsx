@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -18,8 +19,6 @@ import { useAuth } from '../context/AuthContext';
 import { fetchOrCreateThread, sendMessage } from '../api/messagesApi';
 import { reportBchOrderTxid } from '../api/paymentsApi';
 import {
-  ANCHOR_FULFILL_DEFERRED_DESCRIPTION,
-  BCH_SUPPORT_DESCRIPTION,
   PAYMENT_SUPPORT_USER_ID,
   buildAnchorFulfillDeferredHelpMessage,
   buildBchVerifyHelpMessage,
@@ -43,7 +42,7 @@ const BchPaymentSupportModal = ({
   onBackToOrder,
   title,
   priceUsd,
-  productLabel = 'producto',
+  productLabel,
   bchOrder = null,
   verifyError = null,
   mode = 'verify_failed',
@@ -51,6 +50,7 @@ const BchPaymentSupportModal = ({
   requestId = null,
   paymentMethod = '',
 }) => {
+  const { t } = useTranslation('payments');
   const isFulfillDeferred = mode === 'fulfill_deferred';
   const navigate = useNavigate();
   const { authState } = useAuth();
@@ -77,11 +77,11 @@ const BchPaymentSupportModal = ({
     if (!isFulfillDeferred) {
       if (!cleanTxid) return;
       if (!isLikelyBchTxid(cleanTxid)) {
-        setError('El ID de transacción debe tener 64 caracteres hexadecimales.');
+        setError(t('bchSupport.txidInvalid'));
         return;
       }
     } else if (cleanTxid && !isLikelyBchTxid(cleanTxid)) {
-      setError('El ID de transacción debe tener 64 caracteres hexadecimales.');
+      setError(t('bchSupport.txidInvalid'));
       return;
     }
 
@@ -94,13 +94,13 @@ const BchPaymentSupportModal = ({
       const threadRes = await fetchOrCreateThread(PAYMENT_SUPPORT_USER_ID);
       const thread = threadRes?.data;
       if (!thread?.id) {
-        throw new Error('No se pudo abrir la conversación');
+        throw new Error(t('bchSupport.openThreadError'));
       }
       const message = isFulfillDeferred
         ? buildAnchorFulfillDeferredHelpMessage({
           title,
           priceUsd,
-          productLabel,
+          productLabel: productLabel || t('genericProduct'),
           bchOrder,
           reviewNote,
           requestId,
@@ -110,7 +110,7 @@ const BchPaymentSupportModal = ({
         : buildBchVerifyHelpMessage({
           title,
           priceUsd,
-          productLabel,
+          productLabel: productLabel || t('genericProduct'),
           bchOrder,
           error: verifyError,
           txid: cleanTxid,
@@ -120,7 +120,7 @@ const BchPaymentSupportModal = ({
       onClose?.();
       navigate(`/messages/thread/${PAYMENT_SUPPORT_USER_ID}`);
     } catch (err) {
-      setError(formatApiError(err, 'No se pudo enviar el mensaje'));
+      setError(formatApiError(err, t('bchSupport.sendError')));
     } finally {
       setBusy(false);
     }
@@ -132,10 +132,10 @@ const BchPaymentSupportModal = ({
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ pr: 6 }}>
         {isFulfillDeferred
-          ? 'Pago recibido — contactar soporte'
-          : 'Ya pagué — avisar a soporte'}
+          ? t('bchSupport.paidTitle')
+          : t('bchSupport.verifyTitle')}
         <IconButton
-          aria-label="Cerrar"
+          aria-label={t('close')}
           onClick={onClose}
           sx={{ position: 'absolute', right: 8, top: 8 }}
         >
@@ -152,8 +152,8 @@ const BchPaymentSupportModal = ({
           )}
           <Alert severity="info">
             {isFulfillDeferred
-              ? ANCHOR_FULFILL_DEFERRED_DESCRIPTION
-              : BCH_SUPPORT_DESCRIPTION}
+              ? t('bchSupport.deferredDescription')
+              : t('bchSupport.description')}
           </Alert>
           {!isFulfillDeferred && verifyError && (
             <Alert severity="warning">{verifyError}</Alert>
@@ -163,8 +163,10 @@ const BchPaymentSupportModal = ({
           )}
           {bchOrder?.address && (
             <Typography variant="body2" color="text.secondary">
-              Orden {bchOrder.id != null ? `#${bchOrder.id} · ` : ''}
-              {bchOrder.expected_amount_bch} BCH →{' '}
+              {t('bchSupport.orderLine', {
+                idPrefix: bchOrder.id != null ? `#${bchOrder.id} · ` : '',
+                amount: bchOrder.expected_amount_bch,
+              })}{' '}
               <Typography
                 component="span"
                 sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}
@@ -175,34 +177,34 @@ const BchPaymentSupportModal = ({
           )}
           {isSelf && (
             <Alert severity="info">
-              Esta opción envía un mensaje a tu propia cuenta. Usa otra sesión para probar el flujo.
+              {t('bchSupport.self')}
             </Alert>
           )}
           {error && <Alert severity="error">{error}</Alert>}
           <TextField
             label={isFulfillDeferred
-              ? 'ID de transacción (TXID) — opcional'
-              : 'ID de transacción (TXID)'}
+              ? t('bchSupport.txidOptional')
+              : t('bchSupport.txidRequired')}
             value={txid}
             onChange={(event) => setTxid(event.target.value)}
-            placeholder="64 caracteres hexadecimales"
+            placeholder={t('bchSupport.txidPlaceholder')}
             fullWidth
             required={!isFulfillDeferred}
             disabled={busy || isSelf}
             helperText={isFulfillDeferred
-              ? 'Opcional si el pago ya quedó confirmado. Útil si tienes el TXID a mano.'
-              : 'Cópialo desde tu billetera o explorador BCH después de enviar el pago.'}
+              ? t('bchSupport.txidHelperOptional')
+              : t('bchSupport.txidHelper')}
             inputProps={{ spellCheck: false, autoComplete: 'off' }}
           />
           <TextField
-            label="Nota opcional"
+            label={t('bchSupport.note')}
             value={note}
             onChange={(event) => setNote(event.target.value)}
             multiline
             minRows={2}
             fullWidth
             disabled={busy || isSelf}
-            placeholder="Cualquier detalle útil (billetera usada, hora aproximada, etc.)"
+            placeholder={t('bchSupport.notePlaceholder')}
           />
         </Stack>
       </DialogContent>
@@ -215,16 +217,16 @@ const BchPaymentSupportModal = ({
           startIcon={busy ? <CircularProgress size={16} color="inherit" /> : null}
         >
           {busy
-            ? 'Enviando...'
-            : (isFulfillDeferred ? 'Contactar soporte' : 'Enviar TXID a soporte')}
+            ? t('sending')
+            : (isFulfillDeferred ? t('contactSupport') : t('bchSupport.sendTxid'))}
         </Button>
         {onBackToOrder && (
           <Button onClick={onBackToOrder} fullWidth disabled={busy}>
-            Volver a la orden BCH
+            {t('bchSupport.backToOrder')}
           </Button>
         )}
         <Button onClick={onClose} fullWidth disabled={busy}>
-          Cerrar
+          {t('close')}
         </Button>
       </DialogActions>
     </Dialog>

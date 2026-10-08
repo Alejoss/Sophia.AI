@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import ApiIcon from '@mui/icons-material/Api';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { Tooltip, Typography, Box, Container, Button, CircularProgress, Alert, Paper, Stack, IconButton, Link as MuiLink } from '@mui/material';
@@ -13,6 +14,7 @@ const Notifications = ({
   onMarkAllAsRead = () => {},
   onRefresh = () => {}
 }) => {
+  const { t } = useTranslation('profiles');
 
   const TOPIC_SUGGESTION_VERBS = [
     'sugirió contenido para',
@@ -46,12 +48,18 @@ const Notifications = ({
 
   const getNotificationDescription = (notification) => {
     if (verbIs(notification.verb, 'comentó en tu camino de conocimiento')) {
-      return `${notification.actor} comentó en tu camino de conocimiento ${notification.context_title}`;
+      return t('notifications.commentedOnPath', {
+        actor: notification.actor,
+        title: notification.context_title,
+      });
     } else if (verbIs(notification.verb, 'respondió a')) {
       if (notification.context_title) {
-        return `${notification.actor} respondió a tu comentario en ${notification.context_title}`;
+        return t('notifications.repliedIn', {
+          actor: notification.actor,
+          title: notification.context_title,
+        });
       }
-      return notification.description || `${notification.actor} respondió a tu comentario`;
+      return notification.description || t('notifications.replied', { actor: notification.actor });
     } else if (verbIs(notification.verb, 'completó tu camino de conocimiento')) {
       return notification.description;
     } else if (verbIs(notification.verb, 'solicitó un certificado para tu camino de conocimiento') ||
@@ -116,31 +124,40 @@ const Notifications = ({
         }
         return notification.description;
       }
-      return `${notification.actor} te invitó a moderar`;
+      return t('notifications.invitedToModerate', { actor: notification.actor });
     } else if (verbIs(notification.verb, 'aceptó tu invitación para moderar')) {
-      return notification.description || `${notification.actor} aceptó tu invitación para moderar`;
+      return notification.description || t('notifications.acceptedModerationInvite', { actor: notification.actor });
     } else if (verbIs(notification.verb, 'rechazó tu invitación para moderar')) {
-      return notification.description || `${notification.actor} rechazó tu invitación para moderar`;
+      return notification.description || t('notifications.rejectedModerationInvite', { actor: notification.actor });
     } else if (verbIs(notification.verb, 'te removió como moderador de')) {
-      return notification.description || `${notification.actor} te removió como moderador`;
+      return notification.description || t('notifications.removedAsModerator', { actor: notification.actor });
     } else if (verbIs(notification.verb, 'sugirió un archivo para tu contenido')) {
-      return notification.description || `${notification.actor} sugirió un archivo para tu contenido`;
+      return notification.description || t('notifications.suggestedFile', { actor: notification.actor });
     } else if (verbIs(notification.verb, 'solicitó crear un tema')) {
-      return notification.description || `${notification.actor} solicitó crear un tema`;
+      return notification.description || t('notifications.requestedTopic', { actor: notification.actor });
     } else if (
       verbIs(notification.verb, 'reportó un pago BCH')
       || verbIs(notification.verb, 'reportó un pago BCH de')
     ) {
-      return notification.description || `${notification.actor} ${notification.verb}`;
+      return notification.description || t('notifications.actorVerb', {
+        actor: notification.actor,
+        verb: notification.verb,
+      });
     } else if (
       verbIs(notification.verb, 'confirmó tu pago de')
       || verbIs(notification.verb, 'compró tu camino de conocimiento')
       || verbIs(notification.verb, 'compró acceso a las consultas de')
     ) {
-      return notification.description || `${notification.actor} ${notification.verb}`;
+      return notification.description || t('notifications.actorVerb', {
+        actor: notification.actor,
+        verb: notification.verb,
+      });
     } else if (verbIn(notification.verb, TOPIC_SUGGESTION_VERBS)) {
       return stripActorFromDescription(
-        notification.description || `${notification.actor} ${notification.verb}`,
+        notification.description || t('notifications.actorVerb', {
+          actor: notification.actor,
+          verb: notification.verb,
+        }),
         notification.actor
       );
     }
@@ -148,7 +165,16 @@ const Notifications = ({
     if (notification.description) {
       return notification.description;
     }
-    return `${notification.actor} ${notification.verb}${notification.context_title ? ` en ${notification.context_title}` : ''}`;
+    return notification.context_title
+      ? t('notifications.fallbackWithContext', {
+          actor: notification.actor,
+          verb: notification.verb,
+          title: notification.context_title,
+        })
+      : t('notifications.actorVerb', {
+          actor: notification.actor,
+          verb: notification.verb,
+        });
   };
 
   return (
@@ -166,12 +192,12 @@ const Notifications = ({
             fontWeight: 600
           }}>
           
-          Notificaciones
+          {t('notifications.title')}
         </Typography>
       </Box>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
         <Button variant="outlined" onClick={onMarkAllAsRead}>
-          Marcar todas como leídas
+          {t('notifications.markAllRead')}
         </Button>
       </Box>
       {loading ?
@@ -179,14 +205,14 @@ const Notifications = ({
           <Stack alignItems="center" spacing={1.5}>
             <CircularProgress size={28} />
             <Typography variant="body2" color="text.secondary">
-              Cargando notificaciones...
+              {t('notifications.loading')}
             </Typography>
           </Stack>
         </Box> :
       error ?
       <Alert severity="error">{error}</Alert> :
       notifications.length === 0 ?
-      <Alert severity="info">No se encontraron notificaciones</Alert> :
+      <Alert severity="info">{t('notifications.empty')}</Alert> :
 
       <Stack spacing={2}>
           {notifications.map((notification) => {
@@ -231,7 +257,7 @@ const Notifications = ({
                           variant="body2"
                           sx={{ fontWeight: 500, whiteSpace: 'nowrap' }}
                         >
-                          Ver sugerencias
+                          {t('notifications.viewSuggestions')}
                         </MuiLink>
                       ) : (
                         <MuiLink
@@ -249,7 +275,7 @@ const Notifications = ({
                   </Box>
 
                   {notification.unread &&
-                <Tooltip title="Marcar como leída" arrow>
+                <Tooltip title={t('notifications.markRead')} arrow>
                       <IconButton
                     color="primary"
                     onClick={() => onMarkAsRead(notification.id)}>
@@ -269,7 +295,7 @@ const Notifications = ({
         color="text.secondary"
         sx={{ textAlign: 'center', display: 'block', mt: 2.5, fontStyle: 'italic' }}>
         
-        Las notificaciones leídas se eliminan después de 30 días
+        {t('notifications.retention')}
       </Typography>
     </Container>);
 

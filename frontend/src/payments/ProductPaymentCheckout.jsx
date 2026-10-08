@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   Alert,
   Box,
@@ -67,21 +68,27 @@ const ProductPaymentCheckout = ({
   nowpaymentsProps = {},
   onPaid,
 }) => {
+  const { t } = useTranslation('payments');
   const catalog = productKind ? getProductCatalogEntry(productKind) : null;
-  const productLabel = productLabelProp || catalog?.productLabel || 'producto';
-  const chooserTitle = chooserTitleProp || catalog?.chooserTitle || `Pagar ${productLabel}`;
+  const productLabel = productLabelProp
+    || (productKind ? t(`catalog.${productKind}.productLabel`) : t('genericProduct'));
+  const chooserTitle = chooserTitleProp
+    || (productKind
+      ? t(`catalog.${productKind}.chooserTitle`)
+      : t('catalog.payProduct', { product: productLabel }));
   const paidSuccessMessage = paidSuccessMessageProp
-    || catalog?.paidSuccessMessage
-    || `¡Pago recibido! Ya puedes usar este ${productLabel}.`;
+    || (catalog?.paidSuccessMessage
+      ? t(`catalog.${productKind}.paidSuccess`)
+      : t('catalog.paidFallback', { product: productLabel }));
   const tokenPaidSuccessMessage = catalog?.tokenPaidSuccessMessage
-    || paidSuccessMessage;
+    ? t(`catalog.${productKind}.tokenPaidSuccess`)
+    : paidSuccessMessage;
   const paidDeferredMessage = catalog?.paidDeferredMessage
-    || (
-      'Pago confirmado, pero el anclaje a Bitcoin no se emitió automáticamente. '
-      + 'No vuelvas a pagar — contacta soporte para completarlo.'
-    );
+    ? t(`catalog.${productKind}.paidDeferred`)
+    : t('catalog.paidDeferredFallback');
   const tokenPaidDeferredMessage = catalog?.tokenPaidDeferredMessage
-    || paidDeferredMessage;
+    ? t(`catalog.${productKind}.tokenPaidDeferred`)
+    : paidDeferredMessage;
 
   const explicitOffers = offerNowpayments != null
     || offerPayphone != null
@@ -258,7 +265,7 @@ const ProductPaymentCheckout = ({
       const order = await createBchPayment();
       setBchOrder(order);
     } catch (err) {
-      setBchError(formatApiError(err, 'No se pudo crear la orden BCH. Inténtalo de nuevo.'));
+      setBchError(formatApiError(err, t('checkout.bchCreateError')));
     } finally {
       setBchBusy(false);
     }
@@ -266,7 +273,7 @@ const ProductPaymentCheckout = ({
 
   const startPayphone = async () => {
     if (!resolvedPaymentTarget?.kind || resolvedPaymentTarget?.purchaseId == null) {
-      setPayphoneError('No hay un producto listo para pagar con tarjeta.');
+      setPayphoneError(t('checkout.noCardProduct'));
       return;
     }
     if (payphoneBusy) return;
@@ -279,7 +286,7 @@ const ProductPaymentCheckout = ({
       });
       const url = order.pay_with_card_url || order.pay_with_payphone_url;
       if (!url) {
-        throw new Error('Payphone no devolvió un enlace de pago.');
+        throw new Error(t('checkout.noPayphoneLink'));
       }
       setMethod('payphone');
       // Full-page redirect required by Payphone (no iframe) so the Referer matches
@@ -287,7 +294,7 @@ const ProductPaymentCheckout = ({
       window.location.assign(url);
     } catch (err) {
       setMethod(null);
-      setPayphoneError(formatApiError(err, 'No se pudo iniciar el pago con tarjeta.'));
+      setPayphoneError(formatApiError(err, t('checkout.cardStartError')));
       setPayphoneBusy(false);
     }
   };
@@ -314,7 +321,7 @@ const ProductPaymentCheckout = ({
     const cleanTxid = normalizeBchTxid(verifyTxid);
     const txidForVerify = isLikelyBchTxid(cleanTxid) ? cleanTxid : undefined;
     if (verifyTxid.trim() && !txidForVerify) {
-      setBchError('El TXID debe tener 64 caracteres hexadecimales.');
+      setBchError(t('checkout.txidLength'));
       return;
     }
     setBchBusy(true);
@@ -331,7 +338,7 @@ const ProductPaymentCheckout = ({
         applyPaidResult(data);
       }
     } catch (err) {
-      setBchError(formatApiError(err, 'No se pudo verificar el pago. Inténtalo de nuevo.'));
+      setBchError(formatApiError(err, t('checkout.verifyError')));
     } finally {
       setBchBusy(false);
     }
@@ -348,7 +355,7 @@ const ProductPaymentCheckout = ({
       }
       applyPaidResult(result, { fromTokens: true });
     } catch (err) {
-      setTokenError(formatApiError(err, 'No se pudo pagar con tokens. Inténtalo de nuevo.'));
+      setTokenError(formatApiError(err, t('checkout.tokenPayError')));
     } finally {
       setTokenBusy(false);
     }
@@ -360,7 +367,7 @@ const ProductPaymentCheckout = ({
       setCopied(key);
       setTimeout(() => setCopied(''), 1800);
     } catch {
-      setBchError('No se pudo copiar al portapapeles');
+      setBchError(t('checkout.copyError'));
     }
   };
 
@@ -398,7 +405,7 @@ const ProductPaymentCheckout = ({
         <DialogTitle sx={{ pr: 6 }}>
           {chooserTitle}
           <IconButton
-            aria-label="Cerrar"
+            aria-label={t('close')}
             onClick={onClose}
             sx={{ position: 'absolute', right: 8, top: 8 }}
           >
@@ -420,7 +427,12 @@ const ProductPaymentCheckout = ({
             <Stack spacing={1.5}>
               {bchNetwork && bchNetwork !== 'mainnet' && methods.bch_direct && (
                 <Typography variant="body2" color="text.secondary">
-                  BCH directo usa la red de pruebas <strong>{bchNetwork}</strong>.
+                  <Trans
+                    t={t}
+                    i18nKey="checkout.testnet"
+                    values={{ network: bchNetwork }}
+                    components={{ strong: <strong /> }}
+                  />
                 </Typography>
               )}
               {catalogAllowsTokens && (
@@ -430,14 +442,12 @@ const ProductPaymentCheckout = ({
                   disabled={!methods.platform_tokens || !canPayTokens}
                   onClick={() => setMethod('tokens')}
                 >
-                  Pagar con tokens ({localPriceTokens})
-                  {' · '}
-                  saldo {localTokenBalance}
+                  {t('checkout.payTokens', { count: localPriceTokens, balance: localTokenBalance })}
                 </Button>
               )}
               {catalogAllowsTokens && methods.platform_tokens && !canPayTokens && (
                 <Typography variant="caption" color="text.secondary">
-                  Necesitas {localPriceTokens} tokens (1 token = $0.01). Compra un paquete en Mis tokens.
+                  {t('checkout.needTokens', { count: localPriceTokens })}
                 </Typography>
               )}
               {catalogAllowsPayphone && (
@@ -447,7 +457,7 @@ const ProductPaymentCheckout = ({
                   disabled={!methods.payphone || payphoneBusy}
                   onClick={startPayphone}
                 >
-                  {payphoneBusy ? 'Abriendo Payphone…' : 'Tarjeta de Crédito (Payphone)'}
+                  {payphoneBusy ? t('checkout.openingPayphone') : t('checkout.card')}
                 </Button>
               )}
               {catalogAllowsPayphone && payphoneError && method === null && (
@@ -461,8 +471,8 @@ const ProductPaymentCheckout = ({
                   onClick={() => setMethod('nowpayments')}
                 >
                   {catalogAllowsBch
-                    ? 'NOWPayments (varias criptos)'
-                    : 'NOWPayments (BCH, BTC y más)'}
+                    ? t('checkout.nowSeveral')
+                    : t('checkout.nowMore')}
                 </Button>
               )}
               {catalogAllowsBch && (
@@ -472,7 +482,7 @@ const ProductPaymentCheckout = ({
                   disabled={!methods.bch_direct}
                   onClick={startBch}
                 >
-                  Bitcoin Cash directo (BCH)
+                  {t('checkout.bchDirect')}
                   {bchNetwork && bchNetwork !== 'mainnet' ? ` · ${bchNetwork}` : ''}
                 </Button>
               )}
@@ -482,27 +492,27 @@ const ProductPaymentCheckout = ({
                   size="large"
                   onClick={() => setMethod('monero')}
                 >
-                  Pagar con Monero
+                  {t('checkout.payMonero')}
                 </Button>
               )}
               {!hasAnyMethod && (
                 <Alert severity="warning">
-                  No hay métodos de pago configurados en el servidor.
+                  {t('checkout.noMethods')}
                 </Alert>
               )}
             </Stack>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose}>Cancelar</Button>
+          <Button onClick={onClose}>{t('cancel')}</Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={showPayphone} onClose={onClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ pr: 6 }}>
-          Pago con tarjeta
+          {t('checkout.cardTitle')}
           <IconButton
-            aria-label="Cerrar"
+            aria-label={t('close')}
             onClick={onClose}
             sx={{ position: 'absolute', right: 8, top: 8 }}
           >
@@ -513,24 +523,23 @@ const ProductPaymentCheckout = ({
           <Stack alignItems="center" spacing={2} sx={{ py: 3 }}>
             <CircularProgress size={28} />
             <Typography variant="body2" color="text.secondary" textAlign="center">
-              Te estamos llevando a Payphone para pagar con tarjeta.
-              Si no se abre, vuelve e inténtalo de nuevo.
+              {t('checkout.cardRedirect')}
             </Typography>
             {payphoneError && <Alert severity="error">{payphoneError}</Alert>}
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setMethod(null); setPayphoneBusy(false); }}>
-            Volver
+            {t('back')}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={showTokens} onClose={onClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ pr: 6 }}>
-          Pagar con tokens
+          {t('checkout.tokensTitle')}
           <IconButton
-            aria-label="Cerrar"
+            aria-label={t('close')}
             onClick={onClose}
             sx={{ position: 'absolute', right: 8, top: 8 }}
           >
@@ -562,7 +571,7 @@ const ProductPaymentCheckout = ({
                       setSupportOpen(true);
                     }}
                   >
-                    Contactar soporte
+                    {t('contactSupport')}
                   </Button>
                 </Box>
               )}
@@ -570,7 +579,7 @@ const ProductPaymentCheckout = ({
           ) : (
             <Stack spacing={1.5}>
               <Typography variant="body2" color="text.secondary">
-                Se descontarán {localPriceTokens} tokens de tu saldo ({localTokenBalance}).
+                {t('checkout.tokenDeduct', { count: localPriceTokens, balance: localTokenBalance })}
               </Typography>
               <Typography variant="body2">
                 {productLabel} · ${Number(priceUsd || 0).toFixed(2)} USD
@@ -587,10 +596,10 @@ const ProductPaymentCheckout = ({
             }}
             disabled={tokenBusy}
           >
-            Cambiar método
+            {t('changeMethod')}
           </Button>
           <Stack direction="row" spacing={1}>
-            <Button onClick={onClose}>Cerrar</Button>
+            <Button onClick={onClose}>{t('close')}</Button>
             {!paid && (
               <Button
                 variant="contained"
@@ -598,7 +607,7 @@ const ProductPaymentCheckout = ({
                 disabled={tokenBusy || !canPayTokens}
                 startIcon={tokenBusy ? <CircularProgress size={16} color="inherit" /> : null}
               >
-                Confirmar pago
+                {t('confirmPayment')}
               </Button>
             )}
           </Stack>
@@ -646,12 +655,12 @@ const ProductPaymentCheckout = ({
 
       <Dialog open={showBch} onClose={onClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ pr: 6 }}>
-          Pago con Bitcoin Cash
+          {t('checkout.bchTitle')}
           {(bchOrder?.network || bchNetwork) && (bchOrder?.network || bchNetwork) !== 'mainnet'
             ? ` (${bchOrder?.network || bchNetwork})`
             : ''}
           <IconButton
-            aria-label="Cerrar"
+            aria-label={t('close')}
             onClick={onClose}
             sx={{ position: 'absolute', right: 8, top: 8 }}
           >
@@ -663,11 +672,7 @@ const ProductPaymentCheckout = ({
             <Alert severity="warning" sx={{ mb: 2 }}>
               {bchError}
               <Typography variant="body2" sx={{ mt: 1 }}>
-                Si ya enviaste el pago, no te preocupes, primero vuelve a intentar
-                clickeando en el botón &quot;Ya realicé el pago&quot; dentro de 5
-                minutos, a veces la blockchain se demora en actualizarse. Si aún así
-                no encontramos automáticamente tu transacción, envíanos el ID de la
-                transacción y la revisaremos manualmente para desbloquear tu acceso.
+                {t('checkout.retryHint')}
               </Typography>
               {!paid && (
                 <Box sx={{ mt: 1.5 }}>
@@ -680,7 +685,7 @@ const ProductPaymentCheckout = ({
                       setSupportOpen(true);
                     }}
                   >
-                    Enviar TXID a soporte
+                    {t('checkout.sendTxid')}
                   </Button>
                 </Box>
               )}
@@ -705,7 +710,7 @@ const ProductPaymentCheckout = ({
                       setSupportOpen(true);
                     }}
                   >
-                    Contactar soporte
+                    {t('contactSupport')}
                   </Button>
                 </Box>
               )}
@@ -715,19 +720,18 @@ const ProductPaymentCheckout = ({
             <Stack alignItems="center" spacing={1} sx={{ py: 3 }}>
               <CircularProgress size={28} />
               <Typography variant="body2" color="text.secondary">
-                Preparando orden BCH…
+                {t('checkout.preparing')}
               </Typography>
             </Stack>
           )}
           {bchOrder && (
             <Stack spacing={2}>
               <Typography variant="body2" color="text.secondary">
-                Envía este monto a la dirección (usa el valor en sats si tu
-                wallet redondea; toleramos hasta ~$0.20 de diferencia).
+                {t('checkout.sendAmount')}
               </Typography>
               <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
                 <Typography variant="caption" color="text.secondary">
-                  Monto exacto
+                  {t('checkout.exactAmount')}
                 </Typography>
                 <Typography variant="h5" fontWeight={800}>
                   {bchOrder.expected_amount_bch} BCH
@@ -738,7 +742,7 @@ const ProductPaymentCheckout = ({
               </Paper>
               <Box>
                 <Typography variant="caption" color="text.secondary">
-                  Dirección
+                  {t('checkout.address')}
                 </Typography>
                 <Stack
                   direction={{ xs: 'column', sm: 'row' }}
@@ -757,7 +761,7 @@ const ProductPaymentCheckout = ({
                       </Typography>
                       <IconButton
                         size="small"
-                        aria-label="Copiar dirección"
+                        aria-label={t('copyAddress')}
                         onClick={() => copyText(bchOrder.address, 'addr')}
                       >
                         <ContentCopyIcon fontSize="small" />
@@ -765,7 +769,7 @@ const ProductPaymentCheckout = ({
                     </Stack>
                     {copied === 'addr' && (
                       <Typography variant="caption" color="success.main">
-                        Copiado
+                        {t('copied')}
                       </Typography>
                     )}
                   </Box>
@@ -774,14 +778,14 @@ const ProductPaymentCheckout = ({
               <BchOrderExpiryNotice bchOrder={bchOrder} />
               {bchError && (
                 <TextField
-                  label="ID de transacción (TXID) — solo si el auto-verify falló"
-                  placeholder="Pega el TXID de 64 caracteres de tu wallet"
+                  label={t('checkout.txidLabel')}
+                  placeholder={t('checkout.txidPlaceholder')}
                   value={verifyTxid}
                   onChange={(e) => setVerifyTxid(e.target.value)}
                   fullWidth
                   size="small"
                   autoComplete="off"
-                  helperText="Opcional: pégalo aquí para reintentar, o envíalo a soporte abajo."
+                  helperText={t('checkout.txidHelper')}
                 />
               )}
               <Divider />
@@ -797,7 +801,7 @@ const ProductPaymentCheckout = ({
               onClick={verifyBch}
               startIcon={bchBusy ? <CircularProgress size={16} color="inherit" /> : null}
             >
-              Ya realicé el pago
+              {t('checkout.alreadyPaid')}
             </Button>
           )}
           {(paid || bchOrder?.status === 'expired') && (
@@ -807,11 +811,11 @@ const ProductPaymentCheckout = ({
               disabled={bchBusy || paid}
               onClick={startBch}
             >
-              Generar nueva orden BCH
+              {t('checkout.newOrder')}
             </Button>
           )}
           <Button onClick={onClose} fullWidth>
-            {paid ? 'Listo' : 'Cerrar'}
+            {paid ? t('ready') : t('close')}
           </Button>
           {!paid && (
             <Button
@@ -823,7 +827,7 @@ const ProductPaymentCheckout = ({
                 setSupportOpen(false);
               }}
             >
-              Volver a métodos de pago
+              {t('backToMethods')}
             </Button>
           )}
         </DialogActions>

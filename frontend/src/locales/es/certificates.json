@@ -1,0 +1,58 @@
+{
+  "dashboard": {
+    "title": "Certificados",
+    "intro": "Elige un camino de conocimiento para ver a sus alumnos. Desde aquí se envía a Sepolia. El certificado educativo se queda en la cuenta del alumno. El NFT es la recompensa, y quien la recibe puede enviarla.",
+    "pathsHeading": "Caminos de conocimiento",
+    "untitled": "Sin título",
+    "pathSummary_one": "Snapshot v{{version}} · {{count}} alumno",
+    "pathSummary_other": "Snapshot v{{version}} · {{count}} alumnos",
+    "readySuffix": " · listo",
+    "empty": "No hay certificados de caminos de conocimiento. Aprueba una solicitud primero.",
+    "waiting": "Sin snapshot: {{titles}}. Esos caminos aparecen aquí cuando tengan un snapshot.",
+    "loadFailed": "No se pudo leer los contratos",
+    "confirmed": "Sepolia confirmó la operación.",
+    "recipientRequired": "Escribe la dirección que va a recibir el token.",
+    "registerPending": "El registro se envió a Sepolia. La confirmación sigue en segundo plano.",
+    "registerAlready": "La versión {{version}} de “{{title}}” ya estaba registrada.",
+    "registerDone": "Versión {{version}} registrada para el certificado.",
+    "registerFailed": "No se pudo registrar la versión",
+    "mintPending": "El certificado se envió a Sepolia. La confirmación sigue en segundo plano.",
+    "mintAlready": "El certificado de {{learner}} ya está emitido (#{{tokenId}}).",
+    "mintDone": "Certificado #{{tokenId}} emitido a {{recipient}}.",
+    "mintFailed": "No se pudo emitir el certificado",
+    "imageSaved": "Imagen guardada para el NFT de {{learner}}.",
+    "imageFailed": "No se pudo guardar la imagen",
+    "rewardPending": "El NFT se envió a Sepolia. La confirmación sigue en segundo plano.",
+    "rewardAlready": "El NFT de {{learner}} ya está emitido (#{{tokenId}}).",
+    "rewardDone": "NFT #{{tokenId}} emitido a {{recipient}}.",
+    "rewardFailed": "No se pudo emitir el NFT"
+  },
+  "contract": {
+    "certificateTitle": "Certificado educativo",
+    "certificateHint": "Acredita que el alumno terminó el camino de conocimiento.",
+    "rewardTitle": "NFT de recompensa",
+    "rewardHint": "Recompensa por ese mismo logro.",
+    "disconnected": "Sin conexión",
+    "notDeployed": "Todavía no está desplegado"
+  },
+  "token": {
+    "owner": "Dueño {{address}}",
+    "viewTx": "Ver transacción"
+  },
+  "student": {
+    "walletLabel": "Cuenta de Sepolia del alumno",
+    "certificateKicker": "Certificado educativo",
+    "certificateBody": "Registra la versión del snapshot y después emítelo a la cuenta de arriba.",
+    "certificateDone": "Certificado #{{tokenId}}",
+    "confirming": "Confirmando…",
+    "registerVersion": "Registrar versión",
+    "mintCertificate": "Emitir certificado",
+    "rewardKicker": "NFT de recompensa",
+    "rewardBody": "Se emite a la misma cuenta.",
+    "rewardDone": "NFT #{{tokenId}}",
+    "savingImage": "Guardando…",
+    "changeImage": "Cambiar imagen",
+    "uploadImage": "Subir imagen",
+    "mintNft": "Emitir NFT"
+  }
+}

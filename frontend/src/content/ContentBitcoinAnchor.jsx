@@ -12,19 +12,13 @@ import {
 import VerifiedIcon from '@mui/icons-material/Verified';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import DownloadIcon from '@mui/icons-material/Download';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import AnchorCheckout from '../payments/adapters/AnchorCheckout';
 import BchPaymentSupportModal from '../payments/BchPaymentSupportModal';
 import { ANCHOR_PAYMENT_TITLE } from '../payments/productCatalog';
 import { getBtcExplorerTxUrl } from '../utils/bitcoinExplorer';
-
-const REQUEST_STATUS_LABELS = {
-  pending_payment: 'Pago pendiente',
-  paid_pending_review: 'Pago recibido — emitiendo anclaje',
-  approved: 'Anclada',
-  rejected: 'Rechazada',
-};
 
 async function sha256HexUtf8(text) {
   const data = new TextEncoder().encode(text);
@@ -38,6 +32,7 @@ async function sha256HexUtf8(text) {
  * Bitcoin OP_RETURN CTA: pay $1 then auto-hash + broadcast (no admin gate).
  */
 const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
+  const { t } = useTranslation('content');
   const { authState } = useContext(AuthContext);
   const isAuthenticated = Boolean(authState?.isAuthenticated);
   const [info, setInfo] = useState(undefined);
@@ -132,7 +127,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
       setActionError(
         err?.response?.data?.error
         || err?.error
-        || 'No se pudo iniciar el anclaje a Bitcoin.',
+        || t('anchor.startError'),
       );
     } finally {
       setRequesting(false);
@@ -144,7 +139,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <CircularProgress size={16} />
         <Typography variant="body2" color="text.secondary">
-          Comprobando anclaje a Bitcoin…
+          {t('anchor.checking')}
         </Typography>
       </Box>
     );
@@ -192,18 +187,18 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
             icon={<VerifiedIcon />}
             label={
               isConfirmed
-                ? 'Anclada a Bitcoin'
-                : 'Anclada a Bitcoin (pendiente de confirmación)'
+                ? t('anchor.anchored')
+                : t('anchor.anchoredPending')
             }
           />
           {anchor.btc_network && (
             <Chip size="small" variant="outlined" label={anchor.btc_network} />
           )}
           {localHashMatch === true && (
-            <Chip size="small" color="success" variant="outlined" label="Hash local OK" />
+            <Chip size="small" color="success" variant="outlined" label={t('anchor.localHashOk')} />
           )}
           {localHashMatch === false && (
-            <Chip size="small" color="error" variant="outlined" label="Hash local no coincide" />
+            <Chip size="small" color="error" variant="outlined" label={t('anchor.localHashMismatch')} />
           )}
         </Box>
 
@@ -235,7 +230,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
               rel="noopener noreferrer"
               sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
             >
-              Ver en mempool.space
+              {t('anchor.explorer')}
               <OpenInNewIcon sx={{ fontSize: 14 }} />
             </Link>
           </Typography>
@@ -244,9 +239,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
         {(certifiedText || downloadUrl) && (
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
-              Texto exacto certificado (UTF-8 normalizado). Descárgalo y comprueba
-              localmente que SHA-256 coincida con text_hash — incluso si la
-              transcripción viva cambia después.
+              {t('anchor.certifiedHelp')}
             </Typography>
             {downloadUrl && (
               <Button
@@ -273,11 +266,11 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
                     link.remove();
                     URL.revokeObjectURL(objectUrl);
                   } catch {
-                    setActionError('No se pudo descargar el texto certificado.');
+                    setActionError(t('anchor.downloadError'));
                   }
                 }}
               >
-                Descargar texto certificado
+                {t('anchor.downloadCertified')}
               </Button>
             )}
             {certifiedText && (
@@ -299,8 +292,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
             )}
             {!certifiedText && (
               <Alert severity="warning" sx={{ mt: 1 }}>
-                Este anclaje no guardó el texto certificado; no se puede verificar
-                de forma independiente solo con el digest.
+                {t('anchor.certifiedMissing')}
               </Alert>
             )}
           </Box>
@@ -308,8 +300,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
 
         {!isConfirmed && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            La transacción ya está en la red; la primera confirmación suele tardar
-            unos 10 minutos o más. No hace falta pagar de nuevo.
+            {t('anchor.awaitingConfirmation')}
           </Typography>
         )}
       </Paper>
@@ -334,12 +325,10 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
             {isMine
               ? (
                 <>
-                  Pago confirmado. Si el anclaje se emitió bien, la confirmación en
-                  Bitcoin suele tardar unos 10 minutos o más. Si pasa mucho más tiempo
-                  sin aparecer el txid, no vuelvas a pagar — contacta soporte.
+                  {t('anchor.paymentConfirmed')}
                   {req?.review_note ? (
                     <Box component="span" sx={{ display: 'block', mt: 1 }}>
-                      Detalle: {req.review_note}
+                      {t('anchor.detail', { note: req.review_note })}
                     </Box>
                   ) : null}
                   <Box sx={{ mt: 1.5 }}>
@@ -349,18 +338,18 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
                       color="inherit"
                       onClick={() => setSupportOpen(true)}
                     >
-                      Contactar soporte
+                      {t('anchor.contactSupport')}
                     </Button>
                   </Box>
                 </>
               )
-              : 'Ya hay un anclaje en curso para este hash.'}
+              : t('anchor.inProgress')}
           </Alert>
         )}
 
         {reqStatus === 'pending_payment' && isMine && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 1 }}>
-            <Chip size="small" label={REQUEST_STATUS_LABELS.pending_payment} />
+            <Chip size="small" label={t('anchor.pendingPayment')} />
             <Button
               variant="contained"
               size="small"
@@ -369,15 +358,15 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
                 setCheckoutOpen(true);
               }}
             >
-              Continuar pago (${priceUsd})
+              {t('anchor.continuePayment', { price: priceUsd })}
             </Button>
           </Box>
         )}
 
         {reqStatus === 'rejected' && isMine && (
           <Alert severity="warning" sx={{ mb: 1.5 }}>
-            El anclaje fue rechazado.
-            {req.review_note ? ` Motivo: ${req.review_note}` : ''}
+            {t('anchor.rejected')}
+            {req.review_note ? ` ${t('anchor.reason', { note: req.review_note })}` : ''}
           </Alert>
         )}
 
@@ -386,9 +375,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
           && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
-              Ancla el hash SHA-256 de esta transcripción a Bitcoin por ${priceUsd} USD.
-              Tras el pago (tokens, crypto o BCH) el anclaje se emite automáticamente;
-              la confirmación en la red suele tardar unos 10 minutos o más.
+              {t('anchor.pitch', { price: priceUsd })}
             </Typography>
             <Button
               variant="contained"
@@ -397,14 +384,14 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
               onClick={handleStartAnchor}
               startIcon={requesting ? <CircularProgress size={14} color="inherit" /> : null}
             >
-              {requesting ? 'Preparando…' : `Anclar a Bitcoin ($${priceUsd})`}
+              {requesting ? t('anchor.preparing') : t('anchor.anchorButton', { price: priceUsd })}
             </Button>
           </Box>
         )}
 
         {!isAuthenticated && (
           <Typography variant="body2" color="text.secondary">
-            Inicia sesión para anclar esta transcripción a Bitcoin.
+            {t('anchor.signIn')}
           </Typography>
         )}
       </Paper>
@@ -429,9 +416,9 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
       <BchPaymentSupportModal
         open={supportOpen}
         onClose={() => setSupportOpen(false)}
-        title={contentTitle || `Contenido ${contentId}`}
+        title={contentTitle || t('common.contentWithId', { id: contentId })}
         priceUsd={priceUsd}
-        productLabel="anclaje a Bitcoin"
+        productLabel={t('anchor.productLabel')}
         mode="fulfill_deferred"
         reviewNote={req?.review_note || ''}
         requestId={req?.id ?? null}

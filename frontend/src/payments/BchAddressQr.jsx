@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
 import { bchAddressQrValue } from './bchAddressQr';
@@ -7,6 +8,7 @@ import { bchAddressQrValue } from './bchAddressQr';
  * Address-only BCH QR (no payment amount in the payload).
  */
 const BchAddressQr = ({ address, size = 160 }) => {
+  const { t } = useTranslation('payments');
   const value = bchAddressQrValue(address);
   if (!value) return null;
 
@@ -37,11 +39,11 @@ const BchAddressQr = ({ address, size = 160 }) => {
           marginSize={1}
           bgColor="#ffffff"
           fgColor="#000000"
-          title="Código QR de la dirección Bitcoin Cash"
+          title={t('qr.title')}
         />
       </Box>
       <Typography variant="caption" color="text.secondary" textAlign="center">
-        Escanea la dirección (sin monto)
+        {t('qr.caption')}
       </Typography>
     </Box>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import contentApi from '../api/contentApi';
 import ContentDisplay from '../content/ContentDisplay';
@@ -10,7 +11,10 @@ import ImageIcon from '@mui/icons-material/Image';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import AudioFileIcon from '@mui/icons-material/AudioFile';
+import { useDateLocales } from '../hooks/useDateLocales';
 const NodeDetail = () => {
+  const { t } = useTranslation('paths');
+  const { intl } = useDateLocales();
   const { pathId, nodeId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -80,11 +84,11 @@ const NodeDetail = () => {
             const opensAt = err.response.data.opens_at;
             setError(
               opensAt
-                ? `Esta misión se desbloqueará para todo el club el ${new Date(opensAt).toLocaleString('es-ES')}.`
-                : 'Esta misión aún no tiene fecha de apertura para el club.'
+                ? t('node.missionOpens', { date: new Date(opensAt).toLocaleString(intl) })
+                : t('node.missionNoDate')
             );
           } else {
-            setError('Error al cargar el nodo');
+            setError(t('node.loadError'));
           }
         }
       } finally {
@@ -102,7 +106,7 @@ const NodeDetail = () => {
 
       isMounted = false;
     };
-  }, [pathId, nodeId, clubSlug]);
+  }, [pathId, nodeId, clubSlug, t, intl]);
 
   const handleComplete = async () => {
 
@@ -116,7 +120,7 @@ const NodeDetail = () => {
       setNode((prev) => ({ ...prev, is_completed: true }));
     } catch (error) {
       console.error('Error marking node as completed:', error);
-      setError('Error al marcar el nodo como completado');
+      setError(t('node.completeError'));
       return;
     }
 
@@ -145,7 +149,7 @@ const NodeDetail = () => {
   if (!node) {
     return (
       <Container maxWidth="md" sx={{ py: 3 }}>
-        <Alert severity="warning">Nodo no encontrado</Alert>
+        <Alert severity="warning">{t('node.notFound')}</Alert>
       </Container>);
 
   }
@@ -204,12 +208,12 @@ const NodeDetail = () => {
             <Alert severity="info" sx={{ mb: 2 }}>
                 <div>
                   <Typography variant="body1" gutterBottom>
-                    Este nodo no tiene contenido adjunto.
+                    {t('node.noContent')}
                   </Typography>
                   {node.media_type &&
                 <Chip
                   icon={getMediaTypeIcon(node.media_type)}
-                  label={`Tipo de medio: ${node.media_type}`}
+                  label={t('node.mediaType', { type: node.media_type })}
                   color="primary"
                   variant="outlined" />
 
@@ -222,7 +226,7 @@ const NodeDetail = () => {
           {/* Description */}
           {node.description &&
           <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" sx={{ mb: 1 }}>Descripción del Nodo</Typography>
+              <Typography variant="h6" sx={{ mb: 1 }}>{t('node.description')}</Typography>
               <Typography
               variant="body1"
               sx={{ whiteSpace: 'pre-line', wordBreak: 'break-word', lineHeight: 1.8 }}>
@@ -236,9 +240,9 @@ const NodeDetail = () => {
           {node.quizzes && node.quizzes.length > 0 &&
           <Alert severity="info" sx={{ mt: 3 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                Cuestionario: {node.quizzes[0].title || 'El nodo incluye un cuestionario'}
+                {t('node.quizTitle', { title: node.quizzes[0].title || t('node.quizFallback') })}
               </Typography>
-              <Typography variant="body2">Marca el nodo como completado para realizar el cuestionario.</Typography>
+              <Typography variant="body2">{t('node.quizHint')}</Typography>
             </Alert>
           }
 
@@ -255,7 +259,7 @@ const NodeDetail = () => {
               onClick={() => navigate(`/knowledge_path/${pathId}/nodes/${prevNode.id}${clubQS}`)}
               sx={{ textTransform: 'none', minWidth: { xs: '100%', sm: 'auto' } }}>
               
-                ← Anterior
+                {t('node.previous')}
               </Button>
             }
             {user && user.username === knowledgePath?.author &&
@@ -265,7 +269,7 @@ const NodeDetail = () => {
               variant="outlined"
               sx={{ textTransform: 'none', minWidth: { xs: '100%', sm: 'auto' } }}>
               
-                Editar Nodo
+                {t('node.edit')}
               </Button>
             }
             <Button
@@ -275,7 +279,7 @@ const NodeDetail = () => {
               color="inherit"
               sx={{ textTransform: 'none', minWidth: { xs: '100%', sm: 'auto' } }}>
               
-              Volver al Camino
+              {t('node.backToPath')}
             </Button>
             {node.is_completed ?
             <Button
@@ -291,7 +295,7 @@ const NodeDetail = () => {
               disabled={!nextNode && !node.quizzes?.length}
               sx={{ textTransform: 'none', minWidth: { xs: '100%', sm: 'auto' } }}>
               
-                Ya Completado {nextNode ? '— Siguiente →' : ''}
+                {nextNode ? t('node.completedNext') : t('node.completed')}
               </Button> :
 
             <Button
@@ -300,7 +304,7 @@ const NodeDetail = () => {
               onClick={handleComplete}
               sx={{ textTransform: 'none', minWidth: { xs: '100%', sm: 'auto' } }}>
               
-                Marcar como Completado
+                {t('node.markComplete')}
               </Button>
             }
           </Stack>

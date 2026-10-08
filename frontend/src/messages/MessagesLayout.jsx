@@ -1,4 +1,5 @@
 import React, { useState, useContext } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, Outlet, Link } from 'react-router-dom';
 import { Box, Paper, useTheme, useMediaQuery, Typography, Avatar, IconButton } from '@mui/material';
 import ThreadList from './ThreadList';
@@ -7,6 +8,7 @@ import { AuthContext } from '../context/AuthContext';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 const MessagesLayout = () => {
+    const { t } = useTranslation('messages');
     const { userId } = useParams();
     const navigate = useNavigate();
     const theme = useTheme();
@@ -131,8 +133,8 @@ const MessagesLayout = () => {
                                     p: 3
                                 }}
                             >
-                                <h2>Seleccione una conversación</h2>
-                                <p>Elija una conversación de la lista o inicie una nueva</p>
+                                <h2>{t('layout.selectTitle')}</h2>
+                                <p>{t('layout.selectHint')}</p>
                             </Box>
                         </Box>
                     )}

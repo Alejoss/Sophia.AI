@@ -35,25 +35,27 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import QuizIcon from '@mui/icons-material/Quiz';
+import { useTranslation } from 'react-i18next';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import quizApi from '../api/quizzesApi';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import i18n from '../i18n';
 
 const schema = yup.object({
   title: yup
     .string()
     .trim()
-    .required('El título es requerido.'),
+    .required(() => i18n.t('quizzes:form.titleRequired')),
   description: yup.string().trim().default(''),
   precedingNodeId: yup
     .mixed()
-    .test('required', 'Debes seleccionar un nodo precedente.', (value) => value != null && value !== ''),
+    .test('required', () => i18n.t('quizzes:form.precedingNodeRequired'), (value) => value != null && value !== ''),
   max_attempts_per_day: yup
     .number()
-    .typeError('Los intentos máximos deben ser un número.')
-    .min(2, 'El mínimo es 2 intentos por día.')
-    .max(9, 'El máximo es 9 intentos por día.')
-    .required('Los intentos máximos por día son requeridos.'),
+    .typeError(() => i18n.t('quizzes:form.maxAttemptsType'))
+    .min(2, () => i18n.t('quizzes:form.maxAttemptsMin'))
+    .max(9, () => i18n.t('quizzes:form.maxAttemptsMax'))
+    .required(() => i18n.t('quizzes:form.maxAttemptsRequired')),
 });
 
 const DEFAULT_QUESTION = {
@@ -74,25 +76,25 @@ function validateQuestions(questions) {
   const messages = [];
 
   questions.forEach((question, qIndex) => {
-    const label = `Pregunta ${qIndex + 1}`;
+    const label = i18n.t('quizzes:form.questionLabel', { index: qIndex + 1 });
 
     if (!question.text?.trim()) {
-      messages.push(`${label}: el texto es requerido.`);
+      messages.push(i18n.t('quizzes:form.questionTextRequired', { label }));
     }
 
     if (!question.options || question.options.length < 2) {
-      messages.push(`${label}: debe tener al menos 2 opciones.`);
+      messages.push(i18n.t('quizzes:form.questionMinOptions', { label }));
     }
 
     question.options?.forEach((option, oIndex) => {
       if (!option.text?.trim()) {
-        messages.push(`${label}, opción ${oIndex + 1}: el texto es requerido.`);
+        messages.push(i18n.t('quizzes:form.optionTextRequired', { label, option: oIndex + 1 }));
       }
     });
 
     const hasCorrect = question.options?.some((opt) => opt.isCorrect);
     if (!hasCorrect) {
-      messages.push(`${label}: debe tener al menos una respuesta correcta.`);
+      messages.push(i18n.t('quizzes:form.questionCorrectRequired', { label }));
     }
   });
 
@@ -100,6 +102,7 @@ function validateQuestions(questions) {
 }
 
 const QuizForm = () => {
+  const { t } = useTranslation('quizzes');
   const navigate = useNavigate();
   const { pathId: initialPathId, quizId } = useParams();
   const mode = quizId ? 'edit' : 'create';
@@ -145,7 +148,7 @@ const QuizForm = () => {
 
           if (!fetchedQuiz.node) {
             console.error('Quiz is missing node information:', fetchedQuiz);
-            setLoadError('Al cuestionario le falta información del nodo');
+            setLoadError(t('form.missingNode'));
             return;
           }
 
@@ -181,14 +184,14 @@ const QuizForm = () => {
           response: err.response?.data,
           status: err.response?.status,
         });
-        setLoadError('Error al cargar los datos');
+        setLoadError(t('form.loadError'));
       } finally {
         setLoading(false);
       }
     };
 
     initializeForm();
-  }, [quizId, initialPathId, mode, reset]);
+  }, [quizId, initialPathId, mode, reset, t]);
 
   const onSubmit = async (formValues) => {
     setSubmitError(null);
@@ -223,7 +226,7 @@ const QuizForm = () => {
         headers: err.response?.headers,
       });
 
-      const fallback = `Error al ${mode === 'create' ? 'crear' : 'actualizar'} el cuestionario`;
+      const fallback = mode === 'create' ? t('form.createError') : t('form.updateError');
       const { generalError } = applyApiErrorsToForm(
         err,
         setError,
@@ -332,7 +335,7 @@ const QuizForm = () => {
       closeDeleteDialog();
       navigate(`/knowledge_path/${currentPathId}/edit`);
     } catch (err) {
-      setDeleteError(err?.message || err?.response?.data?.error || 'Error al eliminar el cuestionario');
+      setDeleteError(err?.message || err?.response?.data?.error || t('form.deleteError'));
     } finally {
       setIsDeletingQuiz(false);
     }
@@ -357,10 +360,10 @@ const QuizForm = () => {
             onClick={() => navigate(`/knowledge_path/${currentPathId}/edit`)}
             sx={{ textTransform: 'none', mb: 2 }}
           >
-            Volver al Camino de Conocimiento
+            {t('form.backToPath')}
           </Button>
           <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
-            {mode === 'create' ? 'Crear Cuestionario' : 'Editar Cuestionario'}
+            {mode === 'create' ? t('form.createTitle') : t('form.editTitle')}
           </Typography>
         </Box>
 
@@ -388,7 +391,7 @@ const QuizForm = () => {
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
             <Stack spacing={4}>
               <FormControl fullWidth required error={!!errors.precedingNodeId}>
-                <InputLabel id="preceding-node-label">Seleccionar Nodo Precedente</InputLabel>
+                <InputLabel id="preceding-node-label">{t('form.precedingNode')}</InputLabel>
                 <Controller
                   name="precedingNodeId"
                   control={control}
@@ -397,10 +400,10 @@ const QuizForm = () => {
                       {...field}
                       labelId="preceding-node-label"
                       id="preceding-node"
-                      label="Seleccionar Nodo Precedente"
+                      label={t('form.precedingNode')}
                     >
                       <MenuItem value="">
-                        <em>Seleccionar un nodo...</em>
+                        <em>{t('form.selectNode')}</em>
                       </MenuItem>
                       {nodes.map((node) => (
                         <MenuItem key={node.id} value={String(node.id)}>
@@ -418,7 +421,7 @@ const QuizForm = () => {
               <TextField
                 fullWidth
                 required
-                label="Título del Cuestionario"
+                label={t('form.quizTitle')}
                 variant="outlined"
                 error={!!errors.title}
                 helperText={errors.title?.message}
@@ -427,7 +430,7 @@ const QuizForm = () => {
 
               <TextField
                 fullWidth
-                label="Descripción del Cuestionario"
+                label={t('form.quizDescription')}
                 variant="outlined"
                 multiline
                 rows={3}
@@ -442,10 +445,10 @@ const QuizForm = () => {
                 <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
                   <QuizIcon color="primary" />
                   <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-                    Preguntas
+                    {t('form.questions')}
                   </Typography>
                   {questions.length > 0 && (
-                    <Chip label={`${questions.length} pregunta(s)`} size="small" color="primary" variant="outlined" />
+                    <Chip label={t('form.questionCount', { count: questions.length })} size="small" color="primary" variant="outlined" />
                   )}
                 </Stack>
 
@@ -456,14 +459,14 @@ const QuizForm = () => {
                         <Stack spacing={3}>
                           <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                              Pregunta {qIndex + 1}
+                              {t('form.questionHeading', { index: qIndex + 1 })}
                             </Typography>
                             {questions.length > 1 && (
                               <IconButton
                                 size="small"
                                 color="error"
                                 onClick={() => handleRemoveQuestion(qIndex)}
-                                aria-label="Eliminar pregunta"
+                                aria-label={t('form.removeQuestion')}
                               >
                                 <DeleteIcon fontSize="small" />
                               </IconButton>
@@ -473,7 +476,7 @@ const QuizForm = () => {
                           <TextField
                             fullWidth
                             required
-                            label="Texto de la Pregunta"
+                            label={t('form.questionText')}
                             value={question.text}
                             onChange={(e) => handleQuestionChange(qIndex, 'text', e.target.value)}
                             variant="outlined"
@@ -482,16 +485,16 @@ const QuizForm = () => {
                           />
 
                           <FormControl fullWidth>
-                            <InputLabel id={`question-type-${qIndex}-label`}>Tipo de Pregunta</InputLabel>
+                            <InputLabel id={`question-type-${qIndex}-label`}>{t('form.questionType')}</InputLabel>
                             <Select
                               labelId={`question-type-${qIndex}-label`}
                               id={`question-type-${qIndex}`}
                               value={question.questionType}
-                              label="Tipo de Pregunta"
+                              label={t('form.questionType')}
                               onChange={(e) => handleQuestionChange(qIndex, 'questionType', e.target.value)}
                             >
-                              <MenuItem value="SINGLE">Opción Única</MenuItem>
-                              <MenuItem value="MULTIPLE">Opción Múltiple</MenuItem>
+                              <MenuItem value="SINGLE">{t('form.single')}</MenuItem>
+                              <MenuItem value="MULTIPLE">{t('form.multiple')}</MenuItem>
                             </Select>
                           </FormControl>
 
@@ -499,7 +502,7 @@ const QuizForm = () => {
 
                           <Box>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-                              Opciones
+                              {t('form.options')}
                             </Typography>
                             <Stack spacing={2}>
                               {question.options.map((option, oIndex) => (
@@ -522,7 +525,7 @@ const QuizForm = () => {
                                     fullWidth
                                     required
                                     size="small"
-                                    placeholder="Texto de la opción"
+                                    placeholder={t('form.optionPlaceholder')}
                                     value={option.text}
                                     onChange={(e) => handleOptionChange(qIndex, oIndex, 'text', e.target.value)}
                                     variant="outlined"
@@ -532,7 +535,7 @@ const QuizForm = () => {
                                       size="small"
                                       color="error"
                                       onClick={() => handleRemoveOption(qIndex, oIndex)}
-                                      aria-label="Eliminar opción"
+                                      aria-label={t('form.removeOption')}
                                       sx={{ mt: 0.5 }}
                                     >
                                       <DeleteIcon fontSize="small" />
@@ -547,7 +550,7 @@ const QuizForm = () => {
                                 size="small"
                                 sx={{ textTransform: 'none', alignSelf: 'flex-start' }}
                               >
-                                Agregar Opción
+                                {t('form.addOption')}
                               </Button>
                             </Stack>
                           </Box>
@@ -563,7 +566,7 @@ const QuizForm = () => {
                     color="success"
                     sx={{ textTransform: 'none' }}
                   >
-                    Agregar Pregunta
+                    {t('form.addQuestion')}
                   </Button>
                 </Stack>
               </Box>
@@ -571,7 +574,7 @@ const QuizForm = () => {
               <Divider />
 
               <FormControl fullWidth required error={!!errors.max_attempts_per_day}>
-                <InputLabel id="max-attempts-label">Intentos Máximos por Día</InputLabel>
+                <InputLabel id="max-attempts-label">{t('form.maxAttempts')}</InputLabel>
                 <Controller
                   name="max_attempts_per_day"
                   control={control}
@@ -580,7 +583,7 @@ const QuizForm = () => {
                       {...field}
                       labelId="max-attempts-label"
                       id="max-attempts"
-                      label="Intentos Máximos por Día"
+                      label={t('form.maxAttempts')}
                       onChange={(e) => {
                         const value = Math.max(2, parseInt(e.target.value, 10) || 2);
                         field.onChange(value);
@@ -588,15 +591,14 @@ const QuizForm = () => {
                     >
                       {[2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                         <MenuItem key={num} value={num}>
-                          {num} intentos
+                          {t('form.attemptsOption', { count: num })}
                         </MenuItem>
                       ))}
                     </Select>
                   )}
                 />
                 <FormHelperText error={!!errors.max_attempts_per_day}>
-                  {errors.max_attempts_per_day?.message ||
-                    'Establezca cuántas veces un estudiante puede intentar este cuestionario por día'}
+                  {errors.max_attempts_per_day?.message || t('form.maxAttemptsHelp')}
                 </FormHelperText>
               </FormControl>
 
@@ -606,7 +608,7 @@ const QuizForm = () => {
                   variant="outlined"
                   sx={{ textTransform: 'none' }}
                 >
-                  Cancelar
+                  {t('form.cancel')}
                 </Button>
                 <Button
                   type="submit"
@@ -618,10 +620,10 @@ const QuizForm = () => {
                   {isSubmitting ? (
                     <>
                       <CircularProgress size={20} sx={{ mr: 1 }} />
-                      {mode === 'create' ? 'Creando...' : 'Actualizando...'}
+                      {mode === 'create' ? t('form.creating') : t('form.updating')}
                     </>
                   ) : (
-                    mode === 'create' ? 'Crear Cuestionario' : 'Actualizar Cuestionario'
+                    mode === 'create' ? t('form.create') : t('form.update')
                   )}
                 </Button>
               </Box>
@@ -641,10 +643,10 @@ const QuizForm = () => {
             }}
           >
             <Typography variant="h6" color="error" sx={{ fontWeight: 700, mb: 1 }}>
-              Zona de peligro
+              {t('form.dangerZone')}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Si eliminas este cuestionario se borrarán todas sus preguntas y respuestas y no podrás recuperarlos.
+              {t('form.dangerBody')}
             </Typography>
             <Button
               variant="outlined"
@@ -653,25 +655,25 @@ const QuizForm = () => {
               onClick={openDeleteDialog}
               sx={{ textTransform: 'none' }}
             >
-              Eliminar cuestionario
+              {t('form.deleteQuiz')}
             </Button>
           </Paper>
         )}
       </Stack>
 
       <Dialog open={deleteDialogOpen} onClose={closeDeleteDialog} maxWidth="xs" fullWidth>
-        <DialogTitle>Eliminar cuestionario</DialogTitle>
+        <DialogTitle>{t('form.deleteTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
-            ¿Seguro que deseas eliminar <strong>{title || 'este cuestionario'}</strong>? Se eliminarán todas las preguntas y esta acción no se puede deshacer.
+            {t('form.deleteBefore')}<strong>{title || t('form.deleteFallback')}</strong>{t('form.deleteAfter')}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={closeDeleteDialog} disabled={isDeletingQuiz} sx={{ textTransform: 'none' }}>
-            Cancelar
+            {t('form.cancel')}
           </Button>
           <Button onClick={confirmDeleteQuiz} disabled={isDeletingQuiz} color="error" variant="contained" sx={{ textTransform: 'none' }}>
-            {isDeletingQuiz ? 'Eliminando…' : 'Eliminar'}
+            {isDeletingQuiz ? t('form.deleting') : t('form.delete')}
           </Button>
         </DialogActions>
       </Dialog>

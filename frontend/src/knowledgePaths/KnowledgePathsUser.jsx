@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Container,
   Box,
@@ -22,8 +23,11 @@ import EditIcon from '@mui/icons-material/Edit';
 import SchoolIcon from '@mui/icons-material/School';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import VoteComponent from '../votes/VoteComponent';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 const KnowledgePathsUser = () => {
+  const { t } = useTranslation('paths');
+  const { intl } = useDateLocales();
   const [activeTab, setActiveTab] = useState(0); // 0 = Created, 1 = Engaged
 
   // Created knowledge paths state
@@ -55,7 +59,7 @@ const KnowledgePathsUser = () => {
         setCreatedHasPrevious(!!data.previous);
       } catch (err) {
         console.error('Error fetching created knowledge paths:', err);
-        setCreatedError('Error al cargar tus caminos de conocimiento creados');
+        setCreatedError(t('user.createdError'));
       } finally {
         setCreatedLoading(false);
       }
@@ -71,7 +75,7 @@ const KnowledgePathsUser = () => {
         setEngagedHasPrevious(!!data.previous);
       } catch (err) {
         console.error('Error fetching engaged knowledge paths:', err);
-        setEngagedError('Error al cargar tus caminos de conocimiento en los que participas');
+        setEngagedError(t('user.engagedError'));
       } finally {
         setEngagedLoading(false);
       }
@@ -79,7 +83,7 @@ const KnowledgePathsUser = () => {
 
     fetchCreatedKnowledgePaths();
     fetchEngagedKnowledgePaths();
-  }, [createdCurrentPage, engagedCurrentPage]);
+  }, [createdCurrentPage, engagedCurrentPage, t]);
 
   const handleCreatedPageChange = (newPage) => {
     setCreatedCurrentPage(newPage);
@@ -118,7 +122,7 @@ const KnowledgePathsUser = () => {
         }}>
         
         <Typography variant="h4" component="h1" sx={{ mb: { xs: 2, md: 0 } }}>
-          Caminos de Conocimiento
+          {t('user.title')}
         </Typography>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
           <Button
@@ -128,7 +132,7 @@ const KnowledgePathsUser = () => {
             color="primary"
             sx={{ textTransform: 'none', width: { xs: '100%', md: 'auto' } }}>
             
-            Ver Todos los Caminos
+            {t('user.viewAll')}
           </Button>
           <Button
             component={Link}
@@ -137,16 +141,16 @@ const KnowledgePathsUser = () => {
             color="primary"
             sx={{ textTransform: 'none', width: { xs: '100%', md: 'auto' } }}>
             
-            Crear Nuevo Camino
+            {t('user.create')}
           </Button>
         </Stack>
       </Box>
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={activeTab} onChange={handleTabChange} aria-label="knowledge paths tabs">
-          <Tab label={`Creados (${createdPaths.length})`} icon={<EditIcon />} iconPosition="start" />
-          <Tab label={`En los que participo (${engagedPaths.length})`} icon={<SchoolIcon />} iconPosition="start" />
+        <Tabs value={activeTab} onChange={handleTabChange} aria-label={t('user.tabsAria')}>
+          <Tab label={t('user.createdTab', { count: createdPaths.length })} icon={<EditIcon />} iconPosition="start" />
+          <Tab label={t('user.engagedTab', { count: engagedPaths.length })} icon={<SchoolIcon />} iconPosition="start" />
         </Tabs>
       </Box>
 
@@ -212,7 +216,7 @@ const KnowledgePathsUser = () => {
                     startIcon={<EditIcon />}
                     sx={{ textTransform: 'none', minWidth: 'auto' }}>
                     
-                        Editar
+                        {t('common.edit')}
                       </Button>
                     </Box>
                   </Box>
@@ -236,7 +240,7 @@ const KnowledgePathsUser = () => {
                       <Box sx={{ mb: 1.5 }}>
                         <Chip
                       icon={path.is_visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
-                      label={path.is_visible ? 'Público' : 'Privado'}
+                      label={path.is_visible ? t('common.public') : t('common.private')}
                       color={path.is_visible ? 'success' : 'default'}
                       size="small"
                       variant="outlined" />
@@ -276,10 +280,10 @@ const KnowledgePathsUser = () => {
                   }}>
                   
                       <Typography variant="caption" color="text.secondary">
-                        Por {path.author}
+                        {t('common.byAuthor', { author: path.author })}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {new Date(path.created_at).toLocaleDateString()}
+                        {new Date(path.created_at).toLocaleDateString(intl)}
                       </Typography>
                     </Box>
                   </CardContent>
@@ -290,13 +294,13 @@ const KnowledgePathsUser = () => {
           {createdPaths.length === 0 &&
         <Box sx={{ textAlign: 'center', py: 8 }}>
               <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.secondary', mb: 2 }}>
-                Aún no has creado caminos de conocimiento
+                {t('user.emptyCreatedTitle')}
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Comienza creando tu primer camino de conocimiento para organizar y compartir tu viaje de aprendizaje.
+                {t('user.emptyCreatedBody')}
               </Typography>
               <Button component={Link} to="/knowledge_path/create" variant="contained" color="primary" sx={{ textTransform: 'none' }}>
-                Crear Tu Primer Camino
+                {t('user.createFirst')}
               </Button>
             </Box>
         }
@@ -314,10 +318,10 @@ const KnowledgePathsUser = () => {
               '&:disabled': { bgcolor: 'grey.300', color: 'text.disabled' }
             }}>
             
-                Anterior
+                {t('common.previous')}
               </Button>
               <Typography variant="body2" color="text.secondary">
-                Página {createdCurrentPage} de {createdTotalPages}
+                {t('common.page', { current: createdCurrentPage, total: createdTotalPages })}
               </Typography>
               <Button
             onClick={() => handleCreatedPageChange(createdCurrentPage + 1)}
@@ -331,7 +335,7 @@ const KnowledgePathsUser = () => {
               '&:disabled': { bgcolor: 'grey.300', color: 'text.disabled' }
             }}>
             
-                Siguiente
+                {t('common.next')}
               </Button>
             </Box>
         }
@@ -440,10 +444,10 @@ const KnowledgePathsUser = () => {
                     color="text.secondary"
                     sx={{ textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>
                     
-                        Por {path.author}
+                        {t('common.byAuthor', { author: path.author })}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {new Date(path.created_at).toLocaleDateString()}
+                        {new Date(path.created_at).toLocaleDateString(intl)}
                       </Typography>
                     </Box>
                   </CardContent>
@@ -454,10 +458,10 @@ const KnowledgePathsUser = () => {
           {engagedPaths.length === 0 &&
         <Box sx={{ textAlign: 'center', py: 8 }}>
               <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.secondary', mb: 2 }}>
-                Aún no participas en caminos de conocimiento
+                {t('user.emptyEngagedTitle')}
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                Comienza explorando caminos de conocimiento creados por otros usuarios para iniciar tu viaje de aprendizaje.
+                {t('user.emptyEngagedBody')}
               </Typography>
               <Button component={Link} to="/knowledge_path" variant="contained" color="primary" sx={{ textTransform: 'none' }}>
                 Explorar Caminos de Conocimiento
@@ -478,10 +482,10 @@ const KnowledgePathsUser = () => {
               '&:disabled': { bgcolor: 'grey.300', color: 'text.disabled' }
             }}>
             
-                Anterior
+                {t('common.previous')}
               </Button>
               <Typography variant="body2" color="text.secondary">
-                Página {engagedCurrentPage} de {engagedTotalPages}
+                {t('common.page', { current: engagedCurrentPage, total: engagedTotalPages })}
               </Typography>
               <Button
             onClick={() => handleEngagedPageChange(engagedCurrentPage + 1)}
@@ -495,7 +499,7 @@ const KnowledgePathsUser = () => {
               '&:disabled': { bgcolor: 'grey.300', color: 'text.disabled' }
             }}>
             
-                Siguiente
+                {t('common.next')}
               </Button>
             </Box>
         }

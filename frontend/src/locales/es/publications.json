@@ -1,0 +1,43 @@
+{
+  "loadError": "Error al cargar las publicaciones",
+  "empty": "No se encontraron publicaciones.",
+  "published": "Publicado: {{date}}",
+  "edit": "Editar",
+  "detail": {
+    "copySuccess": "URL copiada al portapapeles",
+    "copyError": "No se pudo copiar la URL",
+    "error": "Error: {{message}}",
+    "notFound": "Publicación no encontrada",
+    "edit": "Editar Publicación",
+    "published": "Publicado el {{date}}",
+    "referenced": "Contenido Referenciado:",
+    "shareTooltip": "Compartir publicación",
+    "shareAria": "compartir publicación"
+  },
+  "create": {
+    "textRequired": "El contenido de texto es requerido.",
+    "error": "Error al crear la publicación.",
+    "title": "Crear Nueva Publicación",
+    "details": "Detalles de la Publicación",
+    "textLabel": "Contenido de Texto",
+    "cancel": "Cancelar",
+    "creating": "Creando...",
+    "submit": "Crear Publicación"
+  },
+  "editForm": {
+    "textRequired": "El contenido de texto es requerido.",
+    "loadError": "Error al cargar los detalles de la publicación",
+    "updateError": "Error al actualizar la publicación.",
+    "deleteConfirm": "¿Está seguro de que desea eliminar esta publicación? Esta acción no se puede deshacer.",
+    "deleteError": "Error al eliminar la publicación",
+    "back": "← Volver al Perfil",
+    "title": "Editar Publicación",
+    "details": "Detalles de la Publicación",
+    "textLabel": "Contenido de Texto",
+    "deleting": "Eliminando...",
+    "delete": "Eliminar",
+    "cancel": "Cancelar",
+    "updating": "Actualizando...",
+    "submit": "Actualizar Publicación"
+  }
+}

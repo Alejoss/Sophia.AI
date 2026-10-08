@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -22,7 +24,7 @@ const commentSchema = yup.object({
     body: yup
         .string()
         .trim()
-        .required('Escribe un comentario antes de publicar.'),
+        .required(() => i18n.t('comments:validation.writeBeforePost')),
 });
 
 const CommentSection = ({
@@ -35,12 +37,17 @@ const CommentSection = ({
     hideForm = false,
     hideFormNotice = null,
     onAfterMutate = null,
-    title = 'Comentarios',
-    placeholder = 'Escriba un comentario...',
-    submitLabel = 'Publicar Comentario',
-    emptyLabel = 'No hay comentarios todavía.',
+    title,
+    placeholder,
+    submitLabel,
+    emptyLabel,
     lockedEmptyLabel = null,
 }) => {
+    const { t } = useTranslation('comments');
+    const resolvedTitle = title === undefined ? t('section.title') : title;
+    const resolvedPlaceholder = placeholder === undefined ? t('section.placeholder') : placeholder;
+    const resolvedSubmitLabel = submitLabel === undefined ? t('section.submit') : submitLabel;
+    const resolvedEmptyLabel = emptyLabel === undefined ? t('section.empty') : emptyLabel;
     const [comments, setComments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -87,7 +94,7 @@ const CommentSection = ({
             setComments(fetchedComments);
         } catch (err) {
             if (err.response?.status !== 404) {
-                setError('Error al cargar los comentarios');
+                setError(t('section.loadFailed'));
             }
             setComments([]);
         } finally {
@@ -103,7 +110,7 @@ const CommentSection = ({
 
     const onSubmit = async ({ body }) => {
         if (!authState.user) {
-            setError('Debe iniciar sesión para comentar');
+            setError(t('section.loginToComment'));
             return;
         }
 
@@ -129,7 +136,7 @@ const CommentSection = ({
             const { generalError: parsed } = applyApiErrorsToForm(
                 err,
                 setFormError,
-                'Error al agregar el comentario. Por favor, inténtelo de nuevo.',
+                t('section.addFailed'),
                 { text: 'body', content: 'body' },
             );
             if (parsed) {
@@ -144,7 +151,7 @@ const CommentSection = ({
             await notifyMutate();
             await loadComments();
         } catch {
-            setError('Error al eliminar el comentario');
+            setError(t('section.deleteFailed'));
         }
     };
 
@@ -153,13 +160,13 @@ const CommentSection = ({
             await commentsApi.updateComment(commentId, body);
             await loadComments();
         } catch {
-            setError('Error al actualizar el comentario');
+            setError(t('section.updateFailed'));
         }
     };
 
     const handleReplySubmit = async (parentId, body) => {
         if (!authState.user) {
-            setError('Debe iniciar sesión para responder');
+            setError(t('section.loginToReply'));
             return;
         }
 
@@ -167,16 +174,16 @@ const CommentSection = ({
             await commentsApi.addCommentReply(parentId, body);
             await loadComments();
         } catch {
-            setError('Error al agregar la respuesta. Por favor, inténtelo de nuevo.');
+            setError(t('reply.addFailed'));
         }
     };
 
-    if (loading && !hideComments) return <Typography>Cargando comentarios...</Typography>;
+    if (loading && !hideComments) return <Typography>{t('section.loading')}</Typography>;
 
     return (
         <Paper sx={{ p: 3, mt: 3 }}>
             <Typography variant="h6" gutterBottom>
-                {title}
+                {resolvedTitle}
             </Typography>
 
             {authState.isAuthenticated && !readOnly && hideForm ? (
@@ -201,7 +208,7 @@ const CommentSection = ({
                         fullWidth
                         multiline
                         rows={3}
-                        placeholder={placeholder}
+                        placeholder={resolvedPlaceholder}
                         error={!!errors.body}
                         helperText={errors.body?.message}
                         disabled={isSubmitting}
@@ -223,19 +230,19 @@ const CommentSection = ({
                         disabled={isSubmitting}
                         startIcon={isSubmitting ? <CircularProgress size={18} color="inherit" /> : null}
                     >
-                        {isSubmitting ? 'Publicando...' : submitLabel}
+                        {isSubmitting ? t('section.submitting') : resolvedSubmitLabel}
                     </Button>
                 </Box>
             ) : readOnly ? (
                 <Typography color="text.secondary" sx={{ mb: 2 }}>
-                    Esta conversación está cerrada.
+                    {t('section.closed')}
                     {hideComments
-                        ? ' Publica tu respuesta cuando esté abierta para ver las de los demás.'
-                        : ' Puedes leer las respuestas.'}
+                        ? t('section.closedHidden')
+                        : t('section.closedReadable')}
                 </Typography>
             ) : (
                 <Typography color="text.secondary" sx={{ mb: 2 }}>
-                    Por favor, inicie sesión para dejar un comentario.
+                    {t('section.loginPrompt')}
                 </Typography>
             )}
 
@@ -243,8 +250,7 @@ const CommentSection = ({
 
             {hideComments ? (
                 <Typography color="text.secondary">
-                    {lockedEmptyLabel ||
-                        'Publica tu respuesta para ver las de los demás miembros.'}
+                    {lockedEmptyLabel || t('section.lockedEmpty')}
                 </Typography>
             ) : comments.length > 0 ? (
                 <Box>
@@ -262,7 +268,7 @@ const CommentSection = ({
                     ))}
                 </Box>
             ) : (
-                <Typography color="text.secondary">{emptyLabel}</Typography>
+                <Typography color="text.secondary">{resolvedEmptyLabel}</Typography>
             )}
 
             <Snackbar

@@ -1,0 +1,57 @@
+{
+  "kicker": "An ecosystem for exploring ideas",
+  "displayLine1": "Understanding",
+  "displayLine2": "is freedom.",
+  "lead": "Explore materials, follow learning paths, research topics, and talk with a community that values good questions.",
+  "heroPrimary": "Explore knowledge paths",
+  "heroSecondary": "Discover topics",
+  "heroNote": "Learn at your own pace. Research with others. Keep your independence.",
+  "startIndex": "01 / THE STARTING POINT",
+  "startTitle": "More information does not mean more clarity.",
+  "startP1": "We have access to more books, videos, articles, and answers than ever. Even so, knowledge often arrives fragmented and out of context.",
+  "startP2": "Learning means relating sources, comparing perspectives, and putting ideas in conversation.",
+  "startP3": "Academia Blockchain brings together tools and people so you can research with curiosity, build judgment, and decide what to think for yourself.",
+  "startPrompt": "Instead of handing your attention to a wall of recommendations, you can explore with intention again.",
+  "startLink": "See why learning does not have to depend on the algorithm",
+  "aboutIndex": "02 / WHO WE ARE",
+  "aboutTitle": "What is Academia Blockchain?",
+  "aboutQuote": "Knowledge is power.",
+  "aboutP1": "Academia Blockchain is an intellectual territory where knowledge is not a resource captured by institutions, algorithms, or economic interests. We are not a trading academy or a cryptocurrency. We use the blockchain in a liberating way. We are a place where the community links knowledge, reorganizes it, and sets it free, in the spirit of the early internet.",
+  "aboutP2": "We exist because of an uncomfortable fact: the architecture of modern knowledge is exposed to censorship, manipulation, and the concentration of power. The search engine and the AI that should open doors actually decide what to show. The university that should illuminate has become an elitist and misleading club. Scientific journals that should guard the truth often submit to political or economic interests. In that noise, what matters is lost: the ability to understand an increasingly complex world.",
+  "aboutP3": "At Academia Blockchain, ideas connect collaboratively through knowledge paths and topics. Materials can be related, downloaded, organized, and preserved with technologies such as IPFS (coming soon) and blockchain. You can also use AI to work with the transcripts of the topics you research.",
+  "aboutPrompt": "Keeping a file changes your relationship with knowledge.",
+  "aboutLink": "See why you can download it and help preserve it",
+  "doIndex": "03 / WHAT YOU CAN DO",
+  "doTitle": "Learn, research, and take part.",
+  "doLead": "The platform combines resources, routes, and social spaces. Choose an entrance and build your own experience.",
+  "principleIndex": "OUR PRINCIPLE",
+  "principleTitle": "Technology should amplify human judgment, not replace it.",
+  "principleCopy": "Source consultations, paths, quizzes, and community tools accompany your process. Your judgment stays at the center.",
+  "finalIndex": "UNDERSTANDING THE WORLD WILL GIVE YOU PEACE OF MIND",
+  "finalTitle": "Follow your curiosity.",
+  "finalAction": "Explore the library",
+  "footerMission": "Clarity. Curiosity. Independence.",
+  "socialNav": "Social networks",
+  "ecosystem": {
+    "library": {
+      "title": "Library and collections",
+      "copy": "Find books, videos, audio, texts, and images. Save favorites, create collections, and organize your own library. You can send a transcript hash to the Bitcoin blockchain and make it lasting. And, most important, you are free to download the content.",
+      "action": "Explore the library"
+    },
+    "topics": {
+      "title": "Topics and research",
+      "copy": "Follow timelines, create topics, name moderators, and relate content together. Vote for the material that is most valuable. You can also consult transcripts with artificial intelligence.",
+      "action": "Research topics"
+    },
+    "paths": {
+      "title": "Knowledge paths",
+      "copy": "Move through content in sequence, record your progress, answer quizzes, and request certificates as NFTs. You can also share what you know by creating your own paths.",
+      "action": "View paths"
+    },
+    "events": {
+      "title": "Events",
+      "copy": "Discover and organize educational gatherings that take ideas from the screen into live conversation. And you can pay with cryptocurrency (freedom money).",
+      "action": "View events"
+    }
+  }
+}

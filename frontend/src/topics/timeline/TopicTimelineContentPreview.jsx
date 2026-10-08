@@ -6,6 +6,7 @@ import ImageIcon from '@mui/icons-material/Image';
 import ArticleIcon from '@mui/icons-material/Article';
 import LinkIcon from '@mui/icons-material/Link';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { useTranslation } from 'react-i18next';
 import { getTopicContentPath, TOPIC_TABS } from '../../utils/urlUtils';
 
 const getMediaIcon = (mediaType) => {
@@ -24,22 +25,23 @@ const getMediaIcon = (mediaType) => {
   }
 };
 
-const getContentTitle = (content) => {
+const getContentTitle = (content, untitled) => {
   const profile = content?.selected_profile || content;
-  return profile?.title || content?.original_title || 'Contenido sin titulo';
+  return profile?.title || content?.original_title || untitled;
 };
 
 const TopicTimelineContentPreview = ({ link, topicId }) => {
+  const { t } = useTranslation('topics');
   const content = link?.content;
   if (!content) return null;
 
   const mediaType = (content.media_type || '').toUpperCase();
-  const title = getContentTitle(content);
+  const title = getContentTitle(content, t('timeline.untitledContent'));
   const contentId = content.id;
   const href = getTopicContentPath(contentId, topicId, TOPIC_TABS.TIMELINE);
 
   return (
-    <Tooltip title="Abre en una nueva pestaña">
+    <Tooltip title={t('timeline.openNewTab')}>
       <Chip
         component="a"
         href={href}

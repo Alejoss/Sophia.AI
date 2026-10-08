@@ -20,18 +20,21 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CancelIcon from "@mui/icons-material/Cancel";
+import { useTranslation } from "react-i18next";
 import contentApi from "../api/contentApi";
 import { applyApiErrorsToForm } from "../utils/apiFormErrors";
+import i18n from "../i18n";
 
 const inviteSchema = yup.object({
   username: yup
     .string()
     .trim()
-    .required("Por favor ingrese un nombre de usuario"),
+    .required(() => i18n.t("topics:moderators.usernameRequired")),
   message: yup.string().trim().default(""),
 });
 
 const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
+  const { t } = useTranslation("topics");
   const [moderators, setModerators] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +71,7 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
         setInvitations(invitationsData || []);
         setLoading(false);
       } catch (err) {
-        setError("Error al cargar los moderadores e invitaciones");
+        setError(t("moderators.loadError"));
         setLoading(false);
       }
     };
@@ -115,7 +118,7 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
       const { generalError } = applyApiErrorsToForm(
         err,
         setFormError,
-        "Error al enviar invitación",
+        t("moderators.inviteError"),
         { username: "username", message: "message" },
       );
       if (generalError) {
@@ -137,7 +140,7 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
       }
     } catch (err) {
       setError(
-        err.response?.data?.error || "Error al eliminar moderador",
+        err.response?.data?.error || t("moderators.removeError"),
       );
     } finally {
       setRemoving((prev) => {
@@ -166,20 +169,20 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
   const getStatusLabel = (status) => {
     switch (status) {
       case "PENDING":
-        return "Pendiente";
+        return t("common.pending");
       case "ACCEPTED":
-        return "Aceptada";
+        return t("moderators.statusAccepted");
       case "DECLINED":
-        return "Rechazada";
+        return t("moderators.statusDeclined");
       case "CANCELLED":
-        return "Cancelada";
+        return t("moderators.statusCancelled");
       default:
         return status;
     }
   };
 
   if (loading) {
-    return <Typography>Cargando moderadores...</Typography>;
+    return <Typography>{t("moderators.loading")}</Typography>;
   }
 
   const pendingInvitations = invitations.filter((inv) => inv.status === "PENDING");
@@ -197,7 +200,7 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
           mb: 2,
         }}
       >
-        Moderadores
+        {t("moderators.title")}
       </Typography>
 
       {error && (
@@ -239,9 +242,9 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label="Nombre de usuario"
+                  label={t("moderators.username")}
                   size="small"
-                  placeholder="Escriba para buscar o ingrese el username"
+                  placeholder={t("moderators.usernamePlaceholder")}
                   error={!!errors.username}
                   helperText={errors.username?.message}
                   disabled={isSubmitting}
@@ -251,11 +254,11 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
           )}
         />
         <TextField
-          label="Mensaje (opcional)"
+          label={t("moderators.messageOptional")}
           size="small"
           multiline
           rows={2}
-          placeholder="Mensaje opcional para el invitado"
+          placeholder={t("moderators.messagePlaceholder")}
           error={!!errors.message}
           helperText={errors.message?.message}
           disabled={isSubmitting}
@@ -267,7 +270,7 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
           startIcon={<AddIcon />}
           disabled={isSubmitting}
         >
-          {isSubmitting ? "Enviando..." : "Invitar Moderador"}
+          {isSubmitting ? t("moderators.sending") : t("moderators.invite")}
         </Button>
       </Box>
 
@@ -279,7 +282,7 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
             color="text.primary"
             sx={{ mb: 1 }}
           >
-            Invitaciones Pendientes
+            {t("moderators.pendingInvitations")}
           </Typography>
           <List>
             {pendingInvitations.map((invitation) => (
@@ -293,11 +296,11 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
                 }}
               >
                 <ListItemText
-                  primary={invitation.invited_user?.username || "Usuario"}
+                  primary={invitation.invited_user?.username || t("moderators.userFallback")}
                   secondary={
                     <Box>
                       <Typography variant="body2" color="text.secondary">
-                        {invitation.message || "Sin mensaje"}
+                        {invitation.message || t("moderators.noMessage")}
                       </Typography>
                       <Chip
                         label={getStatusLabel(invitation.status)}
@@ -312,7 +315,7 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
                   <IconButton
                     edge="end"
                     onClick={() => {
-                      setError("Cancelar invitación aún no está implementado");
+                      setError(t("moderators.cancelNotImplemented"));
                     }}
                     disabled={canceling[invitation.id]}
                     color="error"
@@ -334,11 +337,11 @@ const TopicModerators = ({ topicId, onModeratorsUpdate }) => {
         color="text.primary"
         sx={{ mb: 1 }}
       >
-        Moderadores Activos
+        {t("moderators.active")}
       </Typography>
       {moderators.length === 0 ? (
         <Alert severity="info">
-          No hay moderadores asignados a este tema.
+          {t("moderators.emptyAssigned")}
         </Alert>
       ) : (
         <List>

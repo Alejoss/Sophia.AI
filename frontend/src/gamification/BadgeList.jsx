@@ -1,86 +1,97 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Grid, Typography, CircularProgress, Alert, Tooltip } from '@mui/material';
 import BadgeDisplay from './BadgeDisplay';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 /**
  * Generate a human-readable description of how a badge was earned
  * based on the badge code and context_data
  */
-const getBadgeEarningDescription = (badge) => {
+const getBadgeEarningDescription = (badge, t) => {
   const badgeCode = badge.badge_code || badge.code;
   const contextData = badge.context_data || {};
   
   switch (badgeCode) {
     case 'first_knowledge_path_completed':
       if (contextData.knowledge_path_title) {
-        return `Completaste el camino de conocimiento "${contextData.knowledge_path_title}"`;
+        return t('earning.pathCompletedNamed', { title: contextData.knowledge_path_title });
       }
-      return 'Completaste tu primer camino de conocimiento';
+      return t('earning.pathCompleted');
       
     case 'quiz_master':
       if (contextData.perfect_quizzes_count) {
-        return `Completaste ${contextData.perfect_quizzes_count} cuestionarios con puntuación perfecta`;
+        return t('earning.quizMasterCount', { count: contextData.perfect_quizzes_count });
       }
-      return 'Completaste 5 cuestionarios con puntuación perfecta';
+      return t('earning.quizMaster');
       
     case 'knowledge_seeker':
       if (contextData.completed_nodes_count) {
-        return `Completaste ${contextData.completed_nodes_count} nodos de conocimiento`;
+        return t('earning.nodesCount', { count: contextData.completed_nodes_count });
       }
-      return 'Completaste 20 nodos de conocimiento';
+      return t('earning.nodes');
       
     case 'first_comment':
-      return 'Publicaste tu primer comentario';
+      return t('earning.firstComment');
       
     case 'first_knowledge_path_created':
       if (contextData.knowledge_path_title) {
-        return `Creaste el camino de conocimiento "${contextData.knowledge_path_title}"`;
+        return t('earning.pathCreatedNamed', { title: contextData.knowledge_path_title });
       }
-      return 'Creaste tu primer camino de conocimiento con 2+ nodos';
+      return t('earning.pathCreated');
       
     case 'content_creator':
       if (contextData.highly_rated_contents_count) {
-        return `Creaste ${contextData.highly_rated_contents_count} contenidos con 5+ votos cada uno`;
+        return t('earning.contentCreatorCount', { count: contextData.highly_rated_contents_count });
       }
-      return 'Creaste 3 contenidos con 5+ votos cada uno';
+      return t('earning.contentCreator');
       
     case 'first_highly_rated_comment':
       if (contextData.vote_count) {
-        return `Uno de tus comentarios alcanzó ${contextData.vote_count} votos positivos`;
+        return t('earning.commentVotes', { count: contextData.vote_count });
       }
-      return 'Uno de tus comentarios alcanzó 5+ votos positivos';
+      return t('earning.commentVotesDefault');
       
     case 'first_highly_rated_content':
       if (contextData.vote_count) {
-        return `Uno de tus contenidos alcanzó ${contextData.vote_count} votos positivos`;
+        return t('earning.contentVotes', { count: contextData.vote_count });
       }
-      return 'Uno de tus contenidos alcanzó 10+ votos positivos';
+      return t('earning.contentVotesDefault');
       
     case 'community_voice':
       if (contextData.total_comment_votes) {
-        return `Acumulaste ${contextData.total_comment_votes} votos en total en tus comentarios`;
+        return t('earning.communityVotes', { count: contextData.total_comment_votes });
       }
-      return 'Acumulaste 20+ votos en total en tus comentarios';
+      return t('earning.communityVotesDefault');
       
     case 'topic_curator':
       if (contextData.topic_title) {
         const contents = contextData.contents_count || 0;
         const withVotes = contextData.contents_with_votes || 0;
-        return `Creaste el tema "${contextData.topic_title}" con ${contents} contenidos, ${withVotes} de ellos con votos positivos`;
+        return t('earning.topicCuratorNamed', {
+          title: contextData.topic_title,
+          contents,
+          withVotes,
+        });
       }
-      return 'Creaste un tema con 5+ contenidos, 2+ con votos positivos';
+      return t('earning.topicCurator');
       
     case 'topic_architect':
       if (contextData.topic_title) {
         const withVotes = contextData.contents_with_votes || 0;
         const totalVotes = contextData.total_votes || 0;
         const voters = contextData.distinct_voters || 0;
-        return `El tema "${contextData.topic_title}" alcanzó amplio reconocimiento: ${withVotes} contenidos con votos, ${totalVotes} votos totales, ${voters} usuarios únicos votaron`;
+        return t('earning.topicArchitectNamed', {
+          title: contextData.topic_title,
+          withVotes,
+          totalVotes,
+          voters,
+        });
       }
-      return 'Creaste un tema con amplio reconocimiento comunitario';
+      return t('earning.topicArchitect');
       
     default:
-      return 'Insignia obtenida por tu participación en la comunidad';
+      return t('earning.default');
   }
 };
 
@@ -97,12 +108,16 @@ const getBadgeEarningDescription = (badge) => {
  */
 const BadgeList = ({ 
   badges, 
-  title = 'Insignias', 
-  emptyMessage = 'Aún no hay insignias',
+  title,
+  emptyMessage,
   loading = false,
   error = null,
   showEarningTooltip = true
 }) => {
+  const { t } = useTranslation('gamification');
+  const { intl } = useDateLocales();
+  const resolvedTitle = title === undefined ? t('list.defaultTitle') : title;
+  const resolvedEmpty = emptyMessage === undefined ? t('list.empty') : emptyMessage;
   // Loading state
   if (loading) {
     return (
@@ -126,7 +141,7 @@ const BadgeList = ({
     return (
       <Box sx={{ py: 2 }}>
         <Typography variant="body2" color="text.secondary" align="center">
-          {emptyMessage}
+          {resolvedEmpty}
         </Typography>
       </Box>
     );
@@ -142,7 +157,7 @@ const BadgeList = ({
   // Badge Card Component
   const BadgeCard = ({ badge }) => {
     const description = badge.badge_description || badge.description || '';
-    const earningDescription = getBadgeEarningDescription(badge);
+    const earningDescription = getBadgeEarningDescription(badge, t);
 
     const cardContent = (
       <Box
@@ -227,7 +242,7 @@ const BadgeList = ({
                     color: 'white',
                   }}
                 >
-                  Cómo la obtuviste:
+                  {t('list.howEarned')}
                 </Typography>
                 <Typography 
                   variant="body2"
@@ -245,10 +260,12 @@ const BadgeList = ({
                       color: 'rgba(255, 255, 255, 0.9)',
                     }}
                   >
-                    Obtenida el {new Date(badge.earned_at).toLocaleDateString('es-ES', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
+                    {t('list.earnedOn', {
+                      date: new Date(badge.earned_at).toLocaleDateString(intl, {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      }),
                     })}
                   </Typography>
                 )}
@@ -285,9 +302,9 @@ const BadgeList = ({
   // Badges list with title and description
   return (
     <Box>
-      {title && (
+      {resolvedTitle && (
         <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-          {title}
+          {resolvedTitle}
         </Typography>
       )}
       <Grid container spacing={3}>

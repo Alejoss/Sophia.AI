@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Typography,
@@ -27,8 +28,10 @@ const ImageUploadModal = ({
   existingFocalX = 0.5,
   existingFocalY = 0.5,
   onFocalOnlyUpdate,
-  entityLabel = "tema",
+  entityLabel,
 }) => {
+  const { t } = useTranslation("misc");
+  const resolvedEntity = entityLabel === undefined ? t("imageUpload.defaultEntity") : entityLabel;
   const [error, setError] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -43,11 +46,11 @@ const ImageUploadModal = ({
     const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
 
     if (!allowedTypes.includes(file.type)) {
-      return "El archivo debe ser una imagen (JPEG, PNG o GIF)";
+      return t("imageUpload.typeError");
     }
 
     if (file.size > MAX_COVER_IMAGE_BYTES) {
-      return "El tamaño del archivo debe ser menor a 3 MB";
+      return t("imageUpload.sizeError");
     }
 
     return null;
@@ -118,9 +121,10 @@ const ImageUploadModal = ({
   const showPreview = (mode === "upload" && previewFile) || mode === "focal_only";
   const previewSrc = mode === "focal_only" ? existingImageUrl : previewUrl;
 
-  const titleEdit = `Editar imagen del ${entityLabel}`;
-  const titleChangeZone = "Cambiar zona de la portada";
-  const titleUpload = `Subir Imagen del ${entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1)}`;
+  const capitalizedEntity = resolvedEntity.charAt(0).toUpperCase() + resolvedEntity.slice(1);
+  const titleEdit = t("imageUpload.editTitle", { entity: resolvedEntity });
+  const titleChangeZone = t("imageUpload.changeZone");
+  const titleUpload = t("imageUpload.uploadTitle", { entity: capitalizedEntity });
 
   return (
     <Modal
@@ -158,24 +162,24 @@ const ImageUploadModal = ({
         {showChoice ? (
           <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              Puedes subir una imagen nueva o solo ajustar qué parte de la imagen actual se muestra en la portada.
+              {t("imageUpload.choiceHint")}
             </Typography>
             <Button
               variant="contained"
               color="primary"
               onClick={() => setMode("upload")}
             >
-              Subir nueva imagen
+              {t("imageUpload.uploadNew")}
             </Button>
             <Button
               variant="outlined"
               color="primary"
               onClick={() => setMode("focal_only")}
             >
-              Cambiar el foco de la imagen actual
+              {t("imageUpload.changeFocus")}
             </Button>
             <Button variant="text" onClick={onClose} sx={{ mt: 1 }}>
-              Cancelar
+              {t("imageUpload.cancel")}
             </Button>
           </Box>
         ) : showUploadForm ? (
@@ -185,19 +189,19 @@ const ImageUploadModal = ({
                 <ListItemIcon>
                   <CheckCircleIcon color="disabled" />
                 </ListItemIcon>
-                <ListItemText primary="Formatos: JPEG, PNG o GIF" />
+                <ListItemText primary={t("imageUpload.formats")} />
               </ListItem>
               <ListItem>
                 <ListItemIcon>
                   <CheckCircleIcon color="disabled" />
                 </ListItemIcon>
-                <ListItemText primary="Tamaño máximo: 3 MB" />
+                <ListItemText primary={t("imageUpload.maxSize")} />
               </ListItem>
               <ListItem>
                 <ListItemIcon>
                   <CheckCircleIcon color="disabled" />
                 </ListItemIcon>
-                <ListItemText primary="Recomendado: imagen más ancha que alta (ej. 16:9, como miniatura de YouTube)" />
+                <ListItemText primary={t("imageUpload.recommended")} />
               </ListItem>
             </List>
 
@@ -209,7 +213,7 @@ const ImageUploadModal = ({
 
             <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
               <Button variant="contained" color="primary" component="label">
-                Elegir imagen
+                {t("imageUpload.choose")}
                 <input
                   type="file"
                   hidden
@@ -218,14 +222,14 @@ const ImageUploadModal = ({
                 />
               </Button>
               <Button variant="outlined" onClick={onClose}>
-                Cancelar
+                {t("imageUpload.cancel")}
               </Button>
             </Box>
           </>
         ) : showPreview && previewSrc ? (
           <>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Haz clic en la zona que quieras centrar en la portada.
+              {t("imageUpload.clickToCenter")}
             </Typography>
             <Box
               onClick={onPreviewClick}
@@ -241,7 +245,7 @@ const ImageUploadModal = ({
                 "& img": { width: "100%", height: "100%", objectFit: "cover" },
               }}
             >
-              <img src={previewSrc} alt="Vista previa" />
+              <img src={previewSrc} alt={t("imageUpload.previewAlt")} />
               <Box
                 sx={{
                   position: "absolute",
@@ -259,15 +263,15 @@ const ImageUploadModal = ({
             </Box>
             <Box sx={{ mt: 2, display: "flex", gap: 2, justifyContent: "flex-end" }}>
               <Button variant="outlined" onClick={onClose}>
-                Cancelar
+                {t("imageUpload.cancel")}
               </Button>
               {mode === "focal_only" ? (
                 <Button variant="contained" color="primary" onClick={onConfirmFocalOnly}>
-                  Guardar foco
+                  {t("imageUpload.saveFocus")}
                 </Button>
               ) : (
                 <Button variant="contained" color="primary" onClick={onConfirmUpload}>
-                  Subir imagen
+                  {t("imageUpload.upload")}
                 </Button>
               )}
             </Box>

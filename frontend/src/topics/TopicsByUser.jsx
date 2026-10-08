@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, Box, Typography, Paper, Alert, CircularProgress } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { MEDIA_BASE_URL } from '../api/config';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 const TopicsByUser = ({ userId, userName }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation('topics');
+  const { intl } = useDateLocales();
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -24,7 +28,7 @@ const TopicsByUser = ({ userId, userName }) => {
         setTopics(userTopics);
       } catch (err) {
         console.error('Error fetching topics by user:', err);
-        setError('Error al cargar los temas');
+        setError(t('list.loadFailed'));
       } finally {
         setLoading(false);
       }
@@ -33,7 +37,7 @@ const TopicsByUser = ({ userId, userName }) => {
     if (userId) {
       fetchTopics();
     }
-  }, [userId]);
+  }, [userId, t]);
 
   const getTopicImageUrl = (topic) => {
     const image = topic.topic_image_thumbnail || topic.topic_image;
@@ -76,7 +80,7 @@ const TopicsByUser = ({ userId, userName }) => {
             fontWeight: 600,
           }}
         >
-          Temas por {userName}
+          {t('list.byUser', { userName })}
         </Typography>
       </Box>
 
@@ -165,7 +169,7 @@ const TopicsByUser = ({ userId, userName }) => {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="caption" color="text.secondary">
                   {topic.created_at
-                    ? new Date(topic.created_at).toLocaleDateString()
+                    ? new Date(topic.created_at).toLocaleDateString(intl)
                     : ''}
                 </Typography>
               </Box>
@@ -186,10 +190,10 @@ const TopicsByUser = ({ userId, userName }) => {
               mb: 2
             }}
           >
-            Aún no se han creado temas
+            {t('list.empty')}
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            {userName} aún no ha creado temas.
+            {t('list.emptyByUser', { userName })}
           </Typography>
         </Box>
       )}

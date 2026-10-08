@@ -8,6 +8,8 @@ import {
   Paper,
   Typography,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
+import { useDateLocales } from '../hooks/useDateLocales';
 import SubtitlesIcon from '@mui/icons-material/Subtitles';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import contentApi from '../api/contentApi';
@@ -22,6 +24,8 @@ import contentApi from '../api/contentApi';
  * @param {string|number} [props.topicId]
  */
 const ContentTranscriptLink = ({ contentId, context = 'library', topicId = null }) => {
+  const { t } = useTranslation('content');
+  const { intl } = useDateLocales();
   const navigate = useNavigate();
   const [meta, setMeta] = useState(undefined);
 
@@ -61,7 +65,7 @@ const ContentTranscriptLink = ({ contentId, context = 'library', topicId = null 
       <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
         <CircularProgress size={18} />
         <Typography variant="body2" color="text.secondary">
-          Buscando transcripción…
+          {t('transcriptLink.searching')}
         </Typography>
       </Box>
     );
@@ -86,7 +90,7 @@ const ContentTranscriptLink = ({ contentId, context = 'library', topicId = null 
       <SubtitlesIcon color="primary" />
       <Box sx={{ flexGrow: 1, minWidth: 180 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
-          Transcripción disponible
+          {t('transcriptLink.available')}
         </Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 0.5 }}>
           {meta.language && (
@@ -96,17 +100,17 @@ const ContentTranscriptLink = ({ contentId, context = 'library', topicId = null 
             <Chip
               size="small"
               variant="outlined"
-              label={`${Number(meta.text_length).toLocaleString()} caracteres`}
+              label={t('charCount', { value: Number(meta.text_length).toLocaleString(intl) })}
             />
           )}
           {meta.segment_count > 0 ? (
             <Chip
               size="small"
               variant="outlined"
-              label={`${meta.segment_count} segmentos · con tiempos`}
+              label={t('segmentCountTimed', { count: meta.segment_count })}
             />
           ) : (
-            <Chip size="small" variant="outlined" label="Texto continuo" />
+            <Chip size="small" variant="outlined" label={t('transcriptLink.continuous')} />
           )}
         </Box>
       </Box>
@@ -116,7 +120,7 @@ const ContentTranscriptLink = ({ contentId, context = 'library', topicId = null 
         onClick={() => navigate(transcriptPath)}
         sx={{ textTransform: 'none' }}
       >
-        Ver transcripción
+        {t('transcriptLink.view')}
       </Button>
     </Paper>
   );

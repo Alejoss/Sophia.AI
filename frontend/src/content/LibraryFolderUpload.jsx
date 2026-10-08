@@ -30,14 +30,13 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { getMediaType } from './mediaTypeFromFile';
 import { inferTitleAuthorFromFileName, resolveAuthorWithFolderHint } from './inferTitleAuthorFromFileName';
 
 const FOLDER_BATCH_MAX_BYTES = 10 * 1024 * 1024 * 1024;
 const UPLOAD_CONCURRENCY = 3;
-
-const MEDIA_TYPE_LABELS = { IMAGE: 'Imagen', VIDEO: 'Video', AUDIO: 'Audio', TEXT: 'Texto' };
 
 function formatBytes(n) {
   if (n === 0) return '0 B';
@@ -59,7 +58,7 @@ function buildRowsFromFileList(files, defaultAuthorFromUser) {
     const relativePath = file.webkitRelativePath || file.name;
     const mediaType = getMediaType(file);
     if (!mediaType) {
-      omitted.push({ path: relativePath, reason: 'Tipo de archivo no soportado' });
+      omitted.push({ path: relativePath, reasonKey: 'unsupported' });
       continue;
     }
     const inferred = inferTitleAuthorFromFileName(file.name);
@@ -92,6 +91,7 @@ async function runPool(items, limit, worker) {
 }
 
 const LibraryFolderUpload = () => {
+  const { t } = useTranslation('content');
   const navigate = useNavigate();
   const folderInputRef = useRef(null);
   const [rows, setRows] = useState([]);
@@ -203,7 +203,7 @@ const LibraryFolderUpload = () => {
           ? backendDetails
             ? `${backendError}: ${backendDetails}`
             : backendError
-          : error.message || 'Error al subir';
+          : error.message || t('folder.uploadFailed');
         progressById[row.id] = 0;
         bumpGlobal();
         updateRow(row.id, { status: 'error', error: message });
@@ -212,25 +212,27 @@ const LibraryFolderUpload = () => {
     });
 
     let collectionMessage = '';
+    let collectionFailed = false;
     if (selectedCollectionId && successfulContentProfileIds.length > 0) {
       try {
         await contentApi.addContentToCollection(Number(selectedCollectionId), successfulContentProfileIds);
-        collectionMessage = ' Contenido añadido a la colección elegida.';
+        collectionMessage = t('folder.addedToCollection');
       } catch (err) {
         const ce = err.response?.data?.error;
         const cd = err.response?.data?.details;
-        const cmsg = ce ? (cd ? `${ce}: ${cd}` : ce) : err.message || 'Error desconocido';
-        collectionMessage = ` No se pudo añadir a la colección: ${cmsg}`;
+        const cmsg = ce ? (cd ? `${ce}: ${cd}` : ce) : err.message || t('folder.unknownError');
+        collectionMessage = t('folder.addToCollectionFailed', { message: cmsg });
+        collectionFailed = true;
       }
     }
 
     setIsUploading(false);
 
-    const baseSeverity = failed ? 'warning' : collectionMessage.includes('No se pudo') ? 'warning' : 'success';
+    const baseSeverity = failed || collectionFailed ? 'warning' : 'success';
     const baseMessage =
       failed === 0
-        ? `Subida completada: ${success} archivo(s).${collectionMessage}`
-        : `Finalizado: ${success} correcto(s), ${failed} con error.${collectionMessage}`;
+        ? t('folder.uploadComplete', { count: success, suffix: collectionMessage })
+        : t('folder.uploadFinished', { success, failed, suffix: collectionMessage });
 
     setSnackbar({
       open: true,
@@ -249,47 +251,44 @@ const LibraryFolderUpload = () => {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/content/library_upload_content')} sx={{ textTransform: 'none' }}>
-          Volver a subir contenido
+          {t('folder.back')}
         </Button>
       </Stack>
 
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" gutterBottom>
-          Subir carpeta
+          {t('folder.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Selecciona una carpeta; cada archivo compatible se sube como un ítem en tu biblioteca. Puedes elegir una colección y
-          revisar título y autor antes de subir.
+          {t('folder.intro')}
         </Typography>
       </Box>
 
       <Alert severity="warning" sx={{ mb: 3 }}>
-        El tamaño total de los archivos de esta carpeta no puede superar {formatBytes(FOLDER_BATCH_MAX_BYTES)} por operación. Total
-        actual: <strong>{formatBytes(totalBytes)}</strong>
-        {overLimit ? ' (excede el límite)' : ''}.
+        {t('folder.sizeLimit', { max: formatBytes(FOLDER_BATCH_MAX_BYTES) })}{' '}
+        <strong>{formatBytes(totalBytes)}</strong>
+        {overLimit ? t('folder.overLimit') : ''}.
       </Alert>
 
       <Paper elevation={2} sx={{ p: 3 }}>
             <Stack spacing={3}>
               <Box>
                 <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-                  Autor por defecto (opcional)
+                  {t('folder.defaultAuthor')}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                  Si el nombre del archivo no indica autor, se usará este valor antes que el nombre de la primera subcarpeta en la
-                  ruta.
+                  {t('folder.defaultAuthorHelp')}
                 </Typography>
                 <TextField
                   fullWidth
                   size="small"
-                  placeholder="p. ej. nombre del curso o autor"
+                  placeholder={t('folder.defaultAuthorPlaceholder')}
                   value={defaultFolderAuthor}
                   onChange={(e) => setDefaultFolderAuthor(e.target.value)}
                   disabled={isUploading}
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                  Si lo cambias después de elegir la carpeta, vuelve a pulsar &quot;Seleccionar carpeta&quot; para regenerar títulos y
-                  autores.
+                  {t('folder.regenerateHint')}
                 </Typography>
               </Box>
 
@@ -309,26 +308,26 @@ const LibraryFolderUpload = () => {
                   disabled={isUploading}
                   sx={{ textTransform: 'none' }}
                 >
-                  Seleccionar carpeta
+                  {t('folder.selectFolder')}
                 </Button>
                 {rows.length > 0 && (
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    {rows.length} archivo(s) listo(s) para subir
-                    {omitted.length > 0 ? ` · ${omitted.length} omitido(s)` : ''}
+                    {t('folder.filesReady', { count: rows.length })}
+                    {omitted.length > 0 ? ` · ${t('folder.omittedCount', { count: omitted.length })}` : ''}
                   </Typography>
                 )}
               </Box>
 
               <FormControl fullWidth size="small" disabled={isUploading || collectionsLoading}>
-                <InputLabel id="folder-upload-collection-label">Colección (opcional)</InputLabel>
+                <InputLabel id="folder-upload-collection-label">{t('folder.collectionOptional')}</InputLabel>
                 <Select
                   labelId="folder-upload-collection-label"
-                  label="Colección (opcional)"
+                  label={t('folder.collectionOptional')}
                   value={selectedCollectionId}
                   onChange={(e) => setSelectedCollectionId(e.target.value)}
                 >
                   <MenuItem value="">
-                    <em>Solo mi biblioteca</em>
+                    <em>{t('folder.libraryOnly')}</em>
                   </MenuItem>
                   {collections.map((c) => (
                     <MenuItem key={c.id} value={String(c.id)}>
@@ -339,9 +338,9 @@ const LibraryFolderUpload = () => {
               </FormControl>
               {!collectionsLoading && collections.length === 0 && (
                 <Typography variant="caption" color="text.secondary">
-                  No tienes colecciones.{' '}
+                  {t('folder.noCollections')}{' '}
                   <Link component={RouterLink} to="/content/collections/create" underline="hover">
-                    Crear una
+                    {t('folder.createOne')}
                   </Link>
                 </Typography>
               )}
@@ -349,13 +348,13 @@ const LibraryFolderUpload = () => {
               {omitted.length > 0 && (
                 <Alert severity="info">
                   <Typography variant="subtitle2" gutterBottom>
-                    Archivos omitidos
+                    {t('folder.omittedTitle')}
                   </Typography>
                   <Box component="ul" sx={{ m: 0, pl: 2, maxHeight: 160, overflow: 'auto' }}>
                     {omitted.map((o) => (
                       <li key={o.path}>
                         <Typography variant="caption" component="span">
-                          {o.path} — {o.reason}
+                          {o.path} — {o.reasonKey === 'unsupported' ? t('folder.unsupportedType') : o.reason}
                         </Typography>
                       </li>
                     ))}
@@ -372,7 +371,7 @@ const LibraryFolderUpload = () => {
                       disabled={isUploading}
                     />
                   }
-                  label="Tiene subtítulos en español (todos los archivos)"
+                  label={t('folder.spanishSubtitlesAll')}
                 />
                 <FormControlLabel
                   control={
@@ -382,11 +381,11 @@ const LibraryFolderUpload = () => {
                       disabled={isUploading}
                     />
                   }
-                  label="Está doblado al español (todos los archivos)"
+                  label={t('folder.spanishDubbingAll')}
                 />
                 <FormControlLabel
                   control={<Checkbox checked={isProducer} onChange={(e) => setIsProducer(e.target.checked)} disabled={isUploading} />}
-                  label="He producido este contenido"
+                  label={t('upload.iProduced')}
                 />
                 {isProducer && (
                   <Box sx={{ ml: 3, mt: 1 }}>
@@ -394,7 +393,7 @@ const LibraryFolderUpload = () => {
                       control={
                         <Switch checked={isVisible} onChange={(e) => setIsVisible(e.target.checked)} disabled={isUploading} />
                       }
-                      label="Visible en los resultados de búsqueda"
+                      label={t('upload.visibleInSearch')}
                     />
                   </Box>
                 )}
@@ -406,12 +405,12 @@ const LibraryFolderUpload = () => {
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow>
-                          <TableCell>Ruta</TableCell>
-                          <TableCell width={100}>Tipo</TableCell>
-                          <TableCell>Título</TableCell>
-                          <TableCell>Autor</TableCell>
-                          <TableCell width={110}>Estado</TableCell>
-                          <TableCell width={96}>Acción</TableCell>
+                          <TableCell>{t('common.path')}</TableCell>
+                          <TableCell width={100}>{t('common.type')}</TableCell>
+                          <TableCell>{t('common.title')}</TableCell>
+                          <TableCell>{t('common.author')}</TableCell>
+                          <TableCell width={110}>{t('common.status')}</TableCell>
+                          <TableCell width={96}>{t('common.actions')}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -423,7 +422,7 @@ const LibraryFolderUpload = () => {
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Chip size="small" label={MEDIA_TYPE_LABELS[row.mediaType] ?? row.mediaType} variant="outlined" />
+                              <Chip size="small" label={t(`mediaType.${row.mediaType}`, { defaultValue: row.mediaType })} variant="outlined" />
                             </TableCell>
                             <TableCell>
                               <TextField
@@ -446,18 +445,18 @@ const LibraryFolderUpload = () => {
                             <TableCell>
                               {row.status === 'pending' && (
                                 <Typography variant="caption" color="text.secondary">
-                                  Pendiente
+                                  {t('folder.pending')}
                                 </Typography>
                               )}
                               {row.status === 'uploading' && <CircularProgress size={18} />}
                               {row.status === 'done' && (
                                 <Typography variant="caption" color="success.main">
-                                  Listo
+                                  {t('folder.ready')}
                                 </Typography>
                               )}
                               {row.status === 'error' && (
                                 <Typography variant="caption" color="error" title={row.error || ''}>
-                                  Error
+                                  {t('common.error')}
                                 </Typography>
                               )}
                             </TableCell>
@@ -468,7 +467,7 @@ const LibraryFolderUpload = () => {
                                   sx={{ textTransform: 'none' }}
                                   onClick={() => updateRow(row.id, { status: 'pending', error: null })}
                                 >
-                                  Reintentar
+                                  {t('actions.retry')}
                                 </Button>
                               )}
                             </TableCell>
@@ -503,7 +502,7 @@ const LibraryFolderUpload = () => {
                         </Typography>
                       </Stack>
                       <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                        Subiendo… no cierres esta pestaña.
+                        {t('folder.uploadingDontClose')}
                       </Typography>
                     </Box>
                   )}
@@ -515,11 +514,11 @@ const LibraryFolderUpload = () => {
                       onClick={handleStartUploads}
                       startIcon={isUploading ? <CircularProgress size={20} color="inherit" /> : null}
                     >
-                      {isUploading ? 'Subiendo…' : pendingCount > 0 ? `Subir ${pendingCount} pendiente(s)` : 'Todo subido'}
+                      {isUploading ? t('common.uploadingEllipsis') : pendingCount > 0 ? t('folder.uploadPending', { count: pendingCount }) : t('folder.allUploaded')}
                     </Button>
                     {pendingCount < rows.length && !isUploading && (
                       <Typography variant="caption" color="text.secondary">
-                        Puedes volver a subir solo los pendientes o corregir errores y pulsar de nuevo.
+                        {t('folder.retryHint')}
                       </Typography>
                     )}
                   </Stack>
