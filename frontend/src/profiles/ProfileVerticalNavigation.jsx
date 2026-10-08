@@ -30,6 +30,9 @@ import {
 } from '@mui/icons-material';
 import { createMenuConfig } from '../utils/menuUtils';
 
+/** Temporarily hidden until crypto payments are ready for general use. */
+export const SHOW_FAVORITE_CRYPTOS_SECTION = false;
+
 // Export menu configuration for use in header navigation
 export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCount = 0) => {
   const baseItems = [
@@ -63,12 +66,14 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
       icon: EventIcon,
       path: null
     },
-    {
-      label: 'Criptomonedas favoritas',
-      section: 'cryptos',
-      icon: CryptoIcon,
-      path: null
-    },
+    ...(SHOW_FAVORITE_CRYPTOS_SECTION
+      ? [{
+          label: 'Criptomonedas favoritas',
+          section: 'cryptos',
+          icon: CryptoIcon,
+          path: null
+        }]
+      : []),
     {
       label: 'Insignias',
       section: 'badges',
@@ -78,8 +83,9 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
   ];
 
   if (isOwnProfile) {
-    const cryptoIndex = baseItems.findIndex((item) => item.section === 'cryptos');
-    baseItems.splice(cryptoIndex + 1, 0, {
+    const insertAfterSection = SHOW_FAVORITE_CRYPTOS_SECTION ? 'cryptos' : 'events';
+    const insertIndex = baseItems.findIndex((item) => item.section === insertAfterSection);
+    baseItems.splice(insertIndex + 1, 0, {
       label: 'Mis tokens',
       section: 'tokens',
       icon: TollIcon,
