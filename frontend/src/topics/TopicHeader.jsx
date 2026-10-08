@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { Box, Typography, Paper, Button, Link as MuiLink, Badge } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 
 const TopicHeader = ({
@@ -12,6 +13,7 @@ const TopicHeader = ({
   pendingSuggestionsCount = 0,
 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation("topics");
   const { user, isAuthenticated } = useAuth();
   const creatorId = typeof topic.creator === "object" ? topic.creator.id : topic.creator;
   const userId = user?.id;
@@ -133,7 +135,7 @@ const TopicHeader = ({
                       },
                     }}
                   >
-                    Editar Tema
+                    {t("header.editTopic")}
                   </Button>
                 </Badge>
               )}
@@ -151,7 +153,7 @@ const TopicHeader = ({
             )}
             {topic.creator && (
               <Typography variant="body2" color="text.secondary">
-                Creado por{" "}
+                {t("header.createdBy")}{" "}
                 {creatorId != null ? (
                   <MuiLink
                     component={RouterLink}

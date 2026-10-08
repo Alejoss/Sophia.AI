@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Avatar } from '@mui/material';
 
 export const DEFAULT_AVATAR_SRC = '/images/default-avatar.svg';
@@ -20,6 +21,7 @@ const UserAvatar = ({
   imgProps,
   ...rest
 }) => {
+  const { t } = useTranslation('misc');
   const [imageFailed, setImageFailed] = useState(false);
   const hasCustomImage = Boolean(src) && !imageFailed;
   const resolvedSrc = hasCustomImage ? src : DEFAULT_AVATAR_SRC;
@@ -28,7 +30,7 @@ const UserAvatar = ({
   return (
     <Avatar
       src={resolvedSrc}
-      alt={alt || (username ? `Avatar de ${username}` : 'Avatar de usuario')}
+      alt={alt || (username ? t('avatar.ofUser', { name: username }) : t('avatar.generic'))}
       imgProps={{
         ...imgProps,
         onError: (event) => {

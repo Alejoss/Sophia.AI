@@ -10,6 +10,7 @@ import {
     LinearProgress,
     Box,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { formatFileSize } from '../utils/fileUtils';
 
@@ -22,15 +23,14 @@ const OwnerContentFileUploadDialog = ({
     onClose,
     contentId,
     onSuccess,
-    dialogTitle = 'Subir archivo',
-    submitLabel = 'Adjuntar archivo',
-    introText = (
-        <>
-            Para archivos grandes, la subida puede ir directo al almacenamiento con barra de progreso.
-            Si el servidor no usa S3, se usará subida clásica sin límite de tiempo de 30 s.
-        </>
-    ),
+    dialogTitle,
+    submitLabel,
+    introText,
 }) => {
+    const { t } = useTranslation('content');
+    const resolvedTitle = dialogTitle ?? t('ownerUpload.defaultTitle');
+    const resolvedSubmit = submitLabel ?? t('ownerUpload.submit');
+    const resolvedIntro = introText ?? t('ownerUpload.intro');
     const [file, setFile] = useState(null);
     const [error, setError] = useState('');
     const [uploading, setUploading] = useState(false);
@@ -48,7 +48,7 @@ const OwnerContentFileUploadDialog = ({
     const handleSubmit = async () => {
         setError('');
         if (!file) {
-            setError('Debes seleccionar un archivo.');
+            setError(t('ownerUpload.fileRequired'));
             return;
         }
 
@@ -64,14 +64,14 @@ const OwnerContentFileUploadDialog = ({
             onClose();
         } catch (err) {
             const raw = err?.response?.data?.error;
-            let msg = err?.message || 'No se pudo adjuntar el archivo.';
+            let msg = err?.message || t('ownerUpload.attachError');
             if (typeof raw === 'string') {
                 msg = raw;
             } else if (raw != null && typeof raw === 'object') {
                 try {
                     msg = JSON.stringify(raw);
                 } catch {
-                    msg = 'No se pudo adjuntar el archivo.';
+                    msg = t('ownerUpload.attachError');
                 }
             } else if (raw != null) {
                 msg = String(raw);
@@ -85,10 +85,10 @@ const OwnerContentFileUploadDialog = ({
 
     return (
         <Dialog open={open} onClose={uploading ? undefined : onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>{dialogTitle}</DialogTitle>
+            <DialogTitle>{resolvedTitle}</DialogTitle>
             <DialogContent>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    {introText}
+                    {resolvedIntro}
                 </Typography>
 
                 {error && (
@@ -103,7 +103,7 @@ const OwnerContentFileUploadDialog = ({
                             <>
                                 <LinearProgress />
                                 <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                                    Preparando subida…
+                                    {t('ownerUpload.preparing')}
                                 </Typography>
                             </>
                         ) : (
@@ -118,21 +118,21 @@ const OwnerContentFileUploadDialog = ({
                 )}
 
                 <Button variant="outlined" component="label" sx={{ mb: 2 }} disabled={uploading}>
-                    Seleccionar archivo
+                    {t('ownerUpload.selectFile')}
                     <input type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
                 </Button>
                 {file && (
                     <Typography variant="body2" sx={{ mb: 2 }}>
-                        Archivo: {file.name} ({formatFileSize(file.size)})
+                        {t('ownerUpload.fileLine', { name: file.name, size: formatFileSize(file.size) })}
                     </Typography>
                 )}
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose} disabled={uploading}>
-                    Cancelar
+                    {t('actions.cancel')}
                 </Button>
                 <Button variant="contained" onClick={handleSubmit} disabled={uploading}>
-                    {uploading ? 'Subiendo…' : submitLabel}
+                    {uploading ? t('ownerUpload.uploading') : resolvedSubmit}
                 </Button>
             </DialogActions>
         </Dialog>

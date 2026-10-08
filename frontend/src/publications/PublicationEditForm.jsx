@@ -14,18 +14,21 @@ import {
     Link,
     Alert,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import ContentSelector from '../content/ContentSelector';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import i18n from '../i18n';
 
 const schema = yup.object({
     text_content: yup
         .string()
         .trim()
-        .required('El contenido de texto es requerido.'),
+        .required(() => i18n.t('publications:editForm.textRequired')),
 });
 
 const PublicationEditForm = () => {
+    const { t } = useTranslation('publications');
     const navigate = useNavigate();
     const { publicationId } = useParams();
     const [selectedContent, setSelectedContent] = useState(null);
@@ -65,14 +68,14 @@ const PublicationEditForm = () => {
                 setLoadError('');
             } catch (err) {
                 console.error('Error fetching publication details:', err);
-                setLoadError('Error al cargar los detalles de la publicación');
+                setLoadError(t('editForm.loadError'));
             } finally {
                 setIsFetching(false);
             }
         };
 
         fetchPublicationDetails();
-    }, [publicationId, reset]);
+    }, [publicationId, reset, t]);
 
     const handleContentSelected = (contentProfile) => {
         setSelectedContent(contentProfile);
@@ -103,7 +106,7 @@ const PublicationEditForm = () => {
             const { generalError: parsed } = applyApiErrorsToForm(
                 err,
                 setError,
-                'Error al actualizar la publicación.',
+                t('editForm.updateError'),
                 { text_content: 'text_content' },
             );
             if (parsed) {
@@ -119,7 +122,7 @@ const PublicationEditForm = () => {
     const handleDelete = async () => {
         if (
             window.confirm(
-                '¿Está seguro de que desea eliminar esta publicación? Esta acción no se puede deshacer.',
+                t('editForm.deleteConfirm'),
             )
         ) {
             setDeleteError('');
@@ -131,7 +134,7 @@ const PublicationEditForm = () => {
                 navigate('/profiles/my_profile');
             } catch (err) {
                 console.error('Error deleting publication:', err);
-                setDeleteError('Error al eliminar la publicación');
+                setDeleteError(t('editForm.deleteError'));
             } finally {
                 setIsDeleting(false);
             }
@@ -163,12 +166,12 @@ const PublicationEditForm = () => {
                     onClick={() => navigate('/profiles/my_profile')}
                     sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
                 >
-                    ← Volver al Perfil
+                    {t('editForm.back')}
                 </Link>
             </Box>
 
             <Typography variant="h4" gutterBottom>
-                Editar Publicación
+                {t('editForm.title')}
             </Typography>
 
             <ContentSelector
@@ -182,7 +185,7 @@ const PublicationEditForm = () => {
 
             <Paper elevation={2} sx={{ p: 4 }}>
                 <Typography variant="h6" gutterBottom>
-                    Detalles de la Publicación
+                    {t('editForm.details')}
                 </Typography>
 
                 {(submitError || deleteError) && (
@@ -197,7 +200,7 @@ const PublicationEditForm = () => {
                         multiline
                         minRows={5}
                         maxRows={24}
-                        label="Contenido de Texto"
+                        label={t('editForm.textLabel')}
                         {...register('text_content')}
                         error={!!errors.text_content}
                         helperText={errors.text_content?.message}
@@ -215,7 +218,7 @@ const PublicationEditForm = () => {
                             onClick={handleDelete}
                             disabled={isSubmitting || isDeleting || isUploadingContent}
                         >
-                            {isDeleting ? 'Eliminando...' : 'Eliminar'}
+                            {isDeleting ? t('editForm.deleting') : t('editForm.delete')}
                         </Button>
                         <Button
                             variant="outlined"
@@ -223,14 +226,14 @@ const PublicationEditForm = () => {
                             onClick={handleCancel}
                             disabled={isSubmitting || isDeleting || isUploadingContent}
                         >
-                            Cancelar
+                            {t('editForm.cancel')}
                         </Button>
                         <Button
                             type="submit"
                             variant="contained"
                             disabled={isSubmitting || isDeleting || isUploadingContent || hasPendingContent}
                         >
-                            {isSubmitting ? 'Actualizando...' : 'Actualizar Publicación'}
+                            {isSubmitting ? t('editForm.updating') : t('editForm.submit')}
                         </Button>
                     </Box>
                 </Box>

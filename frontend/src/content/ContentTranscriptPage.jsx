@@ -16,7 +16,9 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import SubtitlesIcon from '@mui/icons-material/Subtitles';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
+import { useDateLocales } from '../hooks/useDateLocales';
 import { AuthContext } from '../context/AuthContext';
 import { getTopicContentPath } from '../utils/urlUtils';
 import ContentBitcoinAnchor from './ContentBitcoinAnchor';
@@ -40,6 +42,8 @@ export const plainTextFromSegments = (segments) =>
     .join(' ');
 
 const ContentTranscriptPage = () => {
+  const { t } = useTranslation('content');
+  const { intl } = useDateLocales();
   const { contentId } = useParams();
   const [searchParams] = useSearchParams();
   const { authState } = useContext(AuthContext);
@@ -50,7 +54,7 @@ const ContentTranscriptPage = () => {
   const [content, setContent] = useState(null);
   const [transcript, setTranscript] = useState(undefined);
   const [error, setError] = useState(null);
-  const [copyLabel, setCopyLabel] = useState('Copiar texto');
+  const [copyState, setCopyState] = useState('idle');
   /** 'timed' | 'plain' — only meaningful when segments exist. */
   const [viewMode, setViewMode] = useState('plain');
 
@@ -65,10 +69,9 @@ const ContentTranscriptPage = () => {
   }, [contentId, context, topicId]);
 
   const backLabel = useMemo(() => {
-    if (context === 'topic') return 'Volver al contenido del tema';
-    if (context === 'search') return 'Volver al contenido';
-    return 'Volver al contenido';
-  }, [context]);
+    if (context === 'topic') return t('transcript.backTopic');
+    return t('transcript.backContent');
+  }, [context, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,14 +107,14 @@ const ContentTranscriptPage = () => {
         setContent(contentData);
         if (!transcriptData) {
           setTranscript(null);
-          setError('Este contenido aún no tiene transcripción.');
+          setError(t('transcript.missing'));
           return;
         }
         setTranscript(transcriptData);
       } catch (err) {
         if (cancelled) return;
         console.error('Error loading transcript page:', err);
-        setError('No se pudo cargar la transcripción.');
+        setError(t('transcript.loadError'));
         setTranscript(null);
       }
     };
@@ -120,12 +123,12 @@ const ContentTranscriptPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [contentId, context, topicId, currentUserId]);
+  }, [contentId, context, topicId, currentUserId, t]);
 
   const title =
     content?.selected_profile?.title ||
     content?.original_title ||
-    `Contenido ${contentId}`;
+    t('common.contentWithId', { id: contentId });
 
   const segments = Array.isArray(transcript?.segments) ? transcript.segments : [];
   const hasSegments = segments.length > 0;
@@ -142,13 +145,19 @@ const ContentTranscriptPage = () => {
     if (!plainText) return;
     try {
       await navigator.clipboard.writeText(plainText);
-      setCopyLabel('Copiado');
-      setTimeout(() => setCopyLabel('Copiar texto'), 1800);
+      setCopyState('copied');
+      setTimeout(() => setCopyState('idle'), 1800);
     } catch {
-      setCopyLabel('No se pudo copiar');
-      setTimeout(() => setCopyLabel('Copiar texto'), 1800);
+      setCopyState('failed');
+      setTimeout(() => setCopyState('idle'), 1800);
     }
   };
+
+  const copyLabel = copyState === 'copied'
+    ? t('transcript.copied')
+    : copyState === 'failed'
+      ? t('transcript.copyFailed')
+      : t('transcript.copy');
 
   if (transcript === undefined) {
     return (
@@ -174,7 +183,7 @@ const ContentTranscriptPage = () => {
           <SubtitlesIcon color="primary" sx={{ mt: 0.5 }} />
           <Box sx={{ flexGrow: 1, minWidth: 0 }}>
             <Typography variant="overline" color="text.secondary">
-              Transcripción
+              {t('transcript.heading')}
             </Typography>
             <Typography variant="h5" component="h1" sx={{ wordBreak: 'break-word' }}>
               {title}
@@ -187,26 +196,26 @@ const ContentTranscriptPage = () => {
                 <Chip
                   size="small"
                   variant="outlined"
-                  label={`${Number(charCount).toLocaleString()} caracteres`}
+                  label={t('charCount', { value: Number(charCount).toLocaleString(intl) })}
                 />
               )}
               {hasSegments ? (
                 <Chip
                   size="small"
                   variant="outlined"
-                  label={`${segments.length} segmentos`}
+                  label={t('segmentCount', { value: segments.length })}
                 />
               ) : (
                 !error &&
                 plainText && (
-                  <Chip size="small" variant="outlined" label="Texto continuo" />
+                  <Chip size="small" variant="outlined" label={t('transcript.continuous')} />
                 )
               )}
             </Box>
           </Box>
           {plainText && (
             <Tooltip title={copyLabel}>
-              <IconButton onClick={handleCopy} aria-label="Copiar transcripción">
+              <IconButton onClick={handleCopy} aria-label={t('transcript.copyAria')}>
                 <ContentCopyIcon />
               </IconButton>
             </Tooltip>
@@ -240,13 +249,13 @@ const ContentTranscriptPage = () => {
               onChange={(_, next) => {
                 if (next) setViewMode(next);
               }}
-              aria-label="Modo de visualización de la transcripción"
+              aria-label={t('transcript.viewModeAria')}
             >
               <ToggleButton value="timed" sx={{ textTransform: 'none', px: 1.5 }}>
-                Con tiempos
+                {t('transcript.withTimes')}
               </ToggleButton>
               <ToggleButton value="plain" sx={{ textTransform: 'none', px: 1.5 }}>
-                Texto continuo
+                {t('transcript.continuous')}
               </ToggleButton>
             </ToggleButtonGroup>
           </Box>
@@ -295,9 +304,9 @@ const ContentTranscriptPage = () => {
 
         {!error && plainText && transcript?.text_hash && (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, mt: showTimed ? 0 : 0 }}>
-            El texto continuo es exactamente el que se usó para calcular el{' '}
+            {t('transcript.hashBefore')}{' '}
             <Box component="span" sx={{ fontFamily: 'ui-monospace, monospace' }}>text_hash</Box>
-            {' '}(SHA-256). Cópialo para verificar el anclaje.
+            {' '}{t('transcript.hashAfter')}
           </Typography>
         )}
 

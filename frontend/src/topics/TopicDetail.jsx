@@ -21,6 +21,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import ListIcon from '@mui/icons-material/List';
+import { Trans, useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { resolveMediaUrl } from '../utils/fileUtils';
 import { useAuth } from '../context/AuthContext';
@@ -65,6 +66,7 @@ function getGalleryImageSrc(content) {
 }
 
 function TopicGalleryThumb({ src, titleText, onOpen }) {
+    const { t } = useTranslation('topics');
     const [failed, setFailed] = useState(false);
     const showImg = src && !failed;
 
@@ -73,7 +75,7 @@ function TopicGalleryThumb({ src, titleText, onOpen }) {
             component="button"
             type="button"
             onClick={onOpen}
-            aria-label={`Ampliar imagen: ${titleText}`}
+            aria-label={t('detail.expandImageTitle', { title: titleText })}
             sx={{
                 display: 'block',
                 width: '100%',
@@ -112,7 +114,7 @@ function TopicGalleryThumb({ src, titleText, onOpen }) {
                     }}
                 >
                     <Typography variant="caption" color="text.secondary" align="center">
-                        Sin vista previa
+                        {t('detail.noPreview')}
                     </Typography>
                 </Box>
             )}
@@ -132,13 +134,14 @@ function TopicImageLightbox({
     onRequestNextPage,
     isLoadingNextPage,
 }) {
+    const { t } = useTranslation('topics');
     const n = items?.length ?? 0;
     const safeIndex = n === 0 ? 0 : Math.min(Math.max(0, index), n - 1);
     const content = n > 0 ? items[safeIndex] : null;
     const [imgFailed, setImgFailed] = useState(false);
 
     const profile = content ? (content.selected_profile || content) : null;
-    const titleText = profile ? (profile.title || content.original_title || 'Sin título') : '';
+    const titleText = profile ? (profile.title || content.original_title || t('common.untitled')) : '';
     const contentData = content ? (content.content || content) : null;
     const contentId = contentData?.id;
     const src = content ? getGalleryImageSrc(content) : null;
@@ -219,7 +222,7 @@ function TopicImageLightbox({
                     <Typography variant="body2" sx={{ color: 'grey.400' }}>
                         {safeIndex + 1} / {n}
                     </Typography>
-                    <IconButton onClick={onClose} aria-label="Cerrar galería" sx={{ color: 'common.white' }}>
+                    <IconButton onClick={onClose} aria-label={t('detail.closeGallery')} sx={{ color: 'common.white' }}>
                         <CloseIcon />
                     </IconButton>
                 </Box>
@@ -238,7 +241,7 @@ function TopicImageLightbox({
                     <IconButton
                         onClick={goPrevious}
                         disabled={safeIndex <= 0}
-                        aria-label="Imagen anterior"
+                        aria-label={t('detail.previousImage')}
                         sx={{
                             color: 'common.white',
                             flexShrink: 0,
@@ -271,14 +274,14 @@ function TopicImageLightbox({
                                 onError={() => setImgFailed(true)}
                             />
                         ) : (
-                            <Typography color="grey.400">Sin vista previa</Typography>
+                            <Typography color="grey.400">{t('detail.noPreview')}</Typography>
                         )}
                     </Box>
 
                     <IconButton
                         onClick={goNext}
                         disabled={(safeIndex >= n - 1 && !hasNextPage) || isLoadingNextPage}
-                        aria-label="Imagen siguiente"
+                        aria-label={t('detail.nextImage')}
                         sx={{
                             color: 'common.white',
                             flexShrink: 0,
@@ -295,7 +298,7 @@ function TopicImageLightbox({
                     </Typography>
                     {isLoadingNextPage && (
                         <Typography variant="caption" sx={{ display: 'block', mb: 0.5, color: 'grey.400' }}>
-                            Cargando más imágenes...
+                            {t('detail.loadingMoreImages')}
                         </Typography>
                     )}
                     {contentData.vote_count !== undefined && topicId && (
@@ -326,7 +329,7 @@ function TopicImageLightbox({
                             onClose();
                         }}
                     >
-                        Abrir ficha del contenido
+                        {t('detail.openContent')}
                     </Button>
                 </Box>
             </Box>
@@ -338,6 +341,7 @@ const TopicDetail = () => {
     const { topicId } = useParams();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
+    const { t } = useTranslation('topics');
     const { user, isAuthenticated } = useAuth();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -449,11 +453,11 @@ const TopicDetail = () => {
             }
             setError(null);
         } catch {
-            setError('Error al cargar los detalles del tema');
+            setError(t('detail.loadError'));
         } finally {
             setLoading(false);
         }
-    }, [topicId, fetchContentByTypePage, fetchPendingSuggestionsCount, fetchPendingTimelineSuggestionsCount, isAuthenticated, user?.id]);
+    }, [topicId, fetchContentByTypePage, fetchPendingSuggestionsCount, fetchPendingTimelineSuggestionsCount, isAuthenticated, user?.id, t]);
 
     useEffect(() => {
         refreshTopicPageData();
@@ -493,7 +497,7 @@ const TopicDetail = () => {
             setShowPaymentModal(true);
         } catch (err) {
             setPurchaseError(
-                err?.response?.data?.error || err?.error || 'No se pudo iniciar el pago',
+                err?.response?.data?.error || err?.error || t('detail.paymentError'),
             );
         } finally {
             setPurchaseLoading(false);
@@ -637,7 +641,7 @@ const TopicDetail = () => {
         const hasMore = totalForType > displayContents.length;
         const sectionTitle = labels.sectionTitle ?? `${type}s`;
         const itemsWord = labels.itemsWord ?? `${type}s`;
-        const seeAllPrefix = labels.seeAllPrefix ?? 'todos los';
+        const seeAllPrefix = labels.seeAllPrefix ?? t('detail.allPrefix');
 
         const sectionHeader = (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -659,7 +663,7 @@ const TopicDetail = () => {
                         onClick={() => navigate(`/content/topics/${topicId}/${type}`)}
                         sx={{ textTransform: 'none' }}
                     >
-                        Ver {seeAllPrefix} {totalForType} {itemsWord}
+                        {t('detail.seeAll', { prefix: seeAllPrefix, count: totalForType, items: itemsWord })}
                     </Button>
                 )}
             </Box>
@@ -680,7 +684,7 @@ const TopicDetail = () => {
                     >
                         {displayContents.map((content) => {
                             const profile = content.selected_profile || content;
-                            const titleText = profile.title || content.original_title || 'Sin título';
+                            const titleText = profile.title || content.original_title || t('common.untitled');
                             const authorName = profile.author || content.original_author;
                             const contentData = content.content || content;
                             const contentId = contentData.id;
@@ -770,7 +774,7 @@ const TopicDetail = () => {
                         >
                             {displayContents.map((content, thumbIndex) => {
                                 const profile = content.selected_profile || content;
-                                const titleText = profile.title || content.original_title || 'Sin título';
+                                const titleText = profile.title || content.original_title || t('common.untitled');
                                 const contentData = content.content || content;
                                 const contentId = contentData.id;
                                 const rowKey = content.id ?? contentId;
@@ -853,9 +857,9 @@ const TopicDetail = () => {
         );
     };
 
-    if (loading) return <Typography>Cargando detalles del tema...</Typography>;
+    if (loading) return <Typography>{t('detail.loading')}</Typography>;
     if (error) return <Typography color="error">{error}</Typography>;
-    if (!topic) return <Typography>Tema no encontrado</Typography>;
+    if (!topic) return <Typography>{t('detail.notFound')}</Typography>;
 
     const totalPendingSuggestions = pendingSuggestionsCount
         + pendingTimelineSuggestionsCount
@@ -881,14 +885,14 @@ const TopicDetail = () => {
                             startIcon={<AddIcon />}
                             onClick={() => setSuggestionModalOpen(true)}
                         >
-                            Sugerir Contenido
+                            {t('detail.suggestContent')}
                         </Button>
                         <Button
                             variant="outlined"
                             startIcon={<ListIcon />}
                             onClick={() => navigate(`/content/topics/${topicId}/suggestions`)}
                         >
-                            Ver sugerencias del tema
+                            {t('detail.viewSuggestions')}
                         </Button>
                     </>
                 )}
@@ -901,10 +905,10 @@ const TopicDetail = () => {
                     variant="scrollable"
                     allowScrollButtonsMobile
                 >
-                    <Tab value="content" label="Contenido" />
-                    {showConsultationsTab && <Tab value={TOPIC_TAB_CONSULTATIONS} label="Consultas" />}
-                    {showTimelineTab && <Tab value="timeline" label="Linea de tiempo" />}
-                    <Tab value="comments" label="Comentarios" />
+                    <Tab value="content" label={t('detail.tabContent')} />
+                    {showConsultationsTab && <Tab value={TOPIC_TAB_CONSULTATIONS} label={t('detail.tabConsultations')} />}
+                    {showTimelineTab && <Tab value="timeline" label={t('detail.tabTimeline')} />}
+                    <Tab value="comments" label={t('detail.tabComments')} />
                 </Tabs>
             </Box>
 
@@ -913,11 +917,15 @@ const TopicDetail = () => {
                     <Alert severity="info" sx={{ mb: 2 }}>
                         <Stack spacing={1.5}>
                             <Typography variant="subtitle1" fontWeight={600}>
-                                Consultas de pago
+                                {t('detail.paidConsultations')}
                             </Typography>
                             <Typography variant="body2">
-                                Desbloquea las consultas de este tema por{' '}
-                                <strong>${Number(topic.reference_price).toFixed(2)} USD</strong>.
+                                <Trans
+                                    t={t}
+                                    i18nKey="detail.unlockConsultationsPrice"
+                                    values={{ price: Number(topic.reference_price).toFixed(2) }}
+                                    components={{ strong: <strong /> }}
+                                />
                             </Typography>
                             {purchaseError && <Typography color="error">{purchaseError}</Typography>}
                             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -928,12 +936,12 @@ const TopicDetail = () => {
                                     disabled={purchaseLoading || !topic.is_for_sale}
                                     sx={{ textTransform: 'none' }}
                                 >
-                                    {purchaseLoading ? 'Preparando...' : 'Pagar consultas'}
+                                    {purchaseLoading ? t('detail.preparing') : t('detail.payConsultations')}
                                 </Button>
                             </Stack>
                             {!topic.is_for_sale && (
                                 <Typography variant="caption" color="text.secondary">
-                                    La venta de consultas de este tema está desactivada.
+                                    {t('detail.salesDisabled')}
                                 </Typography>
                             )}
                         </Stack>
@@ -945,18 +953,24 @@ const TopicDetail = () => {
 
             {activeTab === 'content' && (
                 <>
-                    {renderContentSection('video', contentByType.video)}
-                    {renderContentSection('audio', contentByType.audio)}
+                    {renderContentSection('video', contentByType.video, {
+                        sectionTitle: t('detail.videos'),
+                        itemsWord: t('detail.videosWord'),
+                    })}
+                    {renderContentSection('audio', contentByType.audio, {
+                        sectionTitle: t('detail.audios'),
+                        itemsWord: t('detail.audiosWord'),
+                    })}
                     {renderContentSection('text', contentByType.text, {
-                        sectionTitle: 'Textos',
-                        itemsWord: 'textos',
+                        sectionTitle: t('detail.texts'),
+                        itemsWord: t('detail.textsWord'),
                         layout: 'textList',
                     })}
 
                     {renderContentSection('image', contentByType.image, {
-                        sectionTitle: 'Imágenes',
-                        itemsWord: 'imágenes',
-                        seeAllPrefix: 'todas las',
+                        sectionTitle: t('detail.images'),
+                        itemsWord: t('detail.imagesWord'),
+                        seeAllPrefix: t('detail.allImagesPrefix'),
                         layout: 'imageGallery',
                         onImageGalleryOpen: (idx) => {
                             setImageLightboxIndex(idx);
@@ -980,7 +994,7 @@ const TopicDetail = () => {
 
                     {(Object.values(contentCounts).reduce((acc, n) => acc + (n || 0), 0) === 0) && (
                         <Typography variant="body1" color="text.secondary" align="center">
-                            Aún no se ha agregado contenido a este tema.
+                            {t('detail.empty')}
                         </Typography>
                     )}
                 </>

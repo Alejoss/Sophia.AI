@@ -1,0 +1,182 @@
+{
+  "title": "The Real History of Bitcoin and the War for Cryptocurrencies",
+  "checkout": {
+    "openFailed": "Could not open payment.",
+    "documentTitle": "Payment — {{title}}",
+    "noPrice": "This course does not have a payment price.",
+    "emailRequired": "Email is required.",
+    "emailInvalid": "Enter a valid email address.",
+    "confirmed": "Your place in the course is confirmed.",
+    "backToCourse": "Back to the course",
+    "stepsAria": "Payment steps",
+    "stepEmail": "1. Email",
+    "stepPayment": "2. Payment",
+    "heading": "Checkout",
+    "lead": "Confirm your email for the receipt and course access. Then choose how to pay.",
+    "summaryAria": "Order summary",
+    "emailLabel": "Receipt email",
+    "emailHelper": "We'll send the payment confirmation to this email.",
+    "preparing": "Preparing…",
+    "continue": "Continue to payment",
+    "note": "You can pay with Bitcoin Cash directly, other cryptocurrencies via NOWPayments, or arrange Monero by message."
+  },
+  "landing": {
+    "documentTitle": "{{title}} — Academia Blockchain",
+    "kicker": "Academia Blockchain",
+    "lead": "A guided investigation into the ideas, people, and conflicts that transformed Bitcoin.",
+    "explore": "Explore the course",
+    "enroll": "Enroll",
+    "signalsAria": "What the experience includes",
+    "signalStructured": "Structured content",
+    "signalResearch": "Historical research",
+    "signalLive": "Live sessions",
+    "indexRupture": "01 / The break",
+    "ruptureTitle": "Bitcoin's history is not what they tell you",
+    "ruptureQuote": "If you ask ChatGPT, it will repeat a lie.",
+    "ruptureBody": "You need to know the official story before you can go deeper and understand the real one. And this does not begin or end with Bitcoin.",
+    "eraBefore": "Before",
+    "eraBeforeBody": "Cryptography, privacy, digital money, Cypherpunks, P2P networks.",
+    "eraBirth": "The birth",
+    "eraBirthBody": "A concrete proposal for a concrete problem.",
+    "eraAfter": "After",
+    "eraAfterBody": "Visionaries, conflicts, and decisions that shaped what exists today.",
+    "indexQuestion": "02 / The central question",
+    "questionTitle": "How did Bitcoin become what it is today?",
+    "questionLead": "Bitcoin did not change only as technology. Its history is also shaped by conflicts of ideas and of people, interests, disagreements, and power groups.",
+    "pullCaption": "Eight forces pull Bitcoin in different directions. None of them, on its own, explains what it became.",
+    "indexVisions": "03 / Conflicting visions",
+    "visionsTitle": "Understand the Technology",
+    "visionsLead": "If you don't really understand how it works, and that matters to you, you are in the right place. I have walked hundreds of people through learning Bitcoin's technology. I will explain it as simply as possible so we can then move to a higher level of understanding, always with one-to-one support when you need it. Once you understand the technology, it becomes easier to weigh the different visions of it.",
+    "visionLabel": "Vision {{n}}",
+    "visionAs": "Bitcoin as {{vision}}",
+    "seePath": "See the path",
+    "indexPath": "04 / The path",
+    "pathTitle": "What you will investigate",
+    "pathLead": "A study route in seven questions.",
+    "indexMethod": "05 / Method",
+    "methodTitle": "You will work with sources",
+    "methodQuote": "We don't want to tell you what to think about Bitcoin's history. We want to give you enough context to examine it intelligently.",
+    "methodLead": "The path is not only one teacher's interpretation. It includes reporting, discussions, and articles so you can build your own judgment.",
+    "indexLive": "06 / Live experience",
+    "liveTitle": "The history is studied at your pace. The conversation happens live.",
+    "liveLead": "On-demand content plus live sessions during a set window. You can start when you enroll and move at your own pace. At the end, optionally, you can take a knowledge test to earn a completion certificate stored on the blockchain and a souvenir NFT.",
+    "livePoint1": "Go deeper into events and original sources",
+    "livePoint2": "Examine interpretations in dialogue with the teacher",
+    "livePoint3": "Ask questions and talk with other participants",
+    "livePoint4": "Repeat sessions planned for different paces",
+    "calendarAria": "Session calendar",
+    "meetingLabel": "Session {{id}}",
+    "meetingDate": "Date {{n}} — {{date}}",
+    "windowLabel": "Window:",
+    "windowBody": "each session is offered twice, on successive Mondays, from November 9 to December 15, 2026.",
+    "indexFit": "07 / Fit",
+    "fitTitle": "Who it is for — and who it is not",
+    "fitYes": "It may be for you if…",
+    "fitNo": "It is probably not for you if you are looking for…",
+    "indexGuide": "08 / Research guide",
+    "guideTitle": "Who guides the path",
+    "guideAlt": "Alejandro Veintimilla speaking at a conference.",
+    "guideName": "Alejandro Veintimilla",
+    "guideRole": "Research guide → student. Not guru → follower.",
+    "guideBio1": "Founder of Academia Blockchain, economist, and software developer specialized in blockchain. He has been part of the Bitcoin and blockchain ecosystem since 2014–2015, combining an economic perspective with the technical understanding of more than 14 years building software.",
+    "guideBio2": "Since 2015 he has taught and lectured on Bitcoin, blockchain, money, and power at universities, communities, and international events.",
+    "indexEnroll": "09 / Enrollment",
+    "enrollClosed": "Enrollment is not available right now.",
+    "enrollOpen": "The path, guidance through historical sources, and the three live sessions. Anyone who passes the exam receives a certificate on the blockchain and a souvenir NFT.",
+    "subscribe": "Subscribe",
+    "footerBrand": "ACADEMIA BLOCKCHAIN",
+    "footerMission": "Clarity. Curiosity. Independence.",
+    "footerNavAria": "Course navigation",
+    "footerHome": "Home",
+    "footerEnroll": "Enrollment"
+  },
+  "pulls": {
+    "ideas": { "name": "Ideas", "line": "Cryptography, privacy, and digital money." },
+    "people": { "name": "People", "line": "Those who disagreed about its direction." },
+    "code": { "name": "Code", "line": "Rules that were written and rejected." },
+    "money": { "name": "Money", "line": "Follow the money and you arrive at ...!" },
+    "power": { "name": "Power", "line": "Who decided what Bitcoin is." },
+    "community": { "name": "Community", "line": "Those who used it or left it." },
+    "incentives": { "name": "Incentives", "line": "What pushes a split." },
+    "infrastructure": { "name": "Infrastructure", "line": "What was built on top." }
+  },
+  "visions": {
+    "p2p": "P2P electronic cash",
+    "store": "A store of value",
+    "settlement": "A base settlement layer"
+  },
+  "path": {
+    "before": {
+      "period": "Before Bitcoin",
+      "question": "Which ideas made Bitcoin possible?",
+      "meta": "Cryptography, digital money, Cypherpunks, and P2P networks."
+    },
+    "satoshi": {
+      "period": "Satoshi",
+      "question": "What problem was he trying to solve?",
+      "meta": "The white paper, the context, and the original proposal. Understanding how Bitcoin's technology works."
+    },
+    "early": {
+      "period": "The early years",
+      "question": "What did the first people to use it imagine?",
+      "meta": "Early communities, emerging uses, and the first tensions."
+    },
+    "war": {
+      "period": "The war for the project",
+      "question": "What was Bitcoin supposed to be?",
+      "meta": "Technical, economic, and ideological conflicts over its direction."
+    },
+    "split": {
+      "period": "The split",
+      "question": "How did the conflict actually look, in detail?",
+      "meta": "Important events, forks, and the rewriting of narratives."
+    },
+    "market": {
+      "period": "The market",
+      "question": "Do you really understand what it means that the market is manipulated?",
+      "meta": "The war was never separate from the market."
+    },
+    "beyond": {
+      "period": "Beyond Bitcoin",
+      "question": "Is the war for cryptocurrencies still going on?",
+      "meta": "The ecosystem is much broader and the board is complex. But the perspective you will have built will help you understand it better."
+    }
+  },
+  "sources": {
+    "documents": { "title": "Original documents", "copy": "Foundational texts and historical archives." },
+    "discussions": { "title": "Discussions", "copy": "Forums, mailing lists, and debates of the time." },
+    "interviews": { "title": "Interviews", "copy": "Voices of the people who took part." },
+    "timelines": { "title": "Timelines", "copy": "Sequences that connect the episodes." }
+  },
+  "forWhom": {
+    "users": "People who use Bitcoin and want to understand its history",
+    "followers": "People who follow cryptocurrencies and want to go beyond the price",
+    "enthusiasts": "Technology enthusiasts who want to understand it in depth",
+    "students": "Students of economics, money, or monetary systems",
+    "curious": "People curious about Cypherpunks, privacy, and internet culture",
+    "witnesses": "People who lived parts of the history and never put the whole picture together"
+  },
+  "notFor": {
+    "signals": "Trading signals",
+    "advice": "Investment recommendations",
+    "predictions": "Price predictions",
+    "getRich": "Formulas for getting rich with cryptocurrencies"
+  },
+  "meetings": {
+    "m1": {
+      "topic": "What was Bitcoin supposed to be?",
+      "date1": "Monday 9 November 2026",
+      "date2": "Monday 23 November 2026"
+    },
+    "m2": {
+      "topic": "The war for Bitcoin",
+      "date1": "Monday 23 November 2026",
+      "date2": "Monday 8 December 2026"
+    },
+    "m3": {
+      "topic": "The war beyond Bitcoin",
+      "date1": "Monday 8 December 2026",
+      "date2": "Monday 15 December 2026"
+    }
+  }
+}

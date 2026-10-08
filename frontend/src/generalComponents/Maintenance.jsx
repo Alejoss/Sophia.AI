@@ -1,8 +1,10 @@
 import React from "react";
 import { Box, Container, Typography, useTheme } from "@mui/material";
+import { useTranslation } from 'react-i18next';
 import "../styles/maintenance.css";
 
 const Maintenance = () => {
+  const { t } = useTranslation('public');
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const messageBoxBg = isDark ? "rgba(30,30,30,0.9)" : "rgba(255,255,255,0.77)";
@@ -13,12 +15,12 @@ const Maintenance = () => {
         <Box
           component="img"
           src="/images/maintenance_page.png"
-          alt="Página en mantenimiento"
+          alt={t('maintenance.imageAlt')}
           className="maintenance-image"
         />
         <Box className="maintenance-image-overlay">
           <Typography variant="h1" component="h1" sx={styles.maintenanceTitle}>
-            Estamos en mantenimiento ... pronto volveremos!
+            {t('maintenance.title')}
           </Typography>
         </Box>
       </Box>
@@ -27,11 +29,10 @@ const Maintenance = () => {
         <Box className="maintenance-message-wrapper">
           <Box sx={{ ...styles.messageBox, bgcolor: messageBoxBg }}>
             <Typography variant="h1" component="h1" sx={styles.title}>
-              El Conocimiento es Poder
+              {t('maintenance.quote')}
             </Typography>
             <Typography variant="h5" component="p" sx={styles.subtitle}>
-              Aprende desde la autonomía. Explora temas creados por la comunidad y
-              construye tu propia red de aprendizaje.
+              {t('maintenance.subtitle')}
             </Typography>
           </Box>
         </Box>

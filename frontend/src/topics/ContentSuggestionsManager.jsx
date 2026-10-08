@@ -33,18 +33,23 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SearchIcon from '@mui/icons-material/Search';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { getContentOpenInNewTabUrl } from '../utils/fileUtils';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
+import i18n from '../i18n';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 const rejectSchema = yup.object({
     reason: yup
         .string()
         .trim()
-        .required('Debe proporcionar una razón para rechazar'),
+        .required(() => i18n.t('topics:suggestion.rejectReasonRequired')),
 });
 
 const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
+    const { t } = useTranslation('topics');
+    const { intl } = useDateLocales();
     const [suggestions, setSuggestions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -82,7 +87,7 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
             setSuggestions(Array.isArray(data) ? data : []);
             setError(null);
         } catch (err) {
-            setError('Error al cargar las sugerencias');
+            setError(t('suggestion.loadError'));
             console.error('Error fetching suggestions:', err);
         } finally {
             setLoading(false);
@@ -104,7 +109,7 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                 onSuggestionProcessed();
             }
         } catch (err) {
-            setError(err.response?.data?.error || 'Error al aceptar la sugerencia');
+            setError(err.response?.data?.error || t('suggestion.acceptError'));
         } finally {
             setProcessingIds(prev => {
                 const newSet = new Set(prev);
@@ -142,7 +147,7 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
             const { generalError } = applyApiErrorsToForm(
                 err,
                 setRejectFormError,
-                'Error al rechazar la sugerencia',
+                t('suggestion.rejectError'),
                 { rejection_reason: 'reason' },
             );
             if (generalError) {
@@ -159,9 +164,9 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
 
     const getStatusChip = (status) => {
         const statusConfig = {
-            PENDING: { label: 'Pendiente', color: 'warning' },
-            ACCEPTED: { label: 'Aceptada', color: 'success' },
-            REJECTED: { label: 'Rechazada', color: 'error' }
+            PENDING: { label: t('common.pending'), color: 'warning' },
+            ACCEPTED: { label: t('suggestion.statusAccepted'), color: 'success' },
+            REJECTED: { label: t('suggestion.statusRejected'), color: 'error' }
         };
         const config = statusConfig[status] || { label: status, color: 'default' };
         return <Chip label={config.label} color={config.color} size="small" />;
@@ -188,7 +193,7 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h6" gutterBottom>
-                    Sugerencias de Contenido
+                    {t('suggestion.managerTitle')}
                 </Typography>
             </Box>
 
@@ -201,35 +206,35 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
             {/* Filters */}
             <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                 <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel>Estado</InputLabel>
+                    <InputLabel>{t('common.status')}</InputLabel>
                     <Select
                         value={filterStatus}
-                        label="Estado"
+                        label={t('common.status')}
                         onChange={(e) => setFilterStatus(e.target.value)}
                     >
-                        <MenuItem value="all">Todos</MenuItem>
-                        <MenuItem value="PENDING">Pendientes</MenuItem>
-                        <MenuItem value="ACCEPTED">Aceptadas</MenuItem>
-                        <MenuItem value="REJECTED">Rechazadas</MenuItem>
+                        <MenuItem value="all">{t('common.all')}</MenuItem>
+                        <MenuItem value="PENDING">{t('suggestion.statusPendingPlural')}</MenuItem>
+                        <MenuItem value="ACCEPTED">{t('suggestion.statusAcceptedPlural')}</MenuItem>
+                        <MenuItem value="REJECTED">{t('suggestion.statusRejectedPlural')}</MenuItem>
                     </Select>
                 </FormControl>
 
                 <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel>Duplicadas</InputLabel>
+                    <InputLabel>{t('suggestion.duplicates')}</InputLabel>
                     <Select
                         value={filterDuplicate}
-                        label="Duplicadas"
+                        label={t('suggestion.duplicates')}
                         onChange={(e) => setFilterDuplicate(e.target.value)}
                     >
-                        <MenuItem value="all">Todas</MenuItem>
-                        <MenuItem value="true">Solo duplicadas</MenuItem>
-                        <MenuItem value="false">No duplicadas</MenuItem>
+                        <MenuItem value="all">{t('suggestion.allFeminine')}</MenuItem>
+                        <MenuItem value="true">{t('suggestion.onlyDuplicates')}</MenuItem>
+                        <MenuItem value="false">{t('suggestion.notDuplicates')}</MenuItem>
                     </Select>
                 </FormControl>
 
                 <TextField
                     size="small"
-                    placeholder="Buscar contenido o sugeridor..."
+                    placeholder={t('suggestion.searchPlaceholder')}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     InputProps={{
@@ -242,19 +247,19 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
             {/* Suggestions Table */}
             {filteredSuggestions.length === 0 ? (
                 <Alert severity="info">
-                    No hay sugerencias que coincidan con los filtros seleccionados.
+                    {t('suggestion.emptyFilters')}
                 </Alert>
             ) : (
                 <TableContainer component={Paper}>
                     <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell>Contenido</TableCell>
-                                <TableCell>Sugerido por</TableCell>
-                                <TableCell>Mensaje para moderadores</TableCell>
-                                <TableCell>Estado</TableCell>
-                                <TableCell>Fecha</TableCell>
-                                <TableCell align="right">Acciones</TableCell>
+                                <TableCell>{t('common.content')}</TableCell>
+                                <TableCell>{t('suggestion.suggestedBy')}</TableCell>
+                                <TableCell>{t('suggestion.messageForMods')}</TableCell>
+                                <TableCell>{t('common.status')}</TableCell>
+                                <TableCell>{t('suggestion.date')}</TableCell>
+                                <TableCell align="right">{t('common.actions')}</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -263,7 +268,7 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                                     <TableCell>
                                         {(() => {
                                             const viewUrl = getContentOpenInNewTabUrl(suggestion.content);
-                                            const title = suggestion.content?.original_title || 'Sin título';
+                                            const title = suggestion.content?.original_title || t('common.untitled');
                                             if (!viewUrl) {
                                                 return (
                                                     <Typography variant="body2" fontWeight="medium">
@@ -294,7 +299,7 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                                         })()}
                                         {suggestion.is_duplicate && (
                                             <Chip 
-                                                label="Duplicada" 
+                                                label={t('suggestion.duplicate')} 
                                                 size="small" 
                                                 color="warning" 
                                                 sx={{ mt: 0.5 }}
@@ -302,7 +307,7 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                                         )}
                                     </TableCell>
                                     <TableCell>
-                                        {suggestion.suggested_by?.username || 'Usuario desconocido'}
+                                        {suggestion.suggested_by?.username || t('common.unknownUser')}
                                     </TableCell>
                                     <TableCell>
                                         <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 200 }}>
@@ -313,12 +318,12 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                                         {getStatusChip(suggestion.status)}
                                     </TableCell>
                                     <TableCell>
-                                        {suggestion.created_at ? new Date(suggestion.created_at).toLocaleDateString() : '-'}
+                                        {suggestion.created_at ? new Date(suggestion.created_at).toLocaleDateString(intl) : '-'}
                                     </TableCell>
                                     <TableCell align="right">
                                         {suggestion.status === 'PENDING' && (
                                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                                                <Tooltip title="Aceptar">
+                                                <Tooltip title={t('common.accept')}>
                                                     <IconButton
                                                         color="success"
                                                         size="small"
@@ -328,7 +333,7 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                                                         <CheckCircleIcon />
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title="Rechazar">
+                                                <Tooltip title={t('common.reject')}>
                                                     <IconButton
                                                         color="error"
                                                         size="small"
@@ -343,7 +348,7 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                                         {suggestion.status === 'REJECTED' && suggestion.rejection_reason && (
                                             <Tooltip title={suggestion.rejection_reason}>
                                                 <Typography variant="caption" color="text.secondary">
-                                                    Ver razón
+                                                    {t('suggestion.viewReason')}
                                                 </Typography>
                                             </Tooltip>
                                         )}
@@ -363,10 +368,10 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                 fullWidth
             >
                 <Box component="form" onSubmit={handleRejectSubmit(onRejectSubmit)} noValidate>
-                    <DialogTitle>Rechazar Sugerencia</DialogTitle>
+                    <DialogTitle>{t('suggestion.rejectDialogTitle')}</DialogTitle>
                     <DialogContent>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Por favor, proporciona una razón para rechazar esta sugerencia de contenido.
+                            {t('suggestion.rejectHelp')}
                         </Typography>
                         {rejectGeneralError && (
                             <Alert severity="error" sx={{ mb: 2 }}>
@@ -377,8 +382,8 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                             fullWidth
                             multiline
                             rows={4}
-                            label="Razón de rechazo"
-                            placeholder="Explica por qué se rechaza esta sugerencia..."
+                            label={t('suggestion.rejectReasonLabel')}
+                            placeholder={t('suggestion.rejectPlaceholder')}
                             error={!!rejectErrors.reason}
                             helperText={rejectErrors.reason?.message}
                             disabled={isRejectSubmitting || processingIds.has(selectedSuggestion?.id)}
@@ -390,7 +395,7 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                             onClick={() => setRejectDialogOpen(false)}
                             disabled={isRejectSubmitting || processingIds.has(selectedSuggestion?.id)}
                         >
-                            Cancelar
+                            {t('common.cancel')}
                         </Button>
                         <Button
                             type="submit"
@@ -398,7 +403,7 @@ const ContentSuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
                             color="error"
                             disabled={isRejectSubmitting || processingIds.has(selectedSuggestion?.id)}
                         >
-                            {isRejectSubmitting ? 'Rechazando...' : 'Rechazar'}
+                            {isRejectSubmitting ? t('suggestion.rejecting') : t('common.reject')}
                         </Button>
                     </DialogActions>
                 </Box>

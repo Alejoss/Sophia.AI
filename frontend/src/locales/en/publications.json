@@ -1,0 +1,43 @@
+{
+  "loadError": "Could not load the publications",
+  "empty": "No publications were found.",
+  "published": "Published: {{date}}",
+  "edit": "Edit",
+  "detail": {
+    "copySuccess": "URL copied to the clipboard",
+    "copyError": "Could not copy the URL",
+    "error": "Error: {{message}}",
+    "notFound": "Publication not found",
+    "edit": "Edit publication",
+    "published": "Published on {{date}}",
+    "referenced": "Referenced content:",
+    "shareTooltip": "Share publication",
+    "shareAria": "share publication"
+  },
+  "create": {
+    "textRequired": "The text content is required.",
+    "error": "Could not create the publication.",
+    "title": "Create new publication",
+    "details": "Publication details",
+    "textLabel": "Text content",
+    "cancel": "Cancel",
+    "creating": "Creating...",
+    "submit": "Create publication"
+  },
+  "editForm": {
+    "textRequired": "The text content is required.",
+    "loadError": "Could not load the publication details",
+    "updateError": "Could not update the publication.",
+    "deleteConfirm": "Are you sure you want to delete this publication? This action cannot be undone.",
+    "deleteError": "Could not delete the publication",
+    "back": "← Back to profile",
+    "title": "Edit publication",
+    "details": "Publication details",
+    "textLabel": "Text content",
+    "deleting": "Deleting...",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "updating": "Updating...",
+    "submit": "Update publication"
+  }
+}

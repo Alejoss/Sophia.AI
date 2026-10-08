@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import ProductPaymentCheckout from './ProductPaymentCheckout';
 import {
   createTokenPurchaseBchPayment,
@@ -10,6 +11,7 @@ import { PRODUCT_KINDS } from './productCatalog';
  * Token-package checkout adapter.
  */
 const TokenCheckout = ({ checkout, onClose, onPaid }) => {
+  const { t } = useTranslation('payments');
   const lastCheckout = useRef(checkout);
   if (checkout) lastCheckout.current = checkout;
   const active = checkout || lastCheckout.current;
@@ -18,7 +20,7 @@ const TokenCheckout = ({ checkout, onClose, onPaid }) => {
     <ProductPaymentCheckout
       open={Boolean(checkout)}
       onClose={onClose}
-      title={active?.title || 'Paquete de tokens'}
+      title={active?.title || t('tokenPackageTitle')}
       priceUsd={active?.priceUsd || 0}
       productKind={PRODUCT_KINDS.TOKEN_PACKAGE}
       productFlags={{}}

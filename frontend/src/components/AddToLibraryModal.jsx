@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -22,7 +24,7 @@ const schema = yup.object({
   title: yup
     .string()
     .trim()
-    .required('El título es requerido.'),
+    .required(() => i18n.t('misc:library.titleRequired')),
   author: yup.string().trim().default(''),
   personalNote: yup.string().trim().default(''),
 });
@@ -42,6 +44,7 @@ const getDefaultAuthor = (content) =>
   '';
 
 const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
+  const { t } = useTranslation('misc');
   const [openModal, setOpenModal] = useState(false);
   const [generalError, setGeneralError] = useState('');
 
@@ -82,7 +85,7 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
     const contentId = content?.content?.id || content?.id;
 
     if (!contentId) {
-      setGeneralError('No se pudo identificar el contenido. Recarga la página e inténtalo de nuevo.');
+      setGeneralError(t('library.identifyFailed'));
       return;
     }
 
@@ -97,7 +100,7 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
       const { generalError: parsed } = applyApiErrorsToForm(
         error,
         setError,
-        'No se pudo agregar a tu biblioteca. Inténtalo de nuevo.',
+        t('library.addFailed'),
         { personal_note: 'personalNote', title: 'title', author: 'author' },
       );
       if (parsed) {
@@ -108,10 +111,10 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
 
   return (
     <>
-      <Tooltip title="Agregar a mi Biblioteca">
+      <Tooltip title={t('library.add')}>
         {buttonProps?.variant ? (
           <Button onClick={handleOpen} startIcon={<AddIcon />} {...buttonProps}>
-            Agregar a mi Biblioteca
+            {t('library.add')}
           </Button>
         ) : (
           <IconButton onClick={handleOpen} color="primary" size="small" {...buttonProps}>
@@ -130,11 +133,11 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
         aria-labelledby="add-to-library-dialog-title"
       >
         <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-          <DialogTitle id="add-to-library-dialog-title">Agregar a mi Biblioteca</DialogTitle>
+          <DialogTitle id="add-to-library-dialog-title">{t('library.dialogTitle')}</DialogTitle>
           <DialogContent>
             <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <TextField
-                label="Título"
+                label={t('library.titleLabel')}
                 {...register('title')}
                 error={!!errors.title}
                 helperText={errors.title?.message}
@@ -143,7 +146,7 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
               />
 
               <TextField
-                label="Autor"
+                label={t('library.authorLabel')}
                 {...register('author')}
                 error={!!errors.author}
                 helperText={errors.author?.message}
@@ -151,14 +154,14 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
               />
 
               <TextField
-                label="Nota personal"
+                label={t('library.noteLabel')}
                 {...register('personalNote')}
                 error={!!errors.personalNote}
                 helperText={errors.personalNote?.message}
                 multiline
                 rows={4}
                 fullWidth
-                placeholder="Agrega tus pensamientos o notas sobre este contenido..."
+                placeholder={t('library.notePlaceholder')}
               />
 
               {generalError && <Alert severity="error">{generalError}</Alert>}
@@ -166,10 +169,10 @@ const AddToLibraryModal = ({ content, onSuccess, buttonProps = {} }) => {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleClose} disabled={isSubmitting}>
-              Cancelar
+              {t('library.cancel')}
             </Button>
             <Button type="submit" variant="contained" color="primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Agregando...' : 'Agregar a mi Biblioteca'}
+              {isSubmitting ? t('library.adding') : t('library.add')}
             </Button>
           </DialogActions>
         </Box>

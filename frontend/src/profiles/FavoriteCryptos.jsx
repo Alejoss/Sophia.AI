@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -44,14 +45,16 @@ import {
 } from '../api/profilesApi';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
 
-const addCryptoSchema = yup.object({
-  selectedCrypto: yup
-    .string()
-    .required('Por favor selecciona una criptomoneda'),
-  address: yup.string().default(''),
-});
-
 const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
+  const { t } = useTranslation('profiles');
+  const addCryptoSchema = useMemo(
+    () =>
+      yup.object({
+        selectedCrypto: yup.string().required(() => t('cryptos.selectRequired')),
+        address: yup.string().default(''),
+      }),
+    [t],
+  );
   const [acceptedCryptos, setAcceptedCryptos] = useState([]);
   const [availableCryptos, setAvailableCryptos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +92,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
       }
     } catch (err) {
       console.error('Error fetching cryptocurrency data:', err);
-      setError('Failed to load cryptocurrency data');
+      setError(t('cryptos.loadError'));
     } finally {
       setLoading(false);
     }
@@ -109,7 +112,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
       const { generalError: parsed } = applyApiErrorsToForm(
         err,
         setFormError,
-        'Error al agregar la criptomoneda',
+        t('cryptos.addError'),
         { cryptocurrency: 'selectedCrypto', crypto: 'selectedCrypto' },
       );
       if (parsed) {
@@ -119,7 +122,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
   };
 
   const handleDeleteCrypto = async (cryptoId) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar esta criptomoneda?')) {
+    if (!window.confirm(t('cryptos.confirmDelete'))) {
       return;
     }
 
@@ -128,7 +131,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
       await fetchData();
     } catch (err) {
       console.error('Error deleting cryptocurrency:', err);
-      setError('Error al eliminar la criptomoneda');
+      setError(t('cryptos.deleteError'));
     }
   };
 
@@ -179,7 +182,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
             fontWeight: 600,
           }}
         >
-          Criptomonedas favoritas
+          {t('cryptos.title')}
         </Typography>
         {isOwnProfile && (
           <Button
@@ -187,14 +190,14 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
             startIcon={<AddIcon />}
             onClick={handleOpenModal}
           >
-            Agregar criptomoneda
+            {t('cryptos.add')}
           </Button>
         )}
       </Box>
 
       {isOwnProfile && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          Por razones legales, todavía no podemos activar los pagos en cripto.
+          {t('cryptos.legalNotice')}
         </Alert>
       )}
 
@@ -204,13 +207,10 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <CryptoIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
               <Typography variant="h6" color="text.secondary" gutterBottom>
-                Aún no se han agregado criptomonedas
+                {t('cryptos.emptyTitle')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {isOwnProfile
-                  ? 'Agrega tus criptomonedas favoritas para recibir pagos'
-                  : 'Este usuario aún no ha agregado ninguna criptomoneda'
-                }
+                {isOwnProfile ? t('cryptos.emptyOwn') : t('cryptos.emptyOther')}
               </Typography>
             </Box>
           </CardContent>
@@ -270,13 +270,9 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
                           color="text.secondary"
                           sx={{ wordBreak: 'break-all', mt: 1 }}
                         >
-                          {acceptedCrypto.address ? (
-                            <>
-                              <strong>Dirección:</strong> {acceptedCrypto.address}
-                            </>
-                          ) : (
-                            <>Pago en línea vía plataforma (sin dirección propia)</>
-                          )}
+                          {acceptedCrypto.address
+                            ? t('cryptos.address', { address: acceptedCrypto.address })
+                            : t('cryptos.platformAddress')}
                         </Typography>
                       )
                     }
@@ -287,7 +283,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
                         edge="end"
                         color="error"
                         onClick={() => handleDeleteCrypto(acceptedCrypto.crypto.id)}
-                        title="Eliminar criptomoneda"
+                        title={t('cryptos.remove')}
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -303,7 +299,7 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
 
       <Dialog open={modalOpen} onClose={handleModalClose} maxWidth="sm" fullWidth>
         <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-          <DialogTitle>Agregar criptomoneda</DialogTitle>
+          <DialogTitle>{t('cryptos.dialogTitle')}</DialogTitle>
           <DialogContent>
             <Box sx={{ pt: 1 }}>
               {generalError && (
@@ -313,14 +309,14 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
               )}
 
               <FormControl fullWidth sx={{ mb: 3 }} error={!!errors.selectedCrypto}>
-                <InputLabel>Seleccionar criptomoneda</InputLabel>
+                <InputLabel>{t('cryptos.select')}</InputLabel>
                 <Controller
                   name="selectedCrypto"
                   control={control}
                   render={({ field }) => (
                     <Select
                       {...field}
-                      label="Seleccionar criptomoneda"
+                      label={t('cryptos.select')}
                       disabled={isSubmitting}
                     >
                       {availableCryptos.map((crypto) => (
@@ -345,12 +341,9 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
 
               <TextField
                 fullWidth
-                label="Dirección de billetera (opcional)"
-                placeholder="Ingresa tu dirección de billetera"
-                helperText={
-                  errors.address?.message ||
-                  'Opcional. Si no indicas una, los pagos en línea usarán una dirección generada por la plataforma.'
-                }
+                label={t('cryptos.walletLabel')}
+                placeholder={t('cryptos.walletPlaceholder')}
+                helperText={errors.address?.message || t('cryptos.walletHelper')}
                 error={!!errors.address}
                 disabled={isSubmitting}
                 sx={{ mb: 2 }}
@@ -360,14 +353,14 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleModalClose} disabled={isSubmitting}>
-              Cancelar
+              {t('cancel')}
             </Button>
             <Button
               type="submit"
               variant="contained"
               disabled={isSubmitting}
             >
-              {isSubmitting ? <CircularProgress size={20} /> : 'Agregar'}
+              {isSubmitting ? <CircularProgress size={20} /> : t('cryptos.submit')}
             </Button>
           </DialogActions>
         </Box>

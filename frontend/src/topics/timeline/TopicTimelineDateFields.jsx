@@ -12,7 +12,8 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-import 'dayjs/locale/es';
+import { useTranslation } from 'react-i18next';
+import { useDateLocales } from '../../hooks/useDateLocales';
 
 export const DATE_MODES = {
   NONE: 'none',
@@ -29,6 +30,8 @@ const inferInitialMode = (startDate, endDate, isNewEntry) => {
 const toApiDate = (value) => (value && value.isValid() ? value.format('YYYY-MM-DD') : '');
 
 const TopicTimelineDateFields = ({ startDate, endDate, onChange, disabled = false, isNewEntry = false }) => {
+  const { t } = useTranslation('topics');
+  const { dayjs: dayjsLocale } = useDateLocales();
   const [mode, setMode] = useState(() => inferInitialMode(startDate, endDate, isNewEntry));
   const [rangeError, setRangeError] = useState('');
 
@@ -44,7 +47,7 @@ const TopicTimelineDateFields = ({ startDate, endDate, onChange, disabled = fals
 
   const validateRange = (nextStart, nextEnd) => {
     if (nextStart && nextEnd && dayjs(nextEnd).isBefore(dayjs(nextStart), 'day')) {
-      setRangeError('La fecha final no puede ser anterior a la fecha inicial.');
+      setRangeError(t('timeline.dateRangeError'));
       return false;
     }
     setRangeError('');
@@ -93,7 +96,7 @@ const TopicTimelineDateFields = ({ startDate, endDate, onChange, disabled = fals
   };
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={dayjsLocale}>
       <Box
         sx={{
           p: 2,
@@ -104,11 +107,10 @@ const TopicTimelineDateFields = ({ startDate, endDate, onChange, disabled = fals
         }}
       >
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
-          Referencia temporal (opcional)
+          {t('timeline.temporalRef')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Usa una fecha concreta para hitos puntuales o un periodo para etapas con duracion.
-          Si no defines fechas, la entrada se mostrara como una etapa numerada.
+          {t('timeline.temporalHelp')}
         </Typography>
 
         <RadioGroup
@@ -119,23 +121,23 @@ const TopicTimelineDateFields = ({ startDate, endDate, onChange, disabled = fals
           <FormControlLabel
             value={DATE_MODES.POINT}
             control={<Radio size="small" disabled={disabled} />}
-            label="Fecha concreta (un solo día)"
+            label={t('timeline.point')}
           />
           <FormControlLabel
             value={DATE_MODES.PERIOD}
             control={<Radio size="small" disabled={disabled} />}
-            label="Periodo de tiempo"
+            label={t('timeline.period')}
           />
           <FormControlLabel
             value={DATE_MODES.NONE}
             control={<Radio size="small" disabled={disabled} />}
-            label='Sin fecha (Etapa conceptual, por ej. "Período Jurásico")'
+            label={t('timeline.none')}
           />
         </RadioGroup>
 
         {mode === DATE_MODES.POINT && (
           <DatePicker
-            label="Fecha del evento"
+            label={t('timeline.eventDate')}
             value={startValue}
             onChange={handleStartChange}
             disabled={disabled}
@@ -144,7 +146,7 @@ const TopicTimelineDateFields = ({ startDate, endDate, onChange, disabled = fals
               ...datePickerSlotProps,
               textField: {
                 ...datePickerSlotProps.textField,
-                helperText: 'Ej. 31 oct 2008 para la publicacion del whitepaper de Bitcoin.',
+                helperText: t('timeline.eventDateHelp'),
               },
             }}
           />
@@ -153,7 +155,7 @@ const TopicTimelineDateFields = ({ startDate, endDate, onChange, disabled = fals
         {mode === DATE_MODES.PERIOD && (
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <DatePicker
-              label="Fecha inicial"
+              label={t('timeline.startDate')}
               value={startValue}
               onChange={handleStartChange}
               disabled={disabled}
@@ -162,12 +164,12 @@ const TopicTimelineDateFields = ({ startDate, endDate, onChange, disabled = fals
                 ...datePickerSlotProps,
                 textField: {
                   ...datePickerSlotProps.textField,
-                  helperText: 'Inicio del periodo.',
+                  helperText: t('timeline.startDateHelp'),
                 },
               }}
             />
             <DatePicker
-              label="Fecha final (opcional)"
+              label={t('timeline.endDate')}
               value={endValue}
               onChange={handleEndChange}
               disabled={disabled}
@@ -178,7 +180,7 @@ const TopicTimelineDateFields = ({ startDate, endDate, onChange, disabled = fals
                 textField: {
                   ...datePickerSlotProps.textField,
                   error: Boolean(rangeError),
-                  helperText: rangeError || 'Dejala vacia si el periodo sigue abierto.',
+                  helperText: rangeError || t('timeline.endDateHelp'),
                 },
               }}
             />

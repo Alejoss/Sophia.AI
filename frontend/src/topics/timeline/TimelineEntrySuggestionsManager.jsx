@@ -30,20 +30,23 @@ import {
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../../api/contentApi';
+import { useDateLocales } from '../../hooks/useDateLocales';
+import i18n from '../../i18n';
 import { applyApiErrorsToForm } from '../../utils/apiFormErrors.js';
 
 const rejectSchema = yup.object({
   reason: yup
     .string()
     .trim()
-    .required('Debe proporcionar una razón para rechazar'),
+    .required(() => i18n.t('topics:timeline.rejectReasonRequired')),
 });
 
-const formatDate = (value) => {
-  if (!value) return 'Sin fecha';
+const formatDate = (value, locale) => {
+  if (!value) return null;
   try {
-    return new Date(`${value}T00:00:00`).toLocaleDateString('es-ES', {
+    return new Date(`${value}T00:00:00`).toLocaleDateString(locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -54,6 +57,8 @@ const formatDate = (value) => {
 };
 
 const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => {
+  const { t } = useTranslation('topics');
+  const { intl } = useDateLocales();
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -85,7 +90,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
       setSuggestions(Array.isArray(data) ? data : []);
       setError(null);
     } catch {
-      setError('Error al cargar las sugerencias de linea de tiempo');
+      setError(t('timeline.loadSuggestionsError'));
     } finally {
       setLoading(false);
     }
@@ -93,7 +98,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
 
   useEffect(() => {
     fetchSuggestions();
-  }, [topicId, filterStatus]);
+  }, [topicId, filterStatus, t]);
 
   const handleAccept = async (suggestion) => {
     setProcessingIds((prev) => new Set(prev).add(suggestion.id));
@@ -103,7 +108,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
       await fetchSuggestions();
       onSuggestionProcessed?.();
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al aceptar la sugerencia');
+      setError(err.response?.data?.error || t('suggestion.acceptError'));
     } finally {
       setProcessingIds((prev) => {
         const next = new Set(prev);
@@ -135,7 +140,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
       const { generalError } = applyApiErrorsToForm(
         err,
         setRejectFormError,
-        'Error al rechazar la sugerencia',
+        t('suggestion.rejectError'),
         { rejection_reason: 'reason' },
       );
       if (generalError) {
@@ -153,31 +158,29 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        Sugerencias de linea de tiempo
+        {t('user.timelineSuggestionsTitle')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Revisa propuestas de entradas narrativas enviadas por la comunidad.
+        {t('timeline.reviewIntro')}
       </Typography>
       <Alert severity="info" sx={{ mb: 2 }}>
-        El contenido de las sugerencias que aceptes sera sumado al tema (si aun no forma parte de el)
-        y vinculado a la nueva entrada de la linea de tiempo. Las sugerencias de contenido pendientes
-        para el mismo material se cerraran automaticamente.
+        {t('timeline.acceptInfo')}
       </Alert>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
         <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel>Estado</InputLabel>
+          <InputLabel>{t('common.status')}</InputLabel>
           <Select
             value={filterStatus}
-            label="Estado"
+            label={t('common.status')}
             onChange={(event) => setFilterStatus(event.target.value)}
           >
-            <MenuItem value="all">Todos</MenuItem>
-            <MenuItem value="PENDING">Pendientes</MenuItem>
-            <MenuItem value="ACCEPTED">Aceptadas</MenuItem>
-            <MenuItem value="REJECTED">Rechazadas</MenuItem>
+            <MenuItem value="all">{t('common.all')}</MenuItem>
+            <MenuItem value="PENDING">{t('suggestion.statusPendingPlural')}</MenuItem>
+            <MenuItem value="ACCEPTED">{t('suggestion.statusAcceptedPlural')}</MenuItem>
+            <MenuItem value="REJECTED">{t('suggestion.statusRejectedPlural')}</MenuItem>
           </Select>
         </FormControl>
       </Stack>
@@ -188,27 +191,28 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
         </Box>
       ) : suggestions.length === 0 ? (
         <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
-          <Typography color="text.secondary">No hay sugerencias para mostrar.</Typography>
+          <Typography color="text.secondary">{t('timeline.emptySuggestions')}</Typography>
         </Paper>
       ) : (
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Titulo</TableCell>
-                <TableCell>Fechas</TableCell>
-                <TableCell>Sugerido por</TableCell>
-                <TableCell>Contenidos</TableCell>
-                <TableCell>Estado</TableCell>
-                <TableCell align="right">Acciones</TableCell>
+                <TableCell>{t('edit.titleLabel')}</TableCell>
+                <TableCell>{t('timeline.dates')}</TableCell>
+                <TableCell>{t('suggestion.suggestedBy')}</TableCell>
+                <TableCell>{t('timeline.contents')}</TableCell>
+                <TableCell>{t('common.status')}</TableCell>
+                <TableCell align="right">{t('common.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {suggestions.map((suggestion) => {
                 const isProcessing = processingIds.has(suggestion.id);
+                const formatDateLabel = (value) => formatDate(value, intl) || t('common.noDate');
                 const dateLabel = suggestion.end_date
-                  ? `${formatDate(suggestion.start_date)} - ${formatDate(suggestion.end_date)}`
-                  : formatDate(suggestion.start_date);
+                  ? `${formatDateLabel(suggestion.start_date)} - ${formatDateLabel(suggestion.end_date)}`
+                  : formatDateLabel(suggestion.start_date);
                 return (
                   <TableRow key={suggestion.id} hover>
                     <TableCell>
@@ -223,7 +227,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
                       )}
                       {suggestion.message && (
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                          Mensaje para moderadores: {suggestion.message}
+                          {t('timeline.messageForMods', { message: suggestion.message })}
                         </Typography>
                       )}
                     </TableCell>
@@ -234,7 +238,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
                         <Typography variant="body2" color="text.secondary">—</Typography>
                       ) : (
                         (suggestion.contents || []).map((item) => {
-                          const title = item.content?.original_title || 'Sin titulo';
+                          const title = item.content?.original_title || t('common.untitledPlain');
                           return (
                             <Box key={item.id} sx={{ mb: 0.5 }}>
                               <Typography variant="body2" component="span">
@@ -243,7 +247,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
                               {suggestion.status === 'PENDING' && (
                                 <Chip
                                   size="small"
-                                  label={item.is_in_topic ? 'Ya en el tema' : 'Se anadira al tema'}
+                                  label={item.is_in_topic ? t('timeline.alreadyInTopic') : t('timeline.willAddToTopic')}
                                   color={item.is_in_topic ? 'default' : 'primary'}
                                   variant="outlined"
                                   sx={{ ml: 1, verticalAlign: 'middle' }}
@@ -267,13 +271,13 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
                         }
                       />
                       {suggestion.is_duplicate && (
-                        <Chip size="small" label="Duplicada" color="warning" sx={{ ml: 0.5 }} />
+                        <Chip size="small" label={t('suggestion.duplicate')} color="warning" sx={{ ml: 0.5 }} />
                       )}
                     </TableCell>
                     <TableCell align="right">
                       {suggestion.status === 'PENDING' && (
                         <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                          <Tooltip title="Publicar entrada y anadir contenido al tema si aplica">
+                          <Tooltip title={t('timeline.publishTooltip')}>
                             <span>
                               <Button
                                 size="small"
@@ -282,11 +286,11 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
                                 disabled={isProcessing}
                                 onClick={() => handleAccept(suggestion)}
                               >
-                                Aceptar
+                                {t('common.accept')}
                               </Button>
                             </span>
                           </Tooltip>
-                          <Tooltip title="Rechazar">
+                          <Tooltip title={t('common.reject')}>
                             <span>
                               <Button
                                 size="small"
@@ -300,7 +304,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
                                   setRejectDialogOpen(true);
                                 }}
                               >
-                                Rechazar
+                                {t('common.reject')}
                               </Button>
                             </span>
                           </Tooltip>
@@ -322,7 +326,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
         fullWidth
       >
         <Box component="form" onSubmit={handleRejectSubmit(onRejectSubmit)} noValidate>
-          <DialogTitle>Rechazar sugerencia de linea de tiempo</DialogTitle>
+          <DialogTitle>{t('timeline.rejectTimelineTitle')}</DialogTitle>
           <DialogContent>
             {rejectGeneralError && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -333,7 +337,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
               fullWidth
               multiline
               minRows={3}
-              label="Razon del rechazo"
+              label={t('timeline.rejectReasonLabel')}
               error={!!rejectErrors.reason}
               helperText={rejectErrors.reason?.message}
               disabled={isRejectSubmitting}
@@ -343,7 +347,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setRejectDialogOpen(false)} disabled={isRejectSubmitting}>
-              Cancelar
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
@@ -351,7 +355,7 @@ const TimelineEntrySuggestionsManager = ({ topicId, onSuggestionProcessed }) => 
               variant="contained"
               disabled={isRejectSubmitting}
             >
-              {isRejectSubmitting ? 'Rechazando...' : 'Rechazar'}
+              {isRejectSubmitting ? t('suggestion.rejecting') : t('common.reject')}
             </Button>
           </DialogActions>
         </Box>

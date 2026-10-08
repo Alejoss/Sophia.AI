@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Box,
@@ -31,13 +32,15 @@ const shortAddress = (value) => {
   return `${value.slice(0, 6)}…${value.slice(-4)}`;
 };
 
-const ContractCard = ({ title, hint, contract }) => (
+const ContractCard = ({ title, hint, contract }) => {
+  const { t } = useTranslation('certificates');
+  return (
   <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', borderRadius: 3, p: 2, height: '100%' }}>
     <Typography variant="overline" color="text.secondary">
       {title}
     </Typography>
     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-      {contract?.name || 'Sin conexión'}
+      {contract?.name || t('contract.disconnected')}
       {contract?.symbol ? ` · ${contract.symbol}` : ''}
     </Typography>
     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1 }}>
@@ -49,11 +52,12 @@ const ContractCard = ({ title, hint, contract }) => (
       </Link>
     ) : (
       <Typography variant="caption" color="text.secondary">
-        {contract?.error || 'Todavía no está desplegado'}
+        {contract?.error || t('contract.notDeployed')}
       </Typography>
     )}
   </Paper>
-);
+  );
+};
 
 const TokenPanel = ({
   kicker,
@@ -65,7 +69,9 @@ const TokenPanel = ({
   txHash,
   error,
   action,
-}) => (
+}) => {
+  const { t } = useTranslation('certificates');
+  return (
   <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 2, p: 2, height: '100%' }}>
     <Typography variant="overline" color="text.secondary">
       {kicker}
@@ -86,12 +92,12 @@ const TokenPanel = ({
       ) : null}
       {owner && (
         <Typography variant="caption" color="text.secondary">
-          Dueño {shortAddress(owner)}
+          {t('token.owner', { address: shortAddress(owner) })}
         </Typography>
       )}
       {txHash && (
         <Link href={`${TX_EXPLORER}${txHash}`} target="_blank" rel="noopener noreferrer" variant="caption">
-          Ver transacción
+          {t('token.viewTx')}
         </Link>
       )}
       {error && (
@@ -102,16 +108,17 @@ const TokenPanel = ({
       {action}
     </Stack>
   </Box>
-);
+  );
+};
 
-const groupCertificates = (rows) => {
+const groupCertificates = (rows, language, untitled) => {
   const byPath = new Map();
   for (const row of rows) {
     const id = row.knowledgePathDbId;
     if (!byPath.has(id)) {
       byPath.set(id, {
         id,
-        title: row.knowledgePathTitle || 'Sin título',
+        title: row.knowledgePathTitle || untitled,
         snapshotVersion: row.snapshotVersion || null,
         rows: [],
       });
@@ -120,9 +127,9 @@ const groupCertificates = (rows) => {
     group.rows.push(row);
     if (row.snapshotVersion) group.snapshotVersion = row.snapshotVersion;
   }
-  const groups = [...byPath.values()].sort((left, right) => left.title.localeCompare(right.title, 'es'));
+  const groups = [...byPath.values()].sort((left, right) => left.title.localeCompare(right.title, language));
   for (const group of groups) {
-    group.rows.sort((left, right) => (left.learner || '').localeCompare(right.learner || '', 'es'));
+    group.rows.sort((left, right) => (left.learner || '').localeCompare(right.learner || '', language));
   }
   return {
     ready: groups.filter((group) => group.snapshotVersion),
@@ -130,11 +137,13 @@ const groupCertificates = (rows) => {
   };
 };
 
-const pathSummary = (group) => {
-  const count = group.rows.length;
-  const pupils = `${count} ${count === 1 ? 'alumno' : 'alumnos'}`;
+const pathSummary = (group, t) => {
   const pending = group.rows.some((row) => !row.chain?.tokenId || !row.reward?.tokenId);
-  return `Snapshot v${group.snapshotVersion} · ${pupils}${pending ? '' : ' · listo'}`;
+  const base = t('dashboard.pathSummary', {
+    count: group.rows.length,
+    version: group.snapshotVersion,
+  });
+  return pending ? base : `${base}${t('dashboard.readySuffix')}`;
 };
 
 const StudentCard = ({
@@ -150,6 +159,7 @@ const StudentCard = ({
   onImage,
   onReward,
 }) => {
+  const { t } = useTranslation('certificates');
   const chain = row.chain;
   const reward = row.reward;
   const certificateMinted = Boolean(chain?.tokenId);
@@ -167,7 +177,7 @@ const StudentCard = ({
       <TextField
         fullWidth
         size="small"
-        label="Cuenta de Sepolia del alumno"
+        label={t('student.walletLabel')}
         placeholder="0x…"
         value={recipient}
         disabled={bothDone || working}
@@ -176,14 +186,14 @@ const StudentCard = ({
       />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
         <TokenPanel
-          kicker="Certificado educativo"
+          kicker={t('student.certificateKicker')}
           body={
             certificateMinted
               ? ''
-              : 'Registra la versión del snapshot y después emítelo a la cuenta de arriba.'
+              : t('student.certificateBody')
           }
           done={certificateMinted}
-          doneLabel={`Certificado #${chain?.tokenId}`}
+          doneLabel={t('student.certificateDone', { tokenId: chain?.tokenId })}
           owner={chain?.owner}
           txHash={row.transactionHash}
           error={chain?.error || row.ethereumError}
@@ -196,7 +206,7 @@ const StudentCard = ({
                   disabled={working || !contract?.reachable || row.ethereumStatus === 'registering'}
                   onClick={() => onRegister(row)}
                 >
-                  {row.ethereumStatus === 'registering' ? 'Confirmando…' : 'Registrar versión'}
+                  {row.ethereumStatus === 'registering' ? t('student.confirming') : t('student.registerVersion')}
                 </Button>
               )}
               <Button
@@ -205,16 +215,16 @@ const StudentCard = ({
                 disabled={working || !registered || !contract?.reachable || row.ethereumStatus === 'minting'}
                 onClick={() => onMint(row)}
               >
-                {row.ethereumStatus === 'minting' ? 'Confirmando…' : 'Emitir certificado'}
+                {row.ethereumStatus === 'minting' ? t('student.confirming') : t('student.mintCertificate')}
               </Button>
             </Stack>
           )}
         />
         <TokenPanel
-          kicker="NFT de recompensa"
-          body={rewardMinted ? '' : 'Se emite a la misma cuenta.'}
+          kicker={t('student.rewardKicker')}
+          body={rewardMinted ? '' : t('student.rewardBody')}
           done={rewardMinted}
-          doneLabel={`NFT #${reward?.tokenId}`}
+          doneLabel={t('student.rewardDone', { tokenId: reward?.tokenId })}
           owner={reward?.owner}
           txHash={row.rewardTransactionHash}
           error={rewardContract?.reachable ? (reward?.error || row.rewardError) : row.rewardError}
@@ -229,7 +239,7 @@ const StudentCard = ({
                 />
               )}
               <Button size="small" variant="outlined" component="label" disabled={working}>
-                {busy === `${row.id}:image` ? 'Guardando…' : (row.rewardImage ? 'Cambiar imagen' : 'Subir imagen')}
+                {busy === `${row.id}:image` ? t('student.savingImage') : (row.rewardImage ? t('student.changeImage') : t('student.uploadImage'))}
                 <input
                   hidden
                   type="file"
@@ -248,7 +258,7 @@ const StudentCard = ({
                   disabled={working || !hasSnapshot || !rewardContract?.reachable || confirmingReward}
                   onClick={() => onReward(row)}
                 >
-                  {confirmingReward ? 'Confirmando…' : 'Emitir NFT'}
+                  {confirmingReward ? t('student.confirming') : t('student.mintNft')}
                 </Button>
               )}
             </Stack>
@@ -260,6 +270,7 @@ const StudentCard = ({
 };
 
 const EthereumCredentialsDashboard = () => {
+  const { t, i18n } = useTranslation('certificates');
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -287,11 +298,11 @@ const EthereumCredentialsDashboard = () => {
         return next;
       });
     } catch (err) {
-      setError(formatError(err, 'No se pudo leer los contratos'));
+      setError(formatError(err, t('dashboard.loadFailed')));
     } finally {
       if (!quiet) setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -322,13 +333,13 @@ const EthereumCredentialsDashboard = () => {
     const failed = (payload?.certificates || []).some((row) => (
       row.ethereumStatus === 'failed' || row.rewardStatus === 'failed'
     ));
-    setSuccess(failed ? null : 'Sepolia confirmó la operación.');
-  }, [hasPending, payload]);
+    setSuccess(failed ? null : t('dashboard.confirmed'));
+  }, [hasPending, payload, t]);
 
   const requireRecipient = (row) => {
     const recipient = (recipients[row.id] || '').trim();
     if (!recipient) {
-      setError('Escribe la dirección que va a recibir el token.');
+      setError(t('dashboard.recipientRequired'));
       return '';
     }
     return recipient;
@@ -341,17 +352,17 @@ const EthereumCredentialsDashboard = () => {
       setSuccess(null);
       const result = await certificatesApi.registerEthereumCredentialVersion(row.id);
       if (result.pending) {
-        setSuccess('El registro se envió a Sepolia. La confirmación sigue en segundo plano.');
+        setSuccess(t('dashboard.registerPending'));
       } else {
         setSuccess(
           result.alreadyRegistered
-            ? `La versión ${result.version} de “${row.knowledgePathTitle}” ya estaba registrada.`
-            : `Versión ${result.version} registrada para el certificado.`,
+            ? t('dashboard.registerAlready', { version: result.version, title: row.knowledgePathTitle })
+            : t('dashboard.registerDone', { version: result.version }),
         );
       }
       await load({ quiet: true });
     } catch (err) {
-      setError(formatError(err, 'No se pudo registrar la versión'));
+      setError(formatError(err, t('dashboard.registerFailed')));
     } finally {
       setBusy(null);
     }
@@ -366,17 +377,17 @@ const EthereumCredentialsDashboard = () => {
       setSuccess(null);
       const result = await certificatesApi.mintEthereumCredential(row.id, recipient);
       if (result.pending) {
-        setSuccess('El certificado se envió a Sepolia. La confirmación sigue en segundo plano.');
+        setSuccess(t('dashboard.mintPending'));
       } else {
         setSuccess(
           result.alreadyMinted
-            ? `El certificado de ${row.learner} ya está emitido (#${result.tokenId}).`
-            : `Certificado #${result.tokenId} emitido a ${shortAddress(recipient)}.`,
+            ? t('dashboard.mintAlready', { learner: row.learner, tokenId: result.tokenId })
+            : t('dashboard.mintDone', { tokenId: result.tokenId, recipient: shortAddress(recipient) }),
         );
       }
       await load({ quiet: true });
     } catch (err) {
-      setError(formatError(err, 'No se pudo emitir el certificado'));
+      setError(formatError(err, t('dashboard.mintFailed')));
     } finally {
       setBusy(null);
     }
@@ -389,10 +400,10 @@ const EthereumCredentialsDashboard = () => {
       setError(null);
       setSuccess(null);
       await certificatesApi.uploadEthereumRewardImage(row.id, file);
-      setSuccess(`Imagen guardada para el NFT de ${row.learner}.`);
+      setSuccess(t('dashboard.imageSaved', { learner: row.learner }));
       await load();
     } catch (err) {
-      setError(formatError(err, 'No se pudo guardar la imagen'));
+      setError(formatError(err, t('dashboard.imageFailed')));
     } finally {
       setBusy(null);
     }
@@ -407,17 +418,17 @@ const EthereumCredentialsDashboard = () => {
       setSuccess(null);
       const result = await certificatesApi.mintEthereumReward(row.id, recipient);
       if (result.pending) {
-        setSuccess('El NFT se envió a Sepolia. La confirmación sigue en segundo plano.');
+        setSuccess(t('dashboard.rewardPending'));
       } else {
         setSuccess(
           result.alreadyMinted
-            ? `El NFT de ${row.learner} ya está emitido (#${result.tokenId}).`
-            : `NFT #${result.tokenId} emitido a ${shortAddress(recipient)}.`,
+            ? t('dashboard.rewardAlready', { learner: row.learner, tokenId: result.tokenId })
+            : t('dashboard.rewardDone', { tokenId: result.tokenId, recipient: shortAddress(recipient) }),
         );
       }
       await load({ quiet: true });
     } catch (err) {
-      setError(formatError(err, 'No se pudo emitir el NFT'));
+      setError(formatError(err, t('dashboard.rewardFailed')));
     } finally {
       setBusy(null);
     }
@@ -427,18 +438,17 @@ const EthereumCredentialsDashboard = () => {
   const rewardContract = payload?.reward;
   const rows = payload?.certificates || [];
   const working = busy !== null;
-  const { ready, waiting } = groupCertificates(rows);
+  const { ready, waiting } = groupCertificates(rows, i18n.language, t('dashboard.untitled'));
   const selected = ready.find((group) => group.id === selectedPathId) || ready[0] || null;
   const waitingTitles = waiting.map((group) => group.title).join(', ');
 
   return (
     <Box>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-        Certificados
+        {t('dashboard.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 720 }}>
-        Elige un knowledge path para ver a sus alumnos. Desde aquí se envía a Sepolia.
-        El certificado educativo se queda en la cuenta del alumno. El NFT es la recompensa, y quien la recibe puede enviarla.
+        {t('dashboard.intro')}
       </Typography>
 
       {error && (
@@ -454,13 +464,13 @@ const EthereumCredentialsDashboard = () => {
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 3 }}>
         <ContractCard
-          title="Certificado educativo"
-          hint="Acredita que el alumno terminó el knowledge path."
+          title={t('contract.certificateTitle')}
+          hint={t('contract.certificateHint')}
           contract={contract}
         />
         <ContractCard
-          title="NFT de recompensa"
-          hint="Recompensa por ese mismo logro."
+          title={t('contract.rewardTitle')}
+          hint={t('contract.rewardHint')}
           contract={rewardContract}
         />
       </Box>
@@ -473,15 +483,15 @@ const EthereumCredentialsDashboard = () => {
         <Paper elevation={0} sx={{ border: 1, borderColor: 'divider', borderRadius: 3, p: 4 }}>
           <Typography variant="body2" color="text.secondary">
             {waiting.length === 0
-              ? 'No hay certificados de knowledge path. Aprueba una solicitud primero.'
-              : `Sin snapshot: ${waitingTitles}. Esos caminos aparecen aquí cuando tengan un snapshot.`}
+              ? t('dashboard.empty')
+              : t('dashboard.waiting', { titles: waitingTitles })}
           </Typography>
         </Paper>
       ) : (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '280px 1fr' }, gap: 2, alignItems: 'start' }}>
           <Box>
             <Typography variant="overline" color="text.secondary">
-              Knowledge paths
+              {t('dashboard.pathsHeading')}
             </Typography>
             <List disablePadding>
               {ready.map((group) => (
@@ -493,7 +503,7 @@ const EthereumCredentialsDashboard = () => {
                 >
                   <ListItemText
                     primary={group.title}
-                    secondary={pathSummary(group)}
+                    secondary={pathSummary(group, t)}
                     slotProps={{
                       primary: { variant: 'subtitle2', sx: { fontWeight: 700 } },
                       secondary: { variant: 'caption' },
@@ -504,7 +514,7 @@ const EthereumCredentialsDashboard = () => {
             </List>
             {waiting.length > 0 && (
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
-                {`Sin snapshot: ${waitingTitles}. Esos caminos aparecen aquí cuando tengan un snapshot.`}
+                {t('dashboard.waiting', { titles: waitingTitles })}
               </Typography>
             )}
           </Box>
@@ -515,7 +525,7 @@ const EthereumCredentialsDashboard = () => {
                   {selected.title}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {pathSummary(selected)}
+                  {pathSummary(selected, t)}
                 </Typography>
               </Box>
               {selected.rows.map((row) => (

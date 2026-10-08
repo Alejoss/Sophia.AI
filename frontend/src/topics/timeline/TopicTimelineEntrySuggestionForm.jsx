@@ -13,14 +13,16 @@ import {
 import dayjs from 'dayjs';
 import ContentSuggestionPicker, { getProfileContentId } from '../../content/ContentSuggestionPicker';
 import { suggestEntryTitleFromFileName } from '../../content/inferTitleAuthorFromFileName';
+import { useTranslation } from 'react-i18next';
 import { applyApiErrorsToForm } from '../../utils/apiFormErrors';
+import i18n from '../../i18n';
 import TopicTimelineDateFields from './TopicTimelineDateFields';
 
 const schema = yup.object({
   title: yup
     .string()
     .trim()
-    .required('El título es requerido.'),
+    .required(() => i18n.t('topics:timeline.titleRequired')),
   description: yup.string().default(''),
   start_date: yup.string().default(''),
   end_date: yup
@@ -28,7 +30,7 @@ const schema = yup.object({
     .default('')
     .test(
       'date-range',
-      'La fecha final no puede ser anterior a la fecha inicial.',
+      () => i18n.t('topics:timeline.dateRangeError'),
       function dateRange(value) {
         const { start_date: startDate } = this.parent;
         if (!value || !startDate) return true;
@@ -37,7 +39,7 @@ const schema = yup.object({
     ),
   message: yup
     .string()
-    .max(500, 'El mensaje no puede exceder 500 caracteres.')
+    .max(500, () => i18n.t('topics:timeline.messageMax'))
     .default(''),
 });
 
@@ -46,6 +48,7 @@ const TopicTimelineEntrySuggestionForm = ({
   onCancel,
   onSubmit,
 }) => {
+  const { t } = useTranslation('topics');
   const [externalProfiles, setExternalProfiles] = useState([]);
   const [generalError, setGeneralError] = useState('');
 
@@ -108,7 +111,7 @@ const TopicTimelineEntrySuggestionForm = ({
       const { generalError: parsed } = applyApiErrorsToForm(
         err,
         setError,
-        'No se pudo enviar la sugerencia. Inténtalo de nuevo.',
+        t('timeline.suggestionError'),
       );
       if (parsed) setGeneralError(parsed);
     }
@@ -130,12 +133,12 @@ const TopicTimelineEntrySuggestionForm = ({
           onFileSelected={handleFileSelected}
           maxSelections={1}
           disabled={pending}
-          title="Contenido de tu biblioteca o nuevo"
-          description="Opcional: propón un material que aun no esta en el tema. Si se acepta la entrada, tambien se evaluara para el tema."
+          title={t('timeline.pickerTitle')}
+          description={t('timeline.materialHint')}
         />
 
         <TextField
-          label="Título de la entrada"
+          label={t('timeline.entryTitle')}
           {...register('title')}
           error={Boolean(errors.title)}
           helperText={errors.title?.message}
@@ -143,8 +146,8 @@ const TopicTimelineEntrySuggestionForm = ({
           required
         />
         <TextField
-          label="Descripción narrativa"
-          placeholder="Descripción narrativa para la línea de tiempo"
+          label={t('timeline.narrative')}
+          placeholder={t('timeline.narrativePlaceholder')}
           {...register('description')}
           error={Boolean(errors.description)}
           helperText={errors.description?.message}
@@ -171,10 +174,10 @@ const TopicTimelineEntrySuggestionForm = ({
         )}
 
         <TextField
-          label="Mensaje para moderadores (opcional)"
+          label={t('suggestion.messageLabel')}
           {...register('message')}
           error={Boolean(errors.message)}
-          helperText={errors.message?.message || `${messageValue.length}/500 caracteres`}
+          helperText={errors.message?.message || t('timeline.charCount', { count: messageValue.length })}
           fullWidth
           multiline
           minRows={2}
@@ -194,7 +197,7 @@ const TopicTimelineEntrySuggestionForm = ({
         }}
       >
         <Button type="button" onClick={onCancel} disabled={pending}>
-          Cancelar
+          {t('common.cancel')}
         </Button>
         <Button
           type="button"
@@ -202,7 +205,7 @@ const TopicTimelineEntrySuggestionForm = ({
           onClick={handleSubmit(handleFormSubmit)}
           disabled={pending || !isValid}
         >
-          {pending ? 'Enviando...' : 'Enviar sugerencia'}
+          {pending ? t('common.sending') : t('timeline.sendSuggestion')}
         </Button>
       </Box>
     </Paper>

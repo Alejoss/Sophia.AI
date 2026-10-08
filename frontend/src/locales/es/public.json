@@ -1,0 +1,49 @@
+{
+  "notFound": {
+    "title": "No encontramos esta página",
+    "lead": "El camino que buscas no existe, se movió, o nunca estuvo aquí. Vuelve al inicio y sigue explorando con intención.",
+    "home": "Volver al inicio",
+    "paths": "Explorar caminos"
+  },
+  "maintenance": {
+    "imageAlt": "Página en mantenimiento",
+    "title": "Estamos en mantenimiento ... pronto volveremos!",
+    "quote": "El Conocimiento es Poder",
+    "subtitle": "Aprende desde la autonomía. Explora temas creados por la comunidad y construye tu propia red de aprendizaje."
+  },
+  "welcome": {
+    "title": "¡Bienvenido!",
+    "checking": "Verificando tu sesión...",
+    "active": "¡Bienvenido, {{username}}! Tu cuenta está activa y ya has iniciado sesión.",
+    "again": "¡Bienvenido de nuevo, {{username}}! Has iniciado sesión.",
+    "failed": "La verificación de sesión falló. Por favor intenta iniciar sesión.",
+    "error": "Ocurrió un error durante la verificación de sesión. Por favor intenta iniciar sesión.",
+    "next": "¿Qué te gustaría hacer ahora?",
+    "profile": "Ver tu perfil",
+    "login": "Ir a iniciar sesión",
+    "fallbackName": "Usuario"
+  },
+  "club": {
+    "imageAlt": "Club de Lectura — Seminario Cypherpunk. El secuestro de Bitcoin de Roger Ver y Steve Patterson.",
+    "started": "El Club de Lectura ya comenzó",
+    "cycleStarted": "El ciclo «{{title}}» inició el 20 de Julio.",
+    "stillJoin": "Todavía puedes unirte: entra al hub para sumarte a las misiones, el foro y la comunidad.",
+    "entering": "Entrando…",
+    "enter": "Entrar al club",
+    "goToHub": "Ir al hub del club",
+    "join": "Unirme al club",
+    "login": "¿Ya tienes cuenta? Inicia sesión",
+    "none": "Por ahora no hay un ciclo activo publicado. Vuelve pronto."
+  },
+  "newsletter": {
+    "title": "Únete a la comunidad",
+    "lead": "Déjanos tu email y te mantendremos al tanto del avance del proyecto, las novedades de Academia Blockchain y documentales clave. También podrás sumarte a investigaciones de código abierto, conectar con una comunidad de estudio y compartir, junto a nosotros, la construcción de esta plataforma revolucionaria.",
+    "email": "Email",
+    "placeholder": "tu@email",
+    "success": "¡Gracias por suscribirte! Te avisaremos de las próximas novedades.",
+    "error": "No se ha podido completar la suscripción. Inténtalo de nuevo más tarde.",
+    "sending": "Enviando...",
+    "submit": "Quiero suscribirme",
+    "privacy": "Solo usaremos tu correo para enviarte información relevante sobre Academia Blockchain. Puedes darte de baja en cualquier momento."
+  }
+}

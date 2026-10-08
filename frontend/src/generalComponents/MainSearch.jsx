@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import * as yup from 'yup';
@@ -31,7 +33,7 @@ const searchSchema = yup.object({
   query: yup
     .string()
     .trim()
-    .required('Escribe algo para buscar.'),
+    .required(() => i18n.t('misc:search.queryRequired')),
   searchType: yup
     .string()
     .oneOf(['all', 'content', 'topics', 'knowledge_paths'])
@@ -39,6 +41,7 @@ const searchSchema = yup.object({
 });
 
 const MainSearch = () => {
+  const { t } = useTranslation('misc');
   const [searchResults, setSearchResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
@@ -79,7 +82,7 @@ const MainSearch = () => {
       setFeaturedError(
         err.response?.data?.error ||
           err.message ||
-          'No se pudieron cargar los libros destacados',
+          t('search.featuredFailed'),
       );
       setFeaturedTexts([]);
       setFeaturedTotalPages(1);
@@ -116,7 +119,7 @@ const MainSearch = () => {
         .catch((err) => {
           if (!cancelled) {
             setPublicError(
-              err.response?.data?.error || err.message || 'No se pudieron cargar las colecciones',
+              err.response?.data?.error || err.message || t('search.collectionsFailed'),
             );
             setPublicCollections([]);
           }
@@ -134,7 +137,7 @@ const MainSearch = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   const runSearch = async (query, searchType, page = 1) => {
     setIsLoading(true);
@@ -153,7 +156,7 @@ const MainSearch = () => {
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
-      setSearchError('No se pudo completar la búsqueda. Inténtalo de nuevo.');
+      setSearchError(t('search.searchFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -252,7 +255,7 @@ const MainSearch = () => {
         )}
 
         <Button size="small" variant="outlined">
-          Ver Detalles
+          {t('search.details')}
         </Button>
       </Paper>
     );
@@ -263,20 +266,20 @@ const MainSearch = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       <Typography variant="h4" sx={{ fontWeight: 600, mb: 2 }}>
-        Buscar
+        {t('search.title')}
       </Typography>
 
       <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate sx={{ mb: 3 }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="flex-start">
           <TextField
             {...register('query')}
-            placeholder="Buscar contenido, temas, caminos de conocimiento o personas..."
+            placeholder={t('search.placeholder')}
             fullWidth
             error={!!errors.query}
             helperText={errors.query?.message}
           />
           <Button type="submit" variant="contained" disabled={busy} sx={{ flexShrink: 0 }}>
-            {busy ? 'Buscando...' : 'Buscar'}
+            {busy ? t('search.searching') : t('search.submit')}
           </Button>
         </Stack>
 
@@ -285,13 +288,13 @@ const MainSearch = () => {
           control={control}
           render={({ field }) => (
             <RadioGroup row {...field} sx={{ mt: 1 }}>
-              <FormControlLabel value="all" control={<Radio size="small" />} label="Todo" />
-              <FormControlLabel value="content" control={<Radio size="small" />} label="Contenido" />
-              <FormControlLabel value="topics" control={<Radio size="small" />} label="Temas" />
+              <FormControlLabel value="all" control={<Radio size="small" />} label={t('search.typeAll')} />
+              <FormControlLabel value="content" control={<Radio size="small" />} label={t('search.typeContent')} />
+              <FormControlLabel value="topics" control={<Radio size="small" />} label={t('search.typeTopics')} />
               <FormControlLabel
                 value="knowledge_paths"
                 control={<Radio size="small" />}
-                label="Caminos de Conocimiento"
+                label={t('search.typePaths')}
               />
             </RadioGroup>
           )}
@@ -300,14 +303,14 @@ const MainSearch = () => {
 
       <Box component="section" aria-labelledby="search-collections-heading" sx={{ mb: 3 }}>
         <Typography id="search-collections-heading" variant="h6">
-          Biblioteca Compartida
+          {t('search.collectionsTitle')}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Colecciones públicas de la comunidad
+          {t('search.collectionsHint')}
         </Typography>
         {publicLoading && (
           <Typography variant="body2" sx={{ mt: 1 }}>
-            Cargando colecciones…
+            {t('search.collectionsLoading')}
           </Typography>
         )}
         {publicError && !publicLoading && (
@@ -317,7 +320,7 @@ const MainSearch = () => {
         )}
         {!publicLoading && !publicError && publicCollections.length === 0 && (
           <Typography variant="body2" sx={{ mt: 1 }}>
-            Aún no hay colecciones públicas con contenido visible.
+            {t('search.collectionsEmpty')}
           </Typography>
         )}
         {!publicLoading && publicCollections.length > 0 && (
@@ -363,11 +366,10 @@ const MainSearch = () => {
                       </Typography>
                     )}
                     <Typography variant="body2" color="text.secondary">
-                      Por {c.owner_username}
+                      {t('search.byOwner', { name: c.owner_username })}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                      {c.visible_item_count}{' '}
-                      {c.visible_item_count === 1 ? 'elemento visible' : 'elementos visibles'}
+                      {t('search.visibleItems', { count: c.visible_item_count })}
                     </Typography>
                   </CardContent>
                 </CardActionArea>
@@ -380,11 +382,11 @@ const MainSearch = () => {
       {!hasSearched && (
         <Box component="section" aria-labelledby="search-featured-books-heading" sx={{ mb: 3 }}>
           <Typography id="search-featured-books-heading" variant="h6">
-            Algunos de los libros disponibles son:
+            {t('search.featuredTitle')}
           </Typography>
           {featuredLoading && (
             <Typography variant="body2" sx={{ mt: 1 }}>
-              Cargando libros…
+              {t('search.booksLoading')}
             </Typography>
           )}
           {featuredError && !featuredLoading && (
@@ -394,7 +396,7 @@ const MainSearch = () => {
           )}
           {!featuredLoading && !featuredError && featuredTexts.length === 0 && (
             <Typography variant="body2" sx={{ mt: 1 }}>
-              Pronto habrá libros destacados para explorar aquí.
+              {t('search.booksEmpty')}
             </Typography>
           )}
           {!featuredLoading && featuredTexts.length > 0 && (
@@ -413,7 +415,7 @@ const MainSearch = () => {
               >
                 {featuredTexts.map((item) => {
                   const cover = item.thumbnail_preview || item.thumbnail;
-                  const title = item.title || 'Sin título';
+                  const title = item.title || t('search.untitled');
                   return (
                     <Card
                       key={item.id}
@@ -495,7 +497,7 @@ const MainSearch = () => {
                     disabled={featuredLoading || featuredPage <= 1}
                     onClick={() => loadFeaturedTexts(featuredPage - 1)}
                   >
-                    Anteriores
+                    {t('search.previousBooks')}
                   </Button>
                   <Button
                     variant="outlined"
@@ -503,7 +505,7 @@ const MainSearch = () => {
                     disabled={featuredLoading || featuredPage >= featuredTotalPages}
                     onClick={() => loadFeaturedTexts(featuredPage + 1)}
                   >
-                    Siguientes
+                    {t('search.nextBooks')}
                   </Button>
                 </Box>
               )}
@@ -523,7 +525,7 @@ const MainSearch = () => {
           <Stack alignItems="center" spacing={1.5}>
             <CircularProgress size={28} />
             <Typography variant="body2" color="text.secondary">
-              Cargando resultados...
+              {t('search.resultsLoading')}
             </Typography>
           </Stack>
         </Box>
@@ -532,7 +534,7 @@ const MainSearch = () => {
           {searchResults.length > 0 ? (
             <>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                Mostrando {searchResults.length} de {pagination.totalResults} resultados
+                {t('search.showing', { shown: searchResults.length, total: pagination.totalResults })}
               </Typography>
               <Stack component="ul" spacing={2} sx={{ pl: 0, m: 0 }}>
                 {searchResults.map(renderResultItem)}
@@ -563,11 +565,11 @@ const MainSearch = () => {
                       },
                     }}
                   >
-                    Anterior
+                    {t('search.previousPage')}
                   </Button>
 
                   <Typography variant="body2" color="text.secondary">
-                    Página {pagination.currentPage} de {pagination.totalPages}
+                    {t('search.page', { current: pagination.currentPage, total: pagination.totalPages })}
                   </Typography>
 
                   <Button
@@ -587,7 +589,7 @@ const MainSearch = () => {
                       },
                     }}
                   >
-                    Siguiente
+                    {t('search.nextPage')}
                   </Button>
                 </Box>
               )}
@@ -596,7 +598,7 @@ const MainSearch = () => {
             hasSearched &&
             !searchError && (
               <Alert severity="info">
-                No se encontraron resultados para &quot;{lastSubmittedQuery}&quot;
+                {t('search.noResults', { query: lastSubmittedQuery })}
               </Alert>
             )
           )}

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -23,15 +24,19 @@ import { applyApiErrorsToForm } from "../utils/apiFormErrors.js";
 import { passwordField } from "../utils/formSchemas.js";
 import { bindMuiRhfField } from "../utils/muiRhfField.js";
 
-const schema = yup.object({
-  newPassword: passwordField(),
-  confirmPassword: yup
-    .string()
-    .required("Confirma la nueva contraseña.")
-    .oneOf([yup.ref("newPassword")], "Las contraseñas no coinciden."),
-});
-
 const PasswordResetConfirm = () => {
+  const { t } = useTranslation('auth');
+  const schema = useMemo(
+    () =>
+      yup.object({
+        newPassword: passwordField(),
+        confirmPassword: yup
+          .string()
+          .required(() => t('reset.confirmRequired'))
+          .oneOf([yup.ref('newPassword')], () => t('reset.mismatch')),
+      }),
+    [t],
+  );
   const { uid, token } = useParams();
   const [generalError, setGeneralError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -68,7 +73,7 @@ const PasswordResetConfirm = () => {
       const { generalError: parsed } = applyApiErrorsToForm(
         error,
         setError,
-        "No se pudo restablecer la contraseña. El enlace puede haber caducado.",
+        t('reset.error'),
         {
           new_password1: "newPassword",
           new_password2: "confirmPassword",
@@ -92,30 +97,30 @@ const PasswordResetConfirm = () => {
         }}
       >
         <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, textAlign: "center" }}>
-          Nueva contraseña
+          {t('reset.title')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: "center" }}>
-          Elige una contraseña segura para tu cuenta.
+          {t('reset.lead')}
         </Typography>
 
         {linkInvalid ? (
           <Stack spacing={2}>
             <Alert severity="error">
-              Este enlace no es válido. Solicita uno nuevo desde la página de recuperación.
+              {t('reset.invalidLink')}
             </Alert>
             <Typography variant="body2" sx={{ textAlign: "center" }}>
               <MuiLink component={Link} to="/profiles/forgot-password" underline="hover">
-                Solicitar nuevo enlace
+                {t('reset.requestNew')}
               </MuiLink>
             </Typography>
           </Stack>
         ) : success ? (
           <Stack spacing={2}>
             <Alert severity="success">
-              Tu contraseña se actualizó correctamente. Ya puedes iniciar sesión.
+              {t('reset.success')}
             </Alert>
             <Button component={Link} to="/profiles/login" variant="contained" size="large">
-              Ir a iniciar sesión
+              {t('reset.goToLogin')}
             </Button>
           </Stack>
         ) : (
@@ -124,13 +129,12 @@ const PasswordResetConfirm = () => {
               {generalError && <Alert severity="error">{generalError}</Alert>}
 
               <TextField
-                label="Nueva contraseña"
+                label={t('reset.newPassword')}
                 type={showPassword ? "text" : "password"}
                 {...bindMuiRhfField(register("newPassword"), newPasswordValue)}
                 error={!!errors.newPassword}
                 helperText={
-                  errors.newPassword?.message ||
-                  "Mínimo 8 caracteres, mayúsculas, minúsculas, números y símbolos"
+                  errors.newPassword?.message || t('reset.helper')
                 }
                 fullWidth
                 autoComplete="new-password"
@@ -140,7 +144,7 @@ const PasswordResetConfirm = () => {
                       <IconButton
                         edge="end"
                         onClick={() => setShowPassword((v) => !v)}
-                        aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        aria-label={showPassword ? t('hidePassword') : t('showPassword')}
                       >
                         {showPassword ? (
                           <VisibilityOffIcon fontSize="small" />
@@ -154,7 +158,7 @@ const PasswordResetConfirm = () => {
               />
 
               <TextField
-                label="Confirmar nueva contraseña"
+                label={t('reset.confirmPassword')}
                 type={showConfirm ? "text" : "password"}
                 {...bindMuiRhfField(register("confirmPassword"), confirmPasswordValue)}
                 error={!!errors.confirmPassword}
@@ -168,7 +172,7 @@ const PasswordResetConfirm = () => {
                         edge="end"
                         onClick={() => setShowConfirm((v) => !v)}
                         aria-label={
-                          showConfirm ? "Ocultar contraseña" : "Mostrar contraseña"
+                          showConfirm ? t('hidePassword') : t('showPassword')
                         }
                       >
                         {showConfirm ? (
@@ -183,12 +187,12 @@ const PasswordResetConfirm = () => {
               />
 
               <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
-                {isSubmitting ? "Guardando..." : "Restablecer contraseña"}
+                {isSubmitting ? t('reset.submitting') : t('reset.submit')}
               </Button>
 
               <Typography variant="body2" sx={{ textAlign: "center" }}>
                 <MuiLink component={Link} to="/profiles/login" underline="hover">
-                  Volver a iniciar sesión
+                  {t('reset.backToLogin')}
                 </MuiLink>
               </Typography>
             </Stack>

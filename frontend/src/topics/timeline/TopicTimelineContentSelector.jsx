@@ -25,14 +25,8 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SearchIcon from '@mui/icons-material/Search';
-import { formatDate } from '../../utils/dateUtils';
-
-const MEDIA_TYPE_LABELS = {
-  VIDEO: 'Video',
-  AUDIO: 'Audio',
-  IMAGE: 'Imagen',
-  TEXT: 'Texto',
-};
+import { useTranslation } from 'react-i18next';
+import { useDateLocales } from '../../hooks/useDateLocales';
 
 const getContentData = (item) => item?.content || item;
 
@@ -41,19 +35,19 @@ const getItemId = (item) => {
   return content?.id != null ? String(content.id) : null;
 };
 
-const getItemTitle = (item) => {
+const getItemTitle = (item, untitled) => {
   const content = getContentData(item);
   return (
     item?.title ||
     item?.selected_profile?.title ||
     content?.original_title ||
-    'Contenido sin titulo'
+    untitled
   );
 };
 
-const getItemAuthor = (item) => {
+const getItemAuthor = (item, unknown) => {
   const content = getContentData(item);
-  return item?.author || item?.selected_profile?.author || content?.original_author || 'Desconocido';
+  return item?.author || item?.selected_profile?.author || content?.original_author || unknown;
 };
 
 const getItemMediaType = (item) => {
@@ -66,12 +60,12 @@ const getItemCreatedAt = (item) => {
   return item?.created_at || content?.created_at || item?.selected_profile?.created_at || null;
 };
 
-const normalizeItems = (items = []) => (
+const normalizeItems = (items = [], untitled, unknown) => (
   items
     .map((item) => ({
       id: getItemId(item),
-      title: getItemTitle(item),
-      author: getItemAuthor(item),
+      title: getItemTitle(item, untitled),
+      author: getItemAuthor(item, unknown),
       mediaType: getItemMediaType(item),
       createdAt: getItemCreatedAt(item),
       contentId: getItemId(item),
@@ -85,12 +79,23 @@ const TopicTimelineContentSelector = ({
   loading = false,
   onSelectionChange,
 }) => {
+  const { t } = useTranslation('topics');
+  const { intl } = useDateLocales();
+  const mediaTypeLabels = useMemo(() => ({
+    VIDEO: t('chat.video'),
+    AUDIO: t('chat.audio'),
+    IMAGE: t('timeline.image'),
+    TEXT: t('chat.text'),
+  }), [t]);
   const [searchQuery, setSearchQuery] = useState('');
   const [mediaTypeFilter, setMediaTypeFilter] = useState('');
   const [sortField, setSortField] = useState('title');
   const [sortDirection, setSortDirection] = useState('asc');
 
-  const normalizedItems = useMemo(() => normalizeItems(items), [items]);
+  const normalizedItems = useMemo(
+    () => normalizeItems(items, t('timeline.untitledContent'), t('addContent.unknownAuthor')),
+    [items, t],
+  );
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
   const filteredItems = useMemo(() => {
@@ -100,7 +105,7 @@ const TopicTimelineContentSelector = ({
       const matchesSearch = !query ||
         item.title.toLowerCase().includes(query) ||
         item.author.toLowerCase().includes(query) ||
-        (MEDIA_TYPE_LABELS[item.mediaType] || item.mediaType).toLowerCase().includes(query);
+        (mediaTypeLabels[item.mediaType] || item.mediaType).toLowerCase().includes(query);
       return matchesMedia && matchesSearch;
     });
 
@@ -111,8 +116,8 @@ const TopicTimelineContentSelector = ({
         aValue = a.author.toLowerCase();
         bValue = b.author.toLowerCase();
       } else if (sortField === 'mediaType') {
-        aValue = MEDIA_TYPE_LABELS[a.mediaType] || a.mediaType;
-        bValue = MEDIA_TYPE_LABELS[b.mediaType] || b.mediaType;
+        aValue = mediaTypeLabels[a.mediaType] || a.mediaType;
+        bValue = mediaTypeLabels[b.mediaType] || b.mediaType;
       } else if (sortField === 'createdAt') {
         aValue = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         bValue = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -127,7 +132,7 @@ const TopicTimelineContentSelector = ({
     });
 
     return result;
-  }, [mediaTypeFilter, normalizedItems, searchQuery, sortDirection, sortField]);
+  }, [mediaTypeFilter, mediaTypeLabels, normalizedItems, searchQuery, sortDirection, sortField]);
 
   const selectedItems = useMemo(
     () => normalizedItems.filter((item) => selectedSet.has(item.id)),
@@ -164,16 +169,16 @@ const TopicTimelineContentSelector = ({
       <Stack spacing={2}>
         <Box>
           <Typography variant="subtitle1" fontWeight={700}>
-            Contenidos del tema
+            {t('timeline.topicContents')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Selecciona uno o varios contenidos ya agregados al tema.
+            {t('timeline.selectTopicHelp')}
           </Typography>
         </Box>
 
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }}>
           <TextField
-            placeholder="Buscar por titulo, autor o tipo..."
+            placeholder={t('timeline.searchPlaceholder')}
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             size="small"
@@ -185,36 +190,36 @@ const TopicTimelineContentSelector = ({
           />
 
           <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 160 } }} disabled={loading}>
-            <InputLabel>Tipo</InputLabel>
+            <InputLabel>{t('common.type')}</InputLabel>
             <Select
               value={mediaTypeFilter}
-              label="Tipo"
+              label={t('common.type')}
               onChange={(event) => setMediaTypeFilter(event.target.value)}
             >
               <MenuItem value="">
-                <em>Todos los tipos</em>
+                <em>{t('timeline.allTypes')}</em>
               </MenuItem>
-              {Object.entries(MEDIA_TYPE_LABELS).map(([value, label]) => (
+              {Object.entries(mediaTypeLabels).map(([value, label]) => (
                 <MenuItem key={value} value={value}>{label}</MenuItem>
               ))}
             </Select>
           </FormControl>
 
           <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 160 } }} disabled={loading}>
-            <InputLabel>Ordenar por</InputLabel>
+            <InputLabel>{t('timeline.sortBy')}</InputLabel>
             <Select
               value={sortField}
-              label="Ordenar por"
+              label={t('timeline.sortBy')}
               onChange={(event) => setSortField(event.target.value)}
             >
-              <MenuItem value="title">Titulo</MenuItem>
-              <MenuItem value="author">Autor</MenuItem>
-              <MenuItem value="mediaType">Tipo</MenuItem>
-              <MenuItem value="createdAt">Fecha de subida</MenuItem>
+              <MenuItem value="title">{t('edit.titleLabel')}</MenuItem>
+              <MenuItem value="author">{t('addContent.author')}</MenuItem>
+              <MenuItem value="mediaType">{t('common.type')}</MenuItem>
+              <MenuItem value="createdAt">{t('timeline.uploadedAt')}</MenuItem>
             </Select>
           </FormControl>
 
-          <Tooltip title={sortDirection === 'asc' ? 'Ascendente' : 'Descendente'}>
+          <Tooltip title={sortDirection === 'asc' ? t('timeline.ascending') : t('timeline.descending')}>
             <IconButton
               onClick={() => setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
               size="small"
@@ -229,8 +234,8 @@ const TopicTimelineContentSelector = ({
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
           <Typography variant="body2" color="text.secondary">
             {loading
-              ? 'Cargando contenidos...'
-              : `${filteredItems.length} contenido(s) disponible(s) - ${selectedIds.length} seleccionado(s)`}
+              ? t('timeline.loadingContents')
+              : t('timeline.available', { count: filteredItems.length, selected: selectedIds.length })}
           </Typography>
           {selectedItems.length > 0 && (
             <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', gap: 0.75 }}>
@@ -238,7 +243,7 @@ const TopicTimelineContentSelector = ({
                 <Chip key={item.id} size="small" label={item.title} onDelete={() => handleToggle(item.id)} />
               ))}
               {selectedItems.length > 4 && (
-                <Chip size="small" label={`+${selectedItems.length - 4} mas`} variant="outlined" />
+                <Chip size="small" label={t('timeline.more', { count: selectedItems.length - 4 })} variant="outlined" />
               )}
             </Stack>
           )}
@@ -256,11 +261,11 @@ const TopicTimelineContentSelector = ({
                     disabled={loading || filteredItems.length === 0}
                   />
                 </TableCell>
-                <TableCell>Titulo</TableCell>
-                <TableCell>Tipo</TableCell>
-                <TableCell>Autor</TableCell>
-                <TableCell>Fecha</TableCell>
-                <TableCell>Ver</TableCell>
+                <TableCell>{t('edit.titleLabel')}</TableCell>
+                <TableCell>{t('common.type')}</TableCell>
+                <TableCell>{t('addContent.author')}</TableCell>
+                <TableCell>{t('suggestion.date')}</TableCell>
+                <TableCell>{t('common.view')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -287,11 +292,11 @@ const TopicTimelineContentSelector = ({
                         size="small"
                         color="primary"
                         variant="outlined"
-                        label={MEDIA_TYPE_LABELS[item.mediaType] || item.mediaType}
+                        label={mediaTypeLabels[item.mediaType] || item.mediaType}
                       />
                     </TableCell>
                     <TableCell>{item.author}</TableCell>
-                    <TableCell>{item.createdAt ? formatDate(item.createdAt) : '-'}</TableCell>
+                    <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleDateString(intl, { year: 'numeric', month: 'long', day: 'numeric' }) : '-'}</TableCell>
                     <TableCell onClick={(event) => event.stopPropagation()}>
                       <MuiLink
                         href={`/content/${item.contentId}`}
@@ -299,7 +304,7 @@ const TopicTimelineContentSelector = ({
                         rel="noopener noreferrer"
                         sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, textDecoration: 'none' }}
                       >
-                        Ver
+                        {t('common.view')}
                         <OpenInNewIcon fontSize="small" />
                       </MuiLink>
                     </TableCell>
@@ -310,8 +315,8 @@ const TopicTimelineContentSelector = ({
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                     {normalizedItems.length === 0
-                      ? 'Este tema todavia no tiene contenidos para adjuntar.'
-                      : 'No se encontro contenido con los filtros aplicados.'}
+                      ? t('timeline.emptyAttach')
+                      : t('timeline.noFilterMatch')}
                   </TableCell>
                 </TableRow>
               )}

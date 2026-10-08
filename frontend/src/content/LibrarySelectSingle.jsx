@@ -28,6 +28,7 @@ import {
 } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SearchIcon from '@mui/icons-material/Search';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -36,12 +37,14 @@ const LibrarySelectSingle = ({
   isOpen,
   onClose,
   onSelect,
-  title = 'Seleccionar contenido de tu biblioteca',
+  title,
   description,
   filterFunction,
   compact = false,
   isLoading = false,
 }) => {
+  const { t } = useTranslation('content');
+  const heading = title ?? t('librarySelect.singleTitle');
   const filterRef = useRef(filterFunction);
   filterRef.current = filterFunction;
 
@@ -107,12 +110,12 @@ const LibrarySelectSingle = ({
       setError(
         err?.response?.data?.error
         || err?.error
-        || 'Error al obtener tu contenido',
+        || t('librarySelect.loadError'),
       );
     } finally {
       setLoading(false);
     }
-  }, [isOpen, page, rowsPerPage, searchDebounced, selectedCollectionId]);
+  }, [isOpen, page, rowsPerPage, searchDebounced, selectedCollectionId, t]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -149,7 +152,7 @@ const LibrarySelectSingle = ({
     >
       <Box sx={{ mb: compact ? 1.5 : 2 }}>
         <Typography variant="h6" sx={{ mb: 1 }}>
-          {title}
+          {heading}
         </Typography>
         {description && (
           <Typography variant="body2" color="text.secondary">
@@ -171,7 +174,7 @@ const LibrarySelectSingle = ({
         }}
       >
         <TextField
-          placeholder="Buscar contenido..."
+          placeholder={t('common.searchContent')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           size="small"
@@ -183,14 +186,14 @@ const LibrarySelectSingle = ({
           sx={{ flexGrow: 1, minWidth: 180 }}
         />
         <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel>Colección</InputLabel>
+          <InputLabel>{t('common.collection')}</InputLabel>
           <Select
             value={selectedCollectionId}
-            label="Colección"
+            label={t('common.collection')}
             onChange={(e) => setSelectedCollectionId(e.target.value)}
           >
             <MenuItem value="">
-              <em>Todas las colecciones</em>
+              <em>{t('common.allCollections')}</em>
             </MenuItem>
             {collections.map((collection) => (
               <MenuItem key={collection.id} value={String(collection.id)}>
@@ -202,7 +205,7 @@ const LibrarySelectSingle = ({
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Contenido disponible ({totalCount})
+        {t('librarySelect.availableCount', { value: totalCount })}
       </Typography>
 
       {loading && userContent.length === 0 ? (
@@ -222,10 +225,10 @@ const LibrarySelectSingle = ({
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell>Título</TableCell>
-                  <TableCell>Tipo</TableCell>
-                  <TableCell>Autor</TableCell>
-                  <TableCell>Ver</TableCell>
+                  <TableCell>{t('common.title')}</TableCell>
+                  <TableCell>{t('common.type')}</TableCell>
+                  <TableCell>{t('common.author')}</TableCell>
+                  <TableCell>{t('actions.view')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -245,7 +248,7 @@ const LibrarySelectSingle = ({
                       },
                     }}
                   >
-                    <TableCell>{content.title || 'Sin título'}</TableCell>
+                    <TableCell>{content.title || t('common.untitled')}</TableCell>
                     <TableCell>
                       <Chip
                         label={content.content?.media_type || '-'}
@@ -254,7 +257,7 @@ const LibrarySelectSingle = ({
                         variant="outlined"
                       />
                     </TableCell>
-                    <TableCell>{content.author || 'Desconocido'}</TableCell>
+                    <TableCell>{content.author || t('common.unknownAuthor')}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <MuiLink
                         href={`/content/${content.content?.id}`}
@@ -269,7 +272,7 @@ const LibrarySelectSingle = ({
                           '&:hover': { textDecoration: 'underline' },
                         }}
                       >
-                        Ver
+                        {t('actions.view')}
                         <OpenInNewIcon fontSize="small" />
                       </MuiLink>
                     </TableCell>
@@ -279,8 +282,8 @@ const LibrarySelectSingle = ({
                   <TableRow>
                     <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
                       {searchDebounced || selectedCollectionId
-                        ? 'No se encontró contenido con los filtros aplicados'
-                        : 'No hay contenido disponible'}
+                        ? t('librarySelect.emptyFiltered')
+                        : t('librarySelect.empty')}
                     </TableCell>
                   </TableRow>
                 )}
@@ -299,7 +302,7 @@ const LibrarySelectSingle = ({
               setPage(0);
             }}
             rowsPerPageOptions={[10, 25, 50]}
-            labelRowsPerPage="Filas"
+            labelRowsPerPage={t('pagination.rows')}
           />
         </>
       )}
@@ -309,11 +312,11 @@ const LibrarySelectSingle = ({
   if (error && !loading && userContent.length === 0) {
     return (
       <Dialog open={isOpen} onClose={handleClose} maxWidth="md" fullWidth>
-        <DialogTitle>{title}</DialogTitle>
+        <DialogTitle>{heading}</DialogTitle>
         <DialogContent>
           <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
           <Button variant="contained" onClick={loadLibraryPage}>
-            Reintentar
+            {t('actions.retry')}
           </Button>
         </DialogContent>
       </Dialog>
@@ -348,12 +351,12 @@ const LibrarySelectSingle = ({
       <DialogActions sx={{ px: 3, pb: 2, pt: 1 }}>
         {isLoading ? (
           <Typography variant="body2" color="text.secondary">
-            Agregando contenido...
+            {t('librarySelect.adding')}
           </Typography>
         ) : (
           <>
             <Button onClick={handleClose} color="inherit">
-              Cancelar
+              {t('actions.cancel')}
             </Button>
             <Button
               variant="contained"
@@ -361,7 +364,7 @@ const LibrarySelectSingle = ({
               onClick={handleConfirm}
               disabled={!selectedContentProfile}
             >
-              Elegir
+              {t('librarySelect.choose')}
             </Button>
           </>
         )}

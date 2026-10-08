@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
@@ -28,7 +30,7 @@ const optionalLink = yup
   .transform((value) => value || '')
   .test(
     'url-or-empty',
-    'Introduce un enlace válido (por ejemplo https://tu-sitio.com).',
+    () => i18n.t('bookClubs:intro.invalidUrl'),
     (value) => {
       if (!value) return true;
       const withScheme = /^https?:\/\//i.test(value) ? value : `https://${value}`;
@@ -41,13 +43,14 @@ const optionalLink = yup
   );
 
 const schema = yup.object({
-  country: yup.string().trim().max(100, 'Máximo 100 caracteres.'),
-  intro_description: yup.string().trim().max(1000, 'Máximo 1000 caracteres.'),
+  country: yup.string().trim().max(100, () => i18n.t('bookClubs:intro.max100')),
+  intro_description: yup.string().trim().max(1000, () => i18n.t('bookClubs:intro.max1000')),
   social_url: optionalLink,
   additional_url: optionalLink,
 });
 
 const BookClubIntroduction = () => {
+  const { t } = useTranslation('bookClubs');
   const navigate = useNavigate();
   const { slug, club, isGuest, canParticipate } = useBookClub();
   const [loading, setLoading] = useState(!isGuest);
@@ -94,7 +97,7 @@ const BookClubIntroduction = () => {
       .catch((err) => {
         if (!cancelled) {
           setGeneralError(
-            err?.response?.data?.detail || 'No se pudo cargar tu presentación.'
+            err?.response?.data?.detail || t('errors.loadIntro')
           );
         }
       })
@@ -104,7 +107,7 @@ const BookClubIntroduction = () => {
     return () => {
       cancelled = true;
     };
-  }, [slug, isGuest, canParticipate, reset]);
+  }, [slug, isGuest, canParticipate, reset, t]);
 
   const onSubmit = async (data) => {
     setGeneralError('');
@@ -120,7 +123,7 @@ const BookClubIntroduction = () => {
       const { generalError: parsed } = applyApiErrorsToForm(
         err,
         setError,
-        'No se pudo guardar tu presentación.'
+        t('errors.saveIntro')
       );
       if (parsed) setGeneralError(parsed);
     }
@@ -144,10 +147,10 @@ const BookClubIntroduction = () => {
     return (
       <Stack spacing={2} alignItems="flex-start">
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          Preséntate al club
+          {t('intro.title')}
         </Typography>
         <Alert severity="info">
-          Crea tu cuenta para presentarte y participar en la comunidad.
+          {t('intro.guestBody')}
         </Alert>
         <Button
           variant="contained"
@@ -155,7 +158,7 @@ const BookClubIntroduction = () => {
           to={createAccountUrl}
           sx={{ bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
         >
-          Crear cuenta
+          {t('createAccount')}
         </Button>
       </Stack>
     );
@@ -169,14 +172,13 @@ const BookClubIntroduction = () => {
       sx={{ maxWidth: 640 }}
     >
       <Typography variant="overline" sx={{ color: CLUB_ACCENT, fontWeight: 700 }}>
-        Comunidad
+        {t('intro.eyebrow')}
       </Typography>
       <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.5 }}>
-        Preséntate al club
+        {t('intro.title')}
       </Typography>
       <Typography sx={{ color: 'rgba(255,255,255,0.65)', mt: 1, mb: 3 }}>
-        Todos los campos son opcionales. Si ya tenías datos en tu perfil, aparecen aquí
-        listos para confirmar o editar para {club.title}.
+        {t('intro.optionalHint', { title: club.title })}
       </Typography>
 
       {generalError && (
@@ -187,17 +189,17 @@ const BookClubIntroduction = () => {
 
       <Stack spacing={2.5}>
         <TextField
-          label="País"
+          label={t('intro.country')}
           fullWidth
-          placeholder="Ej. Ecuador"
+          placeholder={t('intro.countryPlaceholder')}
           InputLabelProps={{ shrink: true }}
           {...register('country')}
           error={Boolean(errors.country)}
-          helperText={errors.country?.message || 'Opcional. Se guarda en tu perfil.'}
+          helperText={errors.country?.message || t('intro.countryHelper')}
           sx={CLUB_TEXT_FIELD_SX}
         />
         <TextField
-          label="Dos líneas sobre ti"
+          label={t('intro.about')}
           fullWidth
           multiline
           minRows={3}
@@ -206,12 +208,12 @@ const BookClubIntroduction = () => {
           error={Boolean(errors.intro_description)}
           helperText={
             errors.intro_description?.message ||
-            `${descriptionLength}/1000 · Opcional. Se guarda en tu perfil.`
+            t('intro.aboutHelper', { count: descriptionLength })
           }
           sx={CLUB_TEXT_FIELD_SX}
         />
         <TextField
-          label="Enlace de tu perfil"
+          label={t('intro.profileLink')}
           fullWidth
           placeholder="https://..."
           InputLabelProps={{ shrink: true }}
@@ -219,12 +221,12 @@ const BookClubIntroduction = () => {
           error={Boolean(errors.social_url)}
           helperText={
             errors.social_url?.message ||
-            'Opcional. Corresponde al enlace externo de tu perfil.'
+            t('intro.profileHelper')
           }
           sx={CLUB_TEXT_FIELD_SX}
         />
         <TextField
-          label="Otro link más"
+          label={t('intro.otherLink')}
           fullWidth
           placeholder="https://..."
           InputLabelProps={{ shrink: true }}
@@ -232,7 +234,7 @@ const BookClubIntroduction = () => {
           error={Boolean(errors.additional_url)}
           helperText={
             errors.additional_url?.message ||
-            'Opcional y solo para este club: web, proyecto, newsletter…'
+            t('intro.otherHelper')
           }
           sx={CLUB_TEXT_FIELD_SX}
         />
@@ -243,7 +245,7 @@ const BookClubIntroduction = () => {
             disabled={isSubmitting}
             sx={{ bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
           >
-            {isSubmitting ? 'Guardando…' : 'Guardar presentación'}
+            {isSubmitting ? t('intro.saving') : t('intro.save')}
           </Button>
           <Button
             component={RouterLink}
@@ -251,7 +253,7 @@ const BookClubIntroduction = () => {
             disabled={isSubmitting}
             sx={{ color: 'rgba(255,255,255,0.7)' }}
           >
-            Cancelar
+            {t('intro.cancel')}
           </Button>
         </Stack>
       </Stack>

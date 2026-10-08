@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Container,
   Box,
@@ -17,8 +18,11 @@ import {
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import VoteComponent from '../votes/VoteComponent';
 import { AuthContext } from '../context/AuthContext';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 const KnowledgePathList = () => {
+  const { t } = useTranslation('paths');
+  const { intl } = useDateLocales();
   const { authState } = useContext(AuthContext);
   const [knowledgePaths, setKnowledgePaths] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +64,7 @@ const KnowledgePathList = () => {
         setHasPrevious(!!data.previous);
       } catch (err) {
         console.error('Error fetching knowledge paths:', err);
-        setError('Error al cargar los caminos de conocimiento');
+        setError(t('common.loadPathsError'));
         // Set empty array on error to prevent map error
         setKnowledgePaths([]);
       } finally {
@@ -69,7 +73,7 @@ const KnowledgePathList = () => {
     };
 
     fetchKnowledgePaths();
-  }, [currentPage]);
+  }, [currentPage, t]);
 
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
@@ -106,7 +110,7 @@ const KnowledgePathList = () => {
         }}>
         
         <Typography variant="h4" component="h1" sx={{ mb: { xs: 2, md: 0 } }}>
-          Caminos de Conocimiento
+          {t('list.title')}
         </Typography>
         {authState.isAuthenticated &&
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
@@ -121,7 +125,7 @@ const KnowledgePathList = () => {
                 '&:hover': { textDecoration: 'underline' }
               }}>
               
-                Mis caminos del Conocimiento
+                {t('list.mine')}
               </Typography>
             </Link>
             <Button
@@ -134,7 +138,7 @@ const KnowledgePathList = () => {
               width: { xs: '100%', md: 'auto' }
             }}>
             
-              Crear Nuevo Camino
+              {t('list.create')}
             </Button>
           </Stack>
         }
@@ -232,7 +236,7 @@ const KnowledgePathList = () => {
                           label={`$${Number(path.reference_price).toFixed(2)} USD`}
                         />
                       ) : (
-                        <Chip size="small" variant="outlined" label="Gratis" />
+                        <Chip size="small" variant="outlined" label={t('common.free')} />
                       )}
                       <VoteComponent
                         type="knowledge_path"
@@ -265,10 +269,10 @@ const KnowledgePathList = () => {
                         }
                       }}>
                       
-                      Por {path.author}
+                      {t('common.byAuthor', { author: path.author })}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {new Date(path.created_at).toLocaleDateString()}
+                      {new Date(path.created_at).toLocaleDateString(intl)}
                     </Typography>
                   </Box>
                 </CardContent>
@@ -304,11 +308,11 @@ const KnowledgePathList = () => {
             }
           }}>
           
-            Anterior
+            {t('common.previous')}
           </Button>
           
           <Typography variant="body2" color="text.secondary">
-            Página {currentPage} de {totalPages}
+            {t('common.page', { current: currentPage, total: totalPages })}
           </Typography>
           
           <Button
@@ -326,7 +330,7 @@ const KnowledgePathList = () => {
             }
           }}>
           
-            Siguiente
+            {t('common.next')}
           </Button>
         </Box>
       }

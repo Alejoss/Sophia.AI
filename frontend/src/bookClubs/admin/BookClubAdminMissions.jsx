@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useOutletContext, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -15,6 +16,7 @@ import bookClubsApi from '../../api/bookClubsApi';
 import { extractApiError, toDatetimeLocal, toIsoOrNull } from '../clubTheme';
 
 const BookClubAdminMissions = () => {
+  const { t } = useTranslation('bookClubs');
   const { slug } = useParams();
   const { club } = useOutletContext();
   const [missions, setMissions] = useState([]);
@@ -40,7 +42,7 @@ const BookClubAdminMissions = () => {
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(extractApiError(err, 'No se pudo cargar el calendario.'));
+        if (!cancelled) setError(extractApiError(err, t('errors.loadSchedule')));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -48,7 +50,7 @@ const BookClubAdminMissions = () => {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, t]);
 
   const updateDate = (nodeId, value) => {
     setMissions((current) =>
@@ -77,9 +79,9 @@ const BookClubAdminMissions = () => {
           localOpensAt: toDatetimeLocal(mission.opens_at),
         }))
       );
-      setSuccess('Calendario guardado. La disponibilidad se actualiza para todo el club.');
+      setSuccess(t('missionAdmin.saved'));
     } catch (err) {
-      setError(extractApiError(err, 'No se pudo guardar el calendario.'));
+      setError(extractApiError(err, t('errors.saveSchedule')));
     } finally {
       setSaving(false);
     }
@@ -97,12 +99,10 @@ const BookClubAdminMissions = () => {
     <Stack spacing={3}>
       <Box>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          Calendario de misiones
+          {t('missionAdmin.title')}
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 0.75, maxWidth: 720 }}>
-          Por defecto cada misión está abierta. Asigna una fecha solo si quieres bloquearla
-          hasta ese momento. Además de llegar la fecha, cada persona debe haber completado
-          la misión anterior.
+          {t('missionAdmin.intro')}
         </Typography>
       </Box>
 
@@ -111,11 +111,11 @@ const BookClubAdminMissions = () => {
 
       {!club.knowledge_path ? (
         <Alert severity="info">
-          Vincula primero un camino del conocimiento desde la sección Conexiones.
+          {t('missionAdmin.linkPathFirst')}
         </Alert>
       ) : missions.length === 0 ? (
         <Alert severity="info">
-          El camino vinculado todavía no tiene nodos.
+          {t('missionAdmin.noNodes')}
         </Alert>
       ) : (
         <Stack spacing={2}>
@@ -136,19 +136,19 @@ const BookClubAdminMissions = () => {
               >
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="overline" color="text.secondary">
-                    Misión {mission.order}
+                    {t('missionAdmin.mission', { order: mission.order })}
                   </Typography>
                   <Typography sx={{ fontWeight: 700 }}>{mission.title}</Typography>
                 </Box>
                 <Chip
                   icon={<LockClockIcon />}
-                  label={mission.is_released ? 'Disponible' : 'Bloqueada'}
+                  label={mission.is_released ? t('missionAdmin.available') : t('missionAdmin.locked')}
                   color={mission.is_released ? 'success' : 'warning'}
                   variant="outlined"
                 />
                 <TextField
                   type="datetime-local"
-                  label="Se desbloquea (vacío = abierta)"
+                  label={t('missionAdmin.unlocks')}
                   value={mission.localOpensAt}
                   onChange={(event) => updateDate(mission.node_id, event.target.value)}
                   InputLabelProps={{ shrink: true }}
@@ -164,7 +164,7 @@ const BookClubAdminMissions = () => {
             disabled={saving}
             sx={{ alignSelf: 'flex-start' }}
           >
-            {saving ? 'Guardando…' : 'Guardar calendario'}
+            {saving ? t('missionAdmin.saving') : t('missionAdmin.save')}
           </Button>
         </Stack>
       )}

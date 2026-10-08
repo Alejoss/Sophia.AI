@@ -28,7 +28,7 @@ export const mergeMenuConfigs = (menuConfigs) => {
       // Add section header
       mergedItems.push({
         type: 'header',
-        label: config.title,
+        labelKey: config.title,
         key: `header-${config.title.toLowerCase().replace(/\s+/g, '-')}`
       });
       
@@ -37,7 +37,7 @@ export const mergeMenuConfigs = (menuConfigs) => {
         mergedItems.push({
           ...item,
           type: 'item',
-          key: `item-${item.section || item.path || item.label.toLowerCase().replace(/\s+/g, '-')}`
+          key: `item-${item.section || item.path || item.labelKey || 'item'}`
         });
       });
     }

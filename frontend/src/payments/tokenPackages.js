@@ -1,3 +1,5 @@
+import i18n from '../i18n';
+
 export const formatApiError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message;
   if (typeof msg === 'string') return msg;
@@ -6,10 +8,9 @@ export const formatApiError = (err, fallback) => {
 };
 
 export const purchaseStatusLabel = (status) => {
-  if (status === 'PAID') return 'Pagado';
-  if (status === 'PENDING') return 'Pendiente';
-  if (status === 'CANCELLED') return 'Cancelada';
-  if (status === 'REFUNDED') return 'Reembolsado';
+  if (status === 'PAID' || status === 'PENDING' || status === 'CANCELLED' || status === 'REFUNDED') {
+    return i18n.t(`payments:purchaseStatus.${status}`);
+  }
   return status;
 };
 

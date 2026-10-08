@@ -15,11 +15,15 @@ import {
 } from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import { useTranslation } from 'react-i18next';
 import quizApi from '../api/quizzesApi';
 import { parseApiValidationErrors } from '../utils/apiFormErrors';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 const Quiz = () => {
     // TODO complete the quiz
+  const { t } = useTranslation('quizzes');
+  const { intl } = useDateLocales();
   const { quizId } = useParams();
   const navigate = useNavigate();
   const [quiz, setQuiz] = useState(null);
@@ -79,14 +83,14 @@ const Quiz = () => {
         });
         setCurrentAnswers(initialAnswers);
       } catch (err) {
-        setError('Error al cargar el cuestionario');
+        setError(t('loadError'));
       } finally {
         setLoading(false);
       }
     };
 
     fetchQuiz();
-  }, [quizId]);
+  }, [quizId, t]);
 
   const handleOptionSelect = (questionId, optionId, questionType) => {
     setCurrentAnswers(prev => {
@@ -115,7 +119,7 @@ const Quiz = () => {
     );
 
     if (unansweredQuestions.length > 0) {
-      setError('Por favor, responda todas las preguntas antes de enviar');
+      setError(t('answerAll'));
       return;
     }
 
@@ -139,9 +143,9 @@ const Quiz = () => {
     } catch (error) {
       const { generalError } = parseApiValidationErrors(
         error,
-        'No se pudo enviar el cuestionario. Inténtalo de nuevo.',
+        t('submitError'),
       );
-      setError(generalError || 'No se pudo enviar el cuestionario. Inténtalo de nuevo.');
+      setError(generalError || t('submitError'));
       setSubmitted(false);
     }
   };
@@ -173,27 +177,29 @@ const Quiz = () => {
         >
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-              Intentos Anteriores
+              {t('previousAttempts')}
             </Typography>
             <Stack spacing={1}>
               {previousAttempts.map((attempt, index) => (
                 <Typography key={attempt.id} variant="body2">
-                  Intento {index + 1}: Puntuación {attempt.score}% —{' '}
-                  Completado el:{' '}
-                  {new Date(attempt.completed_on).toLocaleDateString('es-ES')}
+                  {t('attemptLine', {
+                    index: index + 1,
+                    score: attempt.score,
+                    date: new Date(attempt.completed_on).toLocaleDateString(intl),
+                  })}
                 </Typography>
               ))}
             </Stack>
             {attemptsExhausted && (
               <Box sx={{ mt: 1.5 }}>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Ha alcanzado el número máximo de intentos (
-                  {quiz.max_attempts_per_day}) para hoy. Por favor, inténtelo de
-                  nuevo mañana.
+                  {t('attemptsExhausted', { count: quiz.max_attempts_per_day })}
                 </Typography>
                 <Typography variant="caption">
-                  Intentos de hoy: {todayAttempts.length}/
-                  {quiz.max_attempts_per_day}
+                  {t('attemptsToday', {
+                    used: todayAttempts.length,
+                    max: quiz.max_attempts_per_day,
+                  })}
                 </Typography>
               </Box>
             )}
@@ -209,7 +215,7 @@ const Quiz = () => {
         <Stack spacing={3}>
           <Paper elevation={1} sx={{ p: 3, borderRadius: 2 }}>
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-              Resultados del Cuestionario
+              {t('resultsTitle')}
             </Typography>
             <Alert
               severity="success"
@@ -221,10 +227,10 @@ const Quiz = () => {
                   component="p"
                   sx={{ fontWeight: 700, mb: 1 }}
                 >
-                  Puntuación: 100%
+                  {t('score', { score: 100 })}
                 </Typography>
                 <Typography variant="body1" sx={{ mb: 2 }}>
-                  ¡Ya ha completado exitosamente este cuestionario!
+                  {t('alreadyCompleted')}
                 </Typography>
                 <Stack
                   direction={{ xs: 'column', sm: 'row' }}
@@ -238,7 +244,7 @@ const Quiz = () => {
                       navigate(`/knowledge_path/${quiz.knowledge_path}`)
                     }
                   >
-                    Ir al Camino de Conocimiento
+                    {t('goToPath')}
                   </Button>
                   {quiz.next_node && (
                     <Button
@@ -250,7 +256,7 @@ const Quiz = () => {
                         )
                       }
                     >
-                      Continuar al Siguiente Nodo: {quiz.next_node.title}
+                      {t('continueNext', { title: quiz.next_node.title })}
                     </Button>
                   )}
                 </Stack>
@@ -273,7 +279,7 @@ const Quiz = () => {
                     <img
                       src={question.image}
                       alt={
-                        question.image_description || 'Imagen de la pregunta'
+                        question.image_description || t('questionImageAlt')
                       }
                       style={{ maxWidth: '100%', height: 'auto', borderRadius: 8 }}
                     />
@@ -321,7 +327,7 @@ const Quiz = () => {
                         <Typography variant="body2">{option.text}</Typography>
                         {wasSelected && (
                           <Chip
-                            label={isCorrect ? 'Respuesta correcta' : 'Respuesta incorrecta'}
+                            label={isCorrect ? t('correctAnswer') : t('incorrectAnswer')}
                             color={isCorrect ? 'success' : 'error'}
                             size="small"
                             sx={{ ml: 'auto' }}
@@ -344,7 +350,7 @@ const Quiz = () => {
         <Stack spacing={3}>
           <Paper elevation={1} sx={{ p: 3, borderRadius: 2 }}>
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-              Resultados del Cuestionario
+              {t('resultsTitle')}
             </Typography>
             <Alert
               severity={isPerfectScore ? 'success' : 'warning'}
@@ -356,27 +362,29 @@ const Quiz = () => {
                   component="p"
                   sx={{ fontWeight: 700, mb: 1 }}
                 >
-                  Puntuación: {quizResult.attempt.score}%
+                  {t('score', { score: quizResult.attempt.score })}
                 </Typography>
                 {isPerfectScore ? (
                   <>
                     <Typography variant="body1" sx={{ mb: 2 }}>
-                      ¡Felicidades! Ha completado exitosamente este cuestionario.
+                      {t('congratulations')}
                     </Typography>
                     {quizResult.next_node && (
                       <Typography variant="body2" sx={{ mb: 1 }}>
-                        Redirigiendo al siguiente nodo en 10 segundos...
+                        {t('redirecting')}
                       </Typography>
                     )}
                   </>
                 ) : (
                   <>
                     <Typography variant="body1">
-                      Respondió correctamente {quizResult.correct_answers} de{' '}
-                      {quizResult.total_questions} preguntas.
+                      {t('correctCount', {
+                        correct: quizResult.correct_answers,
+                        total: quizResult.total_questions,
+                      })}
                     </Typography>
                     <Typography variant="body1" sx={{ mt: 0.5 }}>
-                      Intentos restantes hoy: {quizResult.attempts_remaining}
+                      {t('attemptsRemaining', { count: quizResult.attempts_remaining })}
                     </Typography>
                   </>
                 )}
@@ -386,7 +394,7 @@ const Quiz = () => {
                     color="inherit"
                     onClick={() => navigate(-1)}
                   >
-                    Volver a la Página Anterior
+                    {t('backToPrevious')}
                   </Button>
                 </Box>
               </Box>
@@ -408,7 +416,7 @@ const Quiz = () => {
                     <img
                       src={question.image}
                       alt={
-                        question.image_description || 'Imagen de la pregunta'
+                        question.image_description || t('questionImageAlt')
                       }
                       style={{ maxWidth: '100%', height: 'auto', borderRadius: 8 }}
                     />
@@ -456,7 +464,7 @@ const Quiz = () => {
                         <Typography variant="body2">{option.text}</Typography>
                         {wasSelected && (
                           <Chip
-                            label={isCorrect ? 'Respuesta correcta' : 'Respuesta incorrecta'}
+                            label={isCorrect ? t('correctAnswer') : t('incorrectAnswer')}
                             color={isCorrect ? 'success' : 'error'}
                             size="small"
                             sx={{ ml: 'auto' }}
@@ -494,7 +502,7 @@ const Quiz = () => {
                 <Box sx={{ mb: 2 }}>
                   <img
                     src={question.image}
-                    alt={question.image_description || 'Imagen de la pregunta'}
+                      alt={question.image_description || t('questionImageAlt')}
                     style={{ maxWidth: '100%', height: 'auto', borderRadius: 8 }}
                   />
                 </Box>
@@ -575,7 +583,7 @@ const Quiz = () => {
             disabled={submitted || attemptsExhausted}
             sx={{ minWidth: { xs: '100%', sm: 200 } }}
           >
-            {attemptsExhausted ? 'No Quedan Intentos' : 'Enviar Cuestionario'}
+            {attemptsExhausted ? t('noAttemptsLeft') : t('submit')}
           </Button>
           <Button
             type="button"
@@ -584,7 +592,7 @@ const Quiz = () => {
             onClick={() => navigate(-1)}
             sx={{ minWidth: { xs: '100%', sm: 160 } }}
           >
-            Volver
+            {t('back')}
           </Button>
         </Stack>
       </Box>
@@ -609,7 +617,7 @@ const Quiz = () => {
   if (!quiz) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
-        <Alert severity="error">Cuestionario no encontrado</Alert>
+        <Alert severity="error">{t('notFound')}</Alert>
       </Container>
     );
   }
@@ -632,7 +640,7 @@ const Quiz = () => {
               <Typography variant="body1">{quiz.description}</Typography>
             )}
             <Chip
-              label={`Intentos máximos por día: ${quiz.max_attempts_per_day}`}
+              label={t('maxAttemptsChip', { count: quiz.max_attempts_per_day })}
               size="small"
             />
           </Stack>

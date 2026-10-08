@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Box, Typography, Card, CardContent, Button, IconButton, Chip } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 
@@ -9,6 +10,7 @@ const CollectionsUser = () => {
     const [collections, setCollections] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const { t } = useTranslation('content');
     const navigate = useNavigate();
     const { authState } = useContext(AuthContext);
     const isAuthenticated = authState.isAuthenticated;
@@ -20,7 +22,7 @@ const CollectionsUser = () => {
                 setCollections(data || []);
                 setLoading(false);
             } catch (err) {
-                setError('Error al obtener tus colecciones');
+                setError(t('collections.loadError'));
                 setLoading(false);
             }
         };
@@ -30,11 +32,11 @@ const CollectionsUser = () => {
         } else {
             setLoading(false);
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, t]);
 
-    if (loading) return <Typography>Cargando tus colecciones...</Typography>;
+    if (loading) return <Typography>{t('collections.loading')}</Typography>;
     if (error) return <Typography color="error">{error}</Typography>;
-    if (!isAuthenticated) return <Typography>Por favor inicia sesión para ver tus colecciones</Typography>;
+    if (!isAuthenticated) return <Typography>{t('collections.signIn')}</Typography>;
 
     return (
         <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, color: "text.primary" }}>
@@ -55,7 +57,7 @@ const CollectionsUser = () => {
                             fontSize: "24px"
                         }}
                     >
-                        Mis colecciones
+                        {t('collections.mine')}
                     </Typography>
                 </Box>
                 <Button 
@@ -63,7 +65,7 @@ const CollectionsUser = () => {
                     color="primary"
                     onClick={() => navigate('/content/collections/create')}
                 >
-                    Crear colección
+                    {t('collections.create')}
                 </Button>
             </Box>
 
@@ -80,7 +82,7 @@ const CollectionsUser = () => {
                                         {collection.name}
                                     </Typography>
                                     {collection.is_public && (
-                                        <Chip label="Pública" size="small" color="secondary" variant="outlined" />
+                                        <Chip label={t('collections.public')} size="small" color="secondary" variant="outlined" />
                                     )}
                                 </Box>
                                 {collection.description && (
@@ -99,7 +101,7 @@ const CollectionsUser = () => {
                                     </Typography>
                                 )}
                                 <Typography color="text.secondary">
-                                    {collection.content_count} {collection.content_count === 1 ? 'elemento' : 'elementos'}
+                                    {t('itemCount', { count: collection.content_count })}
                                 </Typography>
                             </CardContent>
                         </Card>
@@ -109,7 +111,7 @@ const CollectionsUser = () => {
                 {collections.length === 0 && (
                     <Box gridColumn="span 12">
                         <Typography variant="body1" color="text.secondary" align="center">
-                            Aún no has creado ninguna colección.
+                            {t('collections.empty')}
                         </Typography>
                     </Box>
                 )}

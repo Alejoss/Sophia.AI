@@ -1,3 +1,6 @@
+import i18n from '../i18n';
+import { getIntlLocale } from '../utils/dateLocales';
+
 export const CLUB_ACCENT = '#FF6B35';
 export const CLUB_ACCENT_HOVER = '#E55A2B';
 export const CLUB_BG = '#0d0d0d';
@@ -70,22 +73,14 @@ export const CLUB_NESTED_FIELDS_SX = {
   '& .MuiTextField-root .MuiFormHelperText-root.Mui-error':
     CLUB_TEXT_FIELD_SX['& .MuiFormHelperText-root.Mui-error'],
 };
-export const STATUS_LABELS = {
-  draft: 'Borrador',
-  active: 'Activo',
-  closed: 'Cerrado',
-};
-
-export const QUESTION_STATUS_LABELS = {
-  draft: 'Borrador',
-  open: 'Abierta',
-  closed: 'Cerrada',
-};
+export const CLUB_STATUSES = ['draft', 'active', 'closed'];
+export const QUESTION_STATUSES = ['draft', 'open', 'closed'];
 
 export const formatClubDate = (value, opts = { dateStyle: 'medium', timeStyle: 'short' }) => {
   if (!value) return null;
   try {
-    return new Date(value).toLocaleString('es-ES', opts);
+    const locale = getIntlLocale(i18n.resolvedLanguage || i18n.language);
+    return new Date(value).toLocaleString(locale, opts);
   } catch {
     return value;
   }
@@ -132,8 +127,8 @@ export const formatClubDateRange = (startsAt, endsAt) => {
   const start = startsAt ? formatClubDate(startsAt, opts) : null;
   const end = endsAt ? formatClubDate(endsAt, opts) : null;
   if (start && end) return `${start} – ${end}`;
-  if (start) return `Desde ${start}`;
-  return `Hasta ${end}`;
+  if (start) return i18n.t('bookClubs:dates.from', { date: start });
+  return i18n.t('bookClubs:dates.until', { date: end });
 };
 
 /** Normalize Telegram invite/group links to a full https URL. */
@@ -147,9 +142,10 @@ export const normalizeTelegramUrl = (raw) => {
   return value;
 };
 
-export const extractApiError = (err, fallback = 'Algo salió mal.') => {
+export const extractApiError = (err, fallback) => {
+  const resolvedFallback = fallback ?? i18n.t('bookClubs:errors.generic');
   const data = err?.response?.data;
-  if (!data) return fallback;
+  if (!data) return resolvedFallback;
   if (typeof data.detail === 'string') return data.detail;
   if (typeof data === 'string') return data;
   const firstKey = Object.keys(data)[0];
@@ -158,5 +154,5 @@ export const extractApiError = (err, fallback = 'Algo salió mal.') => {
     if (Array.isArray(val)) return `${firstKey}: ${val[0]}`;
     if (typeof val === 'string') return `${firstKey}: ${val}`;
   }
-  return fallback;
+  return resolvedFallback;
 };

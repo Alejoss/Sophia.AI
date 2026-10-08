@@ -30,11 +30,15 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import PendingIcon from '@mui/icons-material/Pending';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { MEDIA_BASE_URL } from '../api/config';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 const TopicsUser = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation('topics');
+  const { intl } = useDateLocales();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   
@@ -88,7 +92,7 @@ const TopicsUser = () => {
       setCreatedTopics(Array.isArray(created) ? created : []);
     } catch (err) {
       console.error('Error fetching created topics:', err);
-      setCreatedError('Error al cargar tus temas creados');
+      setCreatedError(t('user.loadCreatedError'));
     } finally {
       setCreatedLoading(false);
     }
@@ -99,7 +103,7 @@ const TopicsUser = () => {
       setModeratedTopics(Array.isArray(moderated) ? moderated : []);
     } catch (err) {
       console.error('Error fetching moderated topics:', err);
-      setModeratedError('Error al cargar los temas en los que eres moderador');
+      setModeratedError(t('user.loadModeratedError'));
     } finally {
       setModeratedLoading(false);
     }
@@ -110,7 +114,7 @@ const TopicsUser = () => {
       setInvitations(Array.isArray(inv) ? inv : []);
     } catch (err) {
       console.error('Error fetching invitations:', err);
-      setInvitationsError('Error al cargar las invitaciones');
+      setInvitationsError(t('user.loadInvitationsError'));
     } finally {
       setInvitationsLoading(false);
     }
@@ -125,7 +129,7 @@ const TopicsUser = () => {
       setTimelineSuggestions(Array.isArray(timelineSugg) ? timelineSugg : []);
     } catch (err) {
       console.error('Error fetching suggestions:', err);
-      setSuggestionsError('Error al cargar tus sugerencias');
+      setSuggestionsError(t('suggestion.loadMineError'));
     } finally {
       setSuggestionsLoading(false);
     }
@@ -133,7 +137,7 @@ const TopicsUser = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [t]);
 
   // Update tab when URL parameter changes
   useEffect(() => {
@@ -165,7 +169,7 @@ const TopicsUser = () => {
       setActiveTab(1);
     } catch (err) {
       console.error('Error accepting invitation:', err);
-      setInvitationsError(err.response?.data?.error || 'Error al aceptar la invitación');
+      setInvitationsError(err.response?.data?.error || t('user.acceptInvitationError'));
     } finally {
       setProcessingInvitation(prev => {
         const newState = { ...prev };
@@ -192,7 +196,7 @@ const TopicsUser = () => {
       setInvitations(prev => prev.filter(inv => inv.id !== invitationId));
     } catch (err) {
       console.error('Error declining invitation:', err);
-      setInvitationsError(err.response?.data?.error || 'Error al rechazar la invitación');
+      setInvitationsError(err.response?.data?.error || t('user.rejectInvitationError'));
     } finally {
       setProcessingInvitation(prev => {
         const newState = { ...prev };
@@ -212,7 +216,7 @@ const TopicsUser = () => {
       setTimelineSuggestions((prev) => prev.filter((item) => item.id !== suggestion.id));
     } catch (err) {
       console.error('Error deleting timeline suggestion:', err);
-      setSuggestionsError('Error al eliminar la sugerencia de linea de tiempo');
+      setSuggestionsError(t('user.deleteTimelineError'));
     } finally {
       setDeletingSuggestion((prev) => ({ ...prev, [key]: false }));
     }
@@ -227,7 +231,7 @@ const TopicsUser = () => {
       return;
     }
 
-    if (!window.confirm('¿Estás seguro de que deseas eliminar esta sugerencia?')) {
+    if (!window.confirm(t('user.deleteConfirm'))) {
       return;
     }
 
@@ -239,7 +243,7 @@ const TopicsUser = () => {
       setSuggestions(prev => prev.filter(sugg => sugg.id !== suggestionId));
     } catch (err) {
       console.error('Error deleting suggestion:', err);
-      setSuggestionsError(err.response?.data?.error || 'Error al eliminar la sugerencia');
+      setSuggestionsError(err.response?.data?.error || t('user.deleteSuggestionError'));
     } finally {
       setDeletingSuggestion(prev => {
         const newState = { ...prev };
@@ -252,17 +256,17 @@ const TopicsUser = () => {
   const getStatusChip = (status) => {
     const statusConfig = {
       PENDING: { 
-        label: 'Pendiente', 
+        label: t('common.pending'), 
         color: 'warning',
         icon: <PendingIcon fontSize="small" />
       },
       ACCEPTED: { 
-        label: 'Aceptada', 
+        label: t('suggestion.statusAccepted'), 
         color: 'success',
         icon: <CheckCircleIcon fontSize="small" />
       },
       REJECTED: { 
-        label: 'Rechazada', 
+        label: t('suggestion.statusRejected'), 
         color: 'error',
         icon: <CancelIcon fontSize="small" />
       }
@@ -309,7 +313,7 @@ const TopicsUser = () => {
             fontWeight: 600,
           }}
         >
-          Temas
+          {t('list.title')}
         </Typography>
         <Button
           component={Link}
@@ -317,7 +321,7 @@ const TopicsUser = () => {
           variant="contained"
           color="primary"
         >
-          Solicitar creación de tema
+          {t('user.requestCreation')}
         </Button>
       </Box>
 
@@ -325,22 +329,22 @@ const TopicsUser = () => {
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}>
         <Tabs value={activeTab} onChange={handleTabChange} aria-label="topics tabs">
           <Tab 
-            label={`Creados (${createdTopics.length})`} 
+            label={t('user.createdCount', { count: createdTopics.length })} 
             icon={<EditIcon />} 
             iconPosition="start"
           />
           <Tab 
-            label={`Moderados (${moderatedTopics.length})`} 
+            label={t('user.moderatedCount', { count: moderatedTopics.length })} 
             icon={<SupervisorAccountIcon />} 
             iconPosition="start"
           />
           <Tab 
-            label={`Invitaciones (${invitations.length})`} 
+            label={t('user.invitationsCount', { count: invitations.length })} 
             icon={<MailIcon />} 
             iconPosition="start"
           />
           <Tab 
-            label={`Sugerencias (${suggestions.length})`} 
+            label={t('edit.suggestionsCount', { count: suggestions.length })} 
             icon={<LightbulbIcon />} 
             iconPosition="start"
           />
@@ -399,7 +403,7 @@ const TopicsUser = () => {
                         )}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
                           <Typography variant="caption" color="text.secondary">
-                            {topic.created_at ? new Date(topic.created_at).toLocaleDateString() : ''}
+                            {topic.created_at ? new Date(topic.created_at).toLocaleDateString(intl) : ''}
                           </Typography>
                           <Link
                             to={`/content/topics/${topic.id}/edit`}
@@ -407,7 +411,7 @@ const TopicsUser = () => {
                             style={{ color: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
                           >
                             <EditIcon sx={{ fontSize: 18 }} />
-                            <Typography component="span" variant="caption">Editar</Typography>
+                            <Typography component="span" variant="caption">{t('common.edit')}</Typography>
                           </Link>
                         </Box>
                       </CardContent>
@@ -420,10 +424,10 @@ const TopicsUser = () => {
 
           {createdTopics.length === 0 && (
             <Box sx={{ textAlign: 'center', py: 6 }}>
-              <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>Aún no has creado temas</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>Comienza creando tu primer tema para organizar y compartir contenido relacionado.</Typography>
+              <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>{t('user.emptyCreatedTitle')}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{t('user.emptyCreatedHelp')}</Typography>
               <Button component={Link} to="/content/create_topic" variant="contained" color="primary">
-                Solicitar tu primer tema
+                {t('user.requestFirst')}
               </Button>
             </Box>
           )}
@@ -463,7 +467,7 @@ const TopicsUser = () => {
                         )}
                         {topic.created_at && (
                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                            {new Date(topic.created_at).toLocaleDateString()}
+                            {new Date(topic.created_at).toLocaleDateString(intl)}
                           </Typography>
                         )}
                       </CardContent>
@@ -476,8 +480,8 @@ const TopicsUser = () => {
 
           {moderatedTopics.length === 0 && (
             <Box sx={{ textAlign: 'center', py: 6 }}>
-              <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>Aún no eres moderador de ningún tema</Typography>
-              <Typography variant="body2" color="text.secondary">Los temas en los que eres moderador aparecerán aquí una vez que aceptes una invitación.</Typography>
+              <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>{t('user.emptyModeratedTitle')}</Typography>
+              <Typography variant="body2" color="text.secondary">{t('user.emptyModeratedHelp')}</Typography>
             </Box>
           )}
         </Box>
@@ -489,10 +493,10 @@ const TopicsUser = () => {
           {invitations.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 6 }}>
               <Typography variant="h6" color="text.secondary" sx={{ mb: 1.5 }}>
-                No tienes invitaciones pendientes
+                {t('user.emptyInvitationsTitle')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Las invitaciones para ser moderador de temas aparecerán aquí.
+                {t('user.emptyInvitationsHelp')}
               </Typography>
             </Box>
           ) : (
@@ -512,10 +516,10 @@ const TopicsUser = () => {
                     primary={
                       <Box>
                         <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
-                          {invitation.topic?.title || 'Tema'}
+                          {invitation.topic?.title || t('user.topicFallback')}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Invitado por: {invitation.invited_by?.username || 'Usuario'}
+                          {t('user.invitedBy', { user: invitation.invited_by?.username || t('moderators.userFallback') })}
                         </Typography>
                       </Box>
                     }
@@ -527,7 +531,7 @@ const TopicsUser = () => {
                           </Typography>
                         )}
                         <Typography variant="caption" color="text.secondary">
-                          {invitation.created_at ? new Date(invitation.created_at).toLocaleDateString() : ''}
+                          {invitation.created_at ? new Date(invitation.created_at).toLocaleDateString(intl) : ''}
                         </Typography>
                       </Box>
                     }
@@ -542,7 +546,7 @@ const TopicsUser = () => {
                         onClick={() => handleAcceptInvitation(invitation)}
                         disabled={processingInvitation[invitation.id] === 'accepting' || processingInvitation[invitation.id] === 'declining'}
                       >
-                        Aceptar
+                        {t('common.accept')}
                       </Button>
                       <Button
                         variant="outlined"
@@ -552,7 +556,7 @@ const TopicsUser = () => {
                         onClick={() => handleDeclineInvitation(invitation)}
                         disabled={processingInvitation[invitation.id] === 'accepting' || processingInvitation[invitation.id] === 'declining'}
                       >
-                        Rechazar
+                        {t('common.reject')}
                       </Button>
                     </Box>
                   </ListItemSecondaryAction>
@@ -567,11 +571,11 @@ const TopicsUser = () => {
       {activeTab === 3 && !suggestionsLoading && !suggestionsError && (
         <Box>
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-            Sugerencias de contenido
+            {t('user.contentSuggestionsTitle')}
           </Typography>
           {suggestions.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-              Aun no has sugerido contenidos para temas.
+              {t('user.emptyContentSuggestions')}
             </Typography>
           ) : (
             <Stack spacing={2} sx={{ mb: 4 }}>
@@ -588,10 +592,10 @@ const TopicsUser = () => {
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
                     <Box sx={{ flexGrow: 1 }}>
                       <Typography variant="h6" gutterBottom>
-                        {suggestion.content?.original_title || 'Sin título'}
+                        {suggestion.content?.original_title || t('common.untitled')}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Tema: {suggestion.topic?.title || 'Tema desconocido'}
+                        {t('suggestion.topicLine', { title: suggestion.topic?.title || t('suggestion.unknownTopic') })}
                       </Typography>
                     </Box>
                     {getStatusChip(suggestion.status)}
@@ -600,7 +604,7 @@ const TopicsUser = () => {
                   {suggestion.message && suggestion.message.trim() && (
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Tu mensaje:</strong> {suggestion.message}
+                        <strong>{t('suggestion.yourMessage')}</strong> {suggestion.message}
                       </Typography>
                     </Box>
                   )}
@@ -608,14 +612,14 @@ const TopicsUser = () => {
                   {suggestion.status === 'REJECTED' && suggestion.rejection_reason && (
                     <Alert severity="error" sx={{ mb: 2 }}>
                       <Typography variant="body2">
-                        <strong>Razón de rechazo:</strong> {suggestion.rejection_reason}
+                        <strong>{t('user.rejectionReason')}</strong> {suggestion.rejection_reason}
                       </Typography>
                     </Alert>
                   )}
 
                   {suggestion.is_duplicate && (
                     <Chip 
-                      label="Este contenido ya estaba en el tema" 
+                      label={t('common.alreadyInTopic')} 
                       size="small" 
                       color="warning" 
                       sx={{ mb: 1 }}
@@ -624,7 +628,7 @@ const TopicsUser = () => {
 
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
                     <Typography variant="caption" color="text.secondary">
-                      Sugerido el {suggestion.created_at ? new Date(suggestion.created_at).toLocaleString() : '-'}
+                      {t('common.suggestedOn')} {suggestion.created_at ? new Date(suggestion.created_at).toLocaleString(intl) : '-'}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       <Button 
@@ -632,7 +636,7 @@ const TopicsUser = () => {
                         variant="outlined"
                         onClick={() => navigate(`/content/topics/${suggestion.topic?.id}`)}
                       >
-                        Ver Tema
+                        {t('user.viewTopicCapital')}
                       </Button>
                       <Button 
                         size="small" 
@@ -642,15 +646,15 @@ const TopicsUser = () => {
                         onClick={() => handleDeleteSuggestion(suggestion)}
                         disabled={deletingSuggestion[suggestion.id]}
                       >
-                        {deletingSuggestion[suggestion.id] ? 'Eliminando...' : 'Eliminar'}
+                        {deletingSuggestion[suggestion.id] ? t('edit.deleting') : t('common.delete')}
                       </Button>
                     </Box>
                   </Box>
 
                   {suggestion.reviewed_at && (
                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                      Revisado el {new Date(suggestion.reviewed_at).toLocaleString()}
-                      {suggestion.reviewed_by && ` por ${suggestion.reviewed_by.username}`}
+                      {t('common.reviewedOn')} {new Date(suggestion.reviewed_at).toLocaleString(intl)}
+                      {suggestion.reviewed_by && t('suggestion.byUser', { user: suggestion.reviewed_by.username })}
                     </Typography>
                   )}
                 </Paper>
@@ -659,11 +663,11 @@ const TopicsUser = () => {
           )}
 
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-            Sugerencias de linea de tiempo
+            {t('user.timelineSuggestionsTitle')}
           </Typography>
           {timelineSuggestions.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              Aun no has sugerido entradas para lineas de tiempo.
+              {t('user.emptyTimelineSuggestions')}
             </Typography>
           ) : (
             <Stack spacing={2}>
@@ -675,29 +679,29 @@ const TopicsUser = () => {
                         {suggestion.title}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Tema: {suggestion.topic?.title || 'Tema desconocido'}
+                        {t('suggestion.topicLine', { title: suggestion.topic?.title || t('suggestion.unknownTopic') })}
                       </Typography>
                     </Box>
                     {getStatusChip(suggestion.status)}
                   </Box>
                   {suggestion.message && (
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      <strong>Tu mensaje:</strong> {suggestion.message}
+                      <strong>{t('suggestion.yourMessage')}</strong> {suggestion.message}
                     </Typography>
                   )}
                   {(suggestion.contents || []).length > 0 && (
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      Contenidos propuestos: {(suggestion.contents || []).length}
+                      {t('user.proposedContents', { count: (suggestion.contents || []).length })}
                     </Typography>
                   )}
                   {suggestion.status === 'REJECTED' && suggestion.rejection_reason && (
                     <Alert severity="error" sx={{ mb: 2 }}>
-                      <strong>Razon de rechazo:</strong> {suggestion.rejection_reason}
+                      <strong>{t('suggestion.rejectionPlainColon')}</strong> {suggestion.rejection_reason}
                     </Alert>
                   )}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
                     <Typography variant="caption" color="text.secondary">
-                      Sugerido el {suggestion.created_at ? new Date(suggestion.created_at).toLocaleString() : '-'}
+                      {t('common.suggestedOn')} {suggestion.created_at ? new Date(suggestion.created_at).toLocaleString(intl) : '-'}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       <Button
@@ -705,7 +709,7 @@ const TopicsUser = () => {
                         variant="outlined"
                         onClick={() => navigate(`/content/topics/${suggestion.topic?.id}?tab=timeline`)}
                       >
-                        Ver tema
+                        {t('edit.viewTopic')}
                       </Button>
                       {suggestion.status === 'PENDING' && (
                         <Button
@@ -716,7 +720,7 @@ const TopicsUser = () => {
                           onClick={() => handleDeleteTimelineSuggestion(suggestion)}
                           disabled={deletingSuggestion[`timeline-${suggestion.id}`]}
                         >
-                          Eliminar
+                          {t('common.delete')}
                         </Button>
                       )}
                     </Box>

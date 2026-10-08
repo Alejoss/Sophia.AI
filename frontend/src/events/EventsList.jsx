@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useDateLocales } from '../hooks/useDateLocales';
 import { fetchEvents } from '../api/eventsApi';
 import {
   Alert,
@@ -17,6 +19,8 @@ import {
 } from '@mui/material';
 
 const EventsList = () => {
+  const { t } = useTranslation('events');
+  const { intl } = useDateLocales();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -34,7 +38,7 @@ const EventsList = () => {
       } else if (typeof err === 'string') {
         setError(err);
       } else {
-        setError('Error al cargar eventos. Por favor, inténtelo de nuevo.');
+        setError(t('errors.loadEvents'));
       }
     } finally {
       setLoading(false);
@@ -46,9 +50,9 @@ const EventsList = () => {
   }, []);
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'TBD';
+    if (!dateString) return t('tbd');
     try {
-      return new Date(dateString).toLocaleDateString('es-ES', {
+      return new Date(dateString).toLocaleDateString(intl, {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -56,29 +60,22 @@ const EventsList = () => {
         minute: '2-digit'
       });
     } catch (error) {
-      return 'Fecha inválida';
+      return t('invalidDate');
     }
   };
 
-  const getEventTypeLabel = (eventType) => {
-    const typeMap = {
-      'LIVE_COURSE': 'Curso en Vivo',
-      'LIVE_CERTIFICATION': 'Certificación en Vivo',
-      'LIVE_MASTER_CLASS': 'Clase Magistral en Vivo'
-    };
-    return typeMap[eventType] || eventType;
-  };
+  const getEventTypeLabel = (eventType) => t(`eventTypes.${eventType}`, { defaultValue: eventType });
 
   const getPlatformLabel = (platform) => {
+    if (platform === 'other') return t('platforms.other');
     const platformMap = {
-      'google_meet': 'Google Meet',
-      'jitsi': 'Jitsi',
-      'microsoft_teams': 'Microsoft Teams',
-      'other': 'Otra',
-      'telegram': 'Telegram',
-      'tox': 'Tox',
-      'twitch': 'Twitch',
-      'zoom': 'Zoom'
+      google_meet: 'Google Meet',
+      jitsi: 'Jitsi',
+      microsoft_teams: 'Microsoft Teams',
+      telegram: 'Telegram',
+      tox: 'Tox',
+      twitch: 'Twitch',
+      zoom: 'Zoom',
     };
     return platformMap[platform] || platform;
   };
@@ -87,9 +84,9 @@ const EventsList = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={1.5} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>Eventos</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>{t('listTitle')}</Typography>
           <CircularProgress size={28} />
-          <Typography variant="body2" color="text.secondary">Cargando eventos...</Typography>
+          <Typography variant="body2" color="text.secondary">{t('loadingEvents')}</Typography>
         </Stack>
       </Container>
     );
@@ -99,10 +96,10 @@ const EventsList = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={2} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>Eventos</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>{t('listTitle')}</Typography>
           <Alert severity="error">{error}</Alert>
           <Button onClick={loadEvents} variant="contained">
-            Intentar de nuevo
+            {t('retry')}
           </Button>
         </Stack>
       </Container>
@@ -113,18 +110,18 @@ const EventsList = () => {
     <Container maxWidth="lg" sx={{ py: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, gap: 2, flexWrap: 'wrap' }}>
         <Typography variant="h4" sx={{ fontWeight: 600 }}>
-          Eventos
+          {t('listTitle')}
         </Typography>
         <Button component={Link} to="/events/create" variant="contained">
-            Crear Evento
+            {t('createEvent')}
         </Button>
       </Box>
 
       {events.length === 0 ? (
         <Stack spacing={2} alignItems="center" sx={{ py: 4 }}>
-          <Typography color="text.secondary">No se encontraron eventos.</Typography>
+          <Typography color="text.secondary">{t('empty')}</Typography>
           <Button component={Link} to="/events/create" variant="contained">
-            Crear tu Evento
+            {t('createYourEvent')}
           </Button>
         </Stack>
       ) : (
@@ -138,7 +135,7 @@ const EventsList = () => {
           {events.map((event) => (
             <Card key={event.id} variant="outlined">
               {event.image ? (
-                <CardMedia component="img" height="180" image={event.image} alt={event.title || 'Evento'} />
+                <CardMedia component="img" height="180" image={event.image} alt={event.title || t('imageAlt')} />
               ) : (
                 <Box sx={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'action.hover' }}>
                   <Typography variant="h5">📅</Typography>
@@ -146,7 +143,7 @@ const EventsList = () => {
               )}
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 1, mb: 1.5 }}>
-                  <Typography variant="h6">{event.title || 'Evento sin título'}</Typography>
+                  <Typography variant="h6">{event.title || t('untitled')}</Typography>
                   <Chip
                     size="small"
                     label={getEventTypeLabel(event.event_type)}
@@ -160,17 +157,17 @@ const EventsList = () => {
                     ? (event.description.length > 150 
                         ? `${event.description.substring(0, 150)}...` 
                         : event.description)
-                    : 'No hay descripción disponible'}
+                    : t('noDescription')}
                 </Typography>
                 
                 <Stack spacing={0.6}>
                   <Typography variant="body2">
-                    <strong>Anfitrión:</strong> {event.owner?.username || 'Desconocido'}
+                    <strong>{t('card.host')}</strong> {event.owner?.username || t('unknownHost')}
                   </Typography>
                   
                   {event.platform && (
                     <Typography variant="body2">
-                      <strong>Plataforma:</strong> {getPlatformLabel(event.platform)}
+                      <strong>{t('card.platform')}</strong> {getPlatformLabel(event.platform)}
                       {event.platform === 'other' && event.other_platform && (
                         <span> ({event.other_platform})</span>
                       )}
@@ -179,24 +176,24 @@ const EventsList = () => {
                   
                   {event.reference_price > 0 && (
                     <Typography variant="body2">
-                      <strong>Precio:</strong> ${event.reference_price}
+                      <strong>{t('card.price')}</strong> ${event.reference_price}
                     </Typography>
                   )}
                   
                   <Typography variant="body2">
-                    <strong>Inicio:</strong> {formatDate(event.date_start)}
+                    <strong>{t('card.start')}</strong> {formatDate(event.date_start)}
                   </Typography>
                   
                   {event.date_end && (
                     <Typography variant="body2">
-                      <strong>Fin:</strong> {formatDate(event.date_end)}
+                      <strong>{t('card.end')}</strong> {formatDate(event.date_end)}
                     </Typography>
                   )}
                 </Stack>
               </CardContent>
               <CardActions>
                 <Button component={Link} to={`/events/${event.id}`} variant="outlined" size="small">
-                  Ver Detalles
+                  {t('viewDetails')}
                 </Button>
               </CardActions>
             </Card>

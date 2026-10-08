@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Alert,
@@ -26,15 +27,16 @@ const clubTimelineTheme = createTheme({
 });
 
 const MEDIA_TYPES = [
-  { key: 'VIDEO', label: 'Videos' },
-  { key: 'IMAGE', label: 'Imágenes' },
-  { key: 'AUDIO', label: 'Podcasts' },
-  { key: 'TEXT', label: 'Textos' },
+  { key: 'VIDEO' },
+  { key: 'IMAGE' },
+  { key: 'AUDIO' },
+  { key: 'TEXT' },
 ];
 
 const emptyCounts = { VIDEO: 0, IMAGE: 0, AUDIO: 0, TEXT: 0 };
 
 const BookClubInvestigation = () => {
+  const { t } = useTranslation('bookClubs');
   const { hub, club, isAuthenticated, isGuest } = useBookClub();
   const topicId = hub?.quick_links?.topic_id ?? club?.topic ?? null;
 
@@ -82,7 +84,7 @@ const BookClubInvestigation = () => {
           setMetaError(
             err?.response?.data?.detail ||
               err?.response?.data?.error ||
-              'No se pudo cargar el tema de investigación.'
+              t('errors.loadTopic')
           );
         }
       } finally {
@@ -94,17 +96,17 @@ const BookClubInvestigation = () => {
     return () => {
       cancelled = true;
     };
-  }, [topicId, isAuthenticated]);
+  }, [topicId, isAuthenticated, t]);
 
   if (!topicId) {
     return (
       <Stack spacing={2}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-            Investigación
+            {t('investigation.title')}
           </Typography>
           <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>
-            Aquí verás la línea de tiempo y el material del tema vinculado a este ciclo.
+            {t('investigation.emptyBody')}
           </Typography>
         </Box>
       </Stack>
@@ -116,16 +118,16 @@ const BookClubInvestigation = () => {
       <Stack spacing={2}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-            Investigación
+            {t('investigation.title')}
           </Typography>
           <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>
-            Inicia sesión o crea tu cuenta para ver la línea de tiempo y el material del tema.
+            {t('investigation.loginBody')}
           </Typography>
         </Box>
         <Alert severity="info" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: '#fff' }}>
           {isGuest
-            ? 'Estás en modo invitado. Crea tu cuenta para explorar la investigación del club.'
-            : 'Necesitas una cuenta para ver esta sección.'}
+            ? t('investigation.guest')
+            : t('investigation.needAccount')}
         </Alert>
         <Button
           variant="contained"
@@ -135,7 +137,7 @@ const BookClubInvestigation = () => {
           )}`}
           sx={{ alignSelf: 'flex-start', bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
         >
-          Iniciar sesión
+          {t('investigation.logIn')}
         </Button>
       </Stack>
     );
@@ -153,14 +155,14 @@ const BookClubInvestigation = () => {
       >
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography variant="overline" sx={{ color: CLUB_ACCENT, fontWeight: 700 }}>
-            Investigación
+            {t('investigation.title')}
           </Typography>
           {loadingMeta ? (
             <CircularProgress size={22} sx={{ color: CLUB_ACCENT, mt: 1 }} />
           ) : (
             <>
               <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.5 }}>
-                {topic?.title || 'Tema del club'}
+                {topic?.title || t('investigation.topicFallback')}
               </Typography>
               {topic?.description && (
                 <Typography sx={{ color: 'rgba(255,255,255,0.65)', mt: 1, maxWidth: 640 }}>
@@ -183,7 +185,7 @@ const BookClubInvestigation = () => {
             '&:hover': { borderColor: CLUB_ACCENT_HOVER, bgcolor: 'rgba(255,107,53,0.08)' },
           }}
         >
-          Ver detalles ↗
+          {t('investigation.viewDetails')}
         </Button>
       </Stack>
 
@@ -218,7 +220,7 @@ const BookClubInvestigation = () => {
                 {counts[m.key]}
               </Typography>
               <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.65)', mt: 0.5 }}>
-                {m.label}
+                {t(`media.${m.key}`)}
               </Typography>
             </Box>
           ))}

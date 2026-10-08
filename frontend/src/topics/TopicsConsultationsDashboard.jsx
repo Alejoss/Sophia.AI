@@ -19,6 +19,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 
 export const consultationStatus = (topic) => {
@@ -29,21 +30,15 @@ export const consultationStatus = (topic) => {
   return 'none';
 };
 
-const STATUS_META = {
-  visible: { label: 'Visible', color: 'success' },
-  ready: { label: 'Listo para activar', color: 'info' },
-  on_no_index: { label: 'Activado (sin embeddings)', color: 'warning' },
-  none: { label: 'Sin embeddings', color: 'default' },
+const STATUS_COLORS = {
+  visible: 'success',
+  ready: 'info',
+  on_no_index: 'warning',
+  none: 'default',
 };
 
-const FILTERS = [
-  { value: 'all', label: 'Todos' },
-  { value: 'visible', label: 'Visibles' },
-  { value: 'ready', label: 'Listos' },
-  { value: 'none', label: 'Sin embeddings' },
-];
-
 const TopicsConsultationsDashboard = () => {
+  const { t } = useTranslation('topics');
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -58,11 +53,11 @@ const TopicsConsultationsDashboard = () => {
       setTopics(results);
       setError(null);
     } catch (err) {
-      setError('No se pudieron cargar los temas.');
+      setError(t('consultationsDashboard.loadError'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadTopics();
@@ -113,7 +108,7 @@ const TopicsConsultationsDashboard = () => {
       const apiError =
         err?.response?.data?.chat_enabled?.[0]
         || err?.response?.data?.error
-        || 'No se pudieron actualizar las consultas.';
+        || t('consultationsDashboard.updateError');
       setError(apiError);
     } finally {
       setSavingId(null);
@@ -139,17 +134,16 @@ const TopicsConsultationsDashboard = () => {
       >
         <Box>
           <Typography variant="h5" gutterBottom>
-            Consultas con los archivos
+            {t('consultationsDashboard.title')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Consultas de usuarios sobre un tema usando los chunks y embeddings
-            guardados en Qdrant. Actívalas cuando el tema ya tenga transcripciones indexadas.
+            {t('consultationsDashboard.intro')}
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          <Chip size="small" color="success" label={`${summary.visible} visibles`} />
-          <Chip size="small" color="info" label={`${summary.ready} listos`} />
-          <Chip size="small" label={`${summary.none} sin embeddings`} />
+          <Chip size="small" color="success" label={t('consultationsDashboard.visibleCount', { count: summary.visible })} />
+          <Chip size="small" color="info" label={t('consultationsDashboard.readyCount', { count: summary.ready })} />
+          <Chip size="small" label={t('consultationsDashboard.noEmbeddingsCount', { count: summary.none })} />
         </Stack>
       </Stack>
 
@@ -162,7 +156,12 @@ const TopicsConsultationsDashboard = () => {
         }}
         sx={{ mb: 2 }}
       >
-        {FILTERS.map((item) => (
+        {[
+          { value: 'all', label: t('consultationsDashboard.filterAll') },
+          { value: 'visible', label: t('consultationsDashboard.filterVisible') },
+          { value: 'ready', label: t('consultationsDashboard.filterReady') },
+          { value: 'none', label: t('consultationsDashboard.filterNoEmbeddings') },
+        ].map((item) => (
           <ToggleButton key={item.value} value={item.value}>
             {item.label}
           </ToggleButton>
@@ -177,24 +176,29 @@ const TopicsConsultationsDashboard = () => {
 
       {filteredTopics.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          No hay temas en este filtro.
+          {t('consultationsDashboard.emptyFilter')}
         </Typography>
       ) : (
         <Paper variant="outlined">
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Tema</TableCell>
-                <TableCell>Estado</TableCell>
-                <TableCell>Embeddings</TableCell>
-                <TableCell>Consultas</TableCell>
-                <TableCell align="right">Acciones</TableCell>
+                <TableCell>{t('consultationsDashboard.topic')}</TableCell>
+                <TableCell>{t('common.status')}</TableCell>
+                <TableCell>{t('consultationsDashboard.embeddings')}</TableCell>
+                <TableCell>{t('consultationsDashboard.columnConsultations')}</TableCell>
+                <TableCell align="right">{t('consultationsDashboard.columnActions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredTopics.map((topic) => {
                 const status = consultationStatus(topic);
-                const meta = STATUS_META[status];
+                const statusLabels = {
+                  visible: t('consultationsDashboard.visible'),
+                  ready: t('consultationsDashboard.ready'),
+                  on_no_index: t('consultationsDashboard.enabledNoEmbeddings'),
+                  none: t('consultationsDashboard.noEmbeddings'),
+                };
                 const canTurnOn = Boolean(topic.chat_can_enable) || Boolean(topic.chat_enabled);
                 return (
                   <TableRow key={topic.id} hover>
@@ -203,11 +207,11 @@ const TopicsConsultationsDashboard = () => {
                         {topic.title}
                       </Typography>
                       {!topic.is_public && (
-                        <Chip size="small" label="Privado" sx={{ mt: 0.5 }} />
+                        <Chip size="small" label={t('consultationsDashboard.private')} sx={{ mt: 0.5 }} />
                       )}
                     </TableCell>
                     <TableCell>
-                      <Chip size="small" color={meta.color} label={meta.label} />
+                      <Chip size="small" color={STATUS_COLORS[status]} label={statusLabels[status]} />
                     </TableCell>
                     <TableCell>
                       {topic.indexed_transcript_count ?? 0}
@@ -222,7 +226,7 @@ const TopicsConsultationsDashboard = () => {
                             onChange={(event) => handleToggle(topic, event.target.checked)}
                           />
                         }
-                        label={topic.chat_enabled ? 'On' : 'Off'}
+                        label={topic.chat_enabled ? t('consultationsDashboard.on') : t('consultationsDashboard.off')}
                       />
                     </TableCell>
                     <TableCell align="right">
@@ -232,14 +236,14 @@ const TopicsConsultationsDashboard = () => {
                           component={RouterLink}
                           to={`/content/topics/${topic.id}`}
                         >
-                          Ver
+                          {t('consultationsDashboard.view')}
                         </Button>
                         <Button
                           size="small"
                           component={RouterLink}
                           to={`/content/topics/${topic.id}/edit`}
                         >
-                          Editar
+                          {t('consultationsDashboard.edit')}
                         </Button>
                       </Stack>
                     </TableCell>

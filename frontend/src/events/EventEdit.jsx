@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
+import i18n from '../i18n';
 import { useForm, Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -43,34 +45,34 @@ const PLATFORM_CHOICES = [
   { value: 'tox', label: 'Tox' },
   { value: 'twitch', label: 'Twitch' },
   { value: 'zoom', label: 'Zoom' },
-  { value: 'other', label: 'Otra' },
+  { value: 'other' },
 ];
 
 const EVENT_TYPES = [
-  { value: 'LIVE_COURSE', label: 'Curso en Vivo' },
-  { value: 'LIVE_CERTIFICATION', label: 'Certificación en Vivo' },
-  { value: 'LIVE_MASTER_CLASS', label: 'Clase Magistral en Vivo' },
+  { value: 'LIVE_COURSE' },
+  { value: 'LIVE_CERTIFICATION' },
+  { value: 'LIVE_MASTER_CLASS' },
 ];
 
 const schema = yup.object({
   title: yup
     .string()
     .trim()
-    .required('El título es obligatorio'),
+    .required(() => i18n.t('events:validation.titleRequired')),
   description: yup
     .string()
     .trim()
-    .required('La descripción es obligatoria'),
+    .required(() => i18n.t('events:validation.descriptionRequired')),
   event_type: yup
     .string()
-    .required('El tipo de evento es obligatorio'),
+    .required(() => i18n.t('events:validation.typeRequired')),
   platform: yup.string().default(''),
   other_platform: yup
     .string()
     .default('')
     .when('platform', {
       is: 'other',
-      then: (field) => field.trim().required('El nombre de la otra plataforma es obligatorio'),
+      then: (field) => field.trim().required(() => i18n.t('events:validation.otherPlatformRequired')),
       otherwise: (field) => field,
     }),
   reference_price: yup.string().default(''),
@@ -80,7 +82,7 @@ const schema = yup.object({
     .default('')
     .test(
       'after-start',
-      'La fecha de fin debe ser posterior a la fecha de inicio',
+      () => i18n.t('events:validation.endAfterStart'),
       function afterStart(value) {
         const { date_start: dateStart } = this.parent;
         if (!value || !dateStart) return true;
@@ -91,6 +93,7 @@ const schema = yup.object({
 });
 
 const EventEdit = () => {
+  const { t } = useTranslation('events');
   const { eventId } = useParams();
   const navigate = useNavigate();
   const { handleAuthError, getErrorMessage } = useAuthErrorHandler({
@@ -161,7 +164,7 @@ const EventEdit = () => {
           return;
         }
         console.error('Error loading event:', err);
-        setLoadError(getErrorMessage(err, 'Error al cargar el evento. Por favor, inténtelo de nuevo.'));
+        setLoadError(getErrorMessage(err, t('errors.loadEvent')));
       } finally {
         setFetchLoading(false);
       }
@@ -175,12 +178,12 @@ const EventEdit = () => {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setImageError('Por favor, seleccione un archivo de imagen válido');
+      setImageError(t('image.invalid'));
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setImageError('El tamaño de la imagen debe ser menor a 5MB');
+      setImageError(t('image.tooLarge'));
       return;
     }
 
@@ -222,7 +225,7 @@ const EventEdit = () => {
       }
 
       const updatedEvent = await updateEvent(eventId, formData);
-      setSuccess('¡Evento actualizado exitosamente!');
+      setSuccess(t('success.updated'));
 
       setTimeout(() => {
         navigate(`/events/${updatedEvent.id}`);
@@ -239,7 +242,7 @@ const EventEdit = () => {
       const { generalError: parsed } = applyApiErrorsToForm(
         err,
         setError,
-        'Error al actualizar el evento. Por favor, inténtelo de nuevo.',
+        t('errors.update'),
       );
 
       if (!imageErrors && parsed) {
@@ -256,7 +259,7 @@ const EventEdit = () => {
       setDeleteDialogOpen(false);
       navigate('/events', { replace: true });
     } catch (err) {
-      setSubmitError(err?.detail || err?.error || 'Error al eliminar el evento. Por favor, inténtelo de nuevo.');
+      setSubmitError(err?.detail || err?.error || t('errors.delete'));
     } finally {
       setIsDeletingEvent(false);
     }
@@ -266,8 +269,8 @@ const EventEdit = () => {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Stack spacing={1.5} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>Editar Evento</Typography>
-          <Typography color="text.secondary">Cargando evento...</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>{t('editEvent')}</Typography>
+          <Typography color="text.secondary">{t('loadingEvent')}</Typography>
         </Stack>
       </Container>
     );
@@ -277,10 +280,10 @@ const EventEdit = () => {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Stack spacing={2} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>Editar Evento</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>{t('editEvent')}</Typography>
           <Alert severity="error">{loadError}</Alert>
           <Button onClick={() => navigate('/events')} variant="contained">
-            Volver a Eventos
+            {t('backToEvents')}
           </Button>
         </Stack>
       </Container>
@@ -290,7 +293,7 @@ const EventEdit = () => {
   return (
     <Container maxWidth="md" sx={{ py: 3 }}>
       <Typography variant="h4" sx={{ fontWeight: 600, mb: 2.5 }}>
-        Editar Evento
+        {t('editEvent')}
       </Typography>
 
       <Card variant="outlined">
@@ -298,20 +301,20 @@ const EventEdit = () => {
           <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
             <Stack spacing={2.5}>
               <TextField
-                label="Título *"
+                label={t('fields.title')}
                 {...register('title')}
                 error={Boolean(errors.title)}
                 helperText={errors.title?.message || ''}
-                placeholder="Ingrese el título del evento"
+                placeholder={t('fields.titlePlaceholder')}
                 fullWidth
               />
 
               <TextField
-                label="Descripción *"
+                label={t('fields.description')}
                 {...register('description')}
                 error={Boolean(errors.description)}
                 helperText={errors.description?.message || ''}
-                placeholder="Describa su evento..."
+                placeholder={t('fields.descriptionPlaceholder')}
                 multiline
                 minRows={3}
                 fullWidth
@@ -319,10 +322,10 @@ const EventEdit = () => {
 
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Imagen del Evento
+                  {t('fields.image')}
                 </Typography>
                 <Button component="label" variant="outlined" disabled={isSubmitting}>
-                  {imagePreview ? 'Cambiar Imagen' : 'Elegir Imagen'}
+                  {imagePreview ? t('fields.changeImage') : t('fields.chooseImage')}
                   <input type="file" accept="image/*" hidden onChange={handleImageChange} />
                 </Button>
                 {imagePreview && (
@@ -335,7 +338,7 @@ const EventEdit = () => {
                     />
                     <Box sx={{ mt: 1 }}>
                       <Button type="button" onClick={removeImage} color="error" size="small">
-                        Eliminar
+                        {t('delete')}
                       </Button>
                     </Box>
                   </Box>
@@ -354,11 +357,11 @@ const EventEdit = () => {
                     control={control}
                     render={({ field }) => (
                       <FormControl fullWidth error={Boolean(errors.event_type)}>
-                        <InputLabel>Tipo de Evento *</InputLabel>
-                        <Select {...field} label="Tipo de Evento *">
-                          <MenuItem value="">Seleccionar tipo</MenuItem>
+                        <InputLabel>{t('fields.eventType')}</InputLabel>
+                        <Select {...field} label={t('fields.eventType')}>
+                          <MenuItem value="">{t('platforms.selectType')}</MenuItem>
                           {EVENT_TYPES.map((et) => (
-                            <MenuItem key={et.value} value={et.value}>{et.label}</MenuItem>
+                            <MenuItem key={et.value} value={et.value}>{t(`eventTypes.${et.value}`)}</MenuItem>
                           ))}
                         </Select>
                         {errors.event_type && (
@@ -375,11 +378,13 @@ const EventEdit = () => {
                     control={control}
                     render={({ field }) => (
                       <FormControl fullWidth error={Boolean(errors.platform)}>
-                        <InputLabel>Plataforma</InputLabel>
-                        <Select {...field} label="Plataforma">
-                          <MenuItem value="">Ninguna</MenuItem>
+                        <InputLabel>{t('fields.platform')}</InputLabel>
+                        <Select {...field} label={t('fields.platform')}>
+                          <MenuItem value="">{t('platforms.none')}</MenuItem>
                           {PLATFORM_CHOICES.map((p) => (
-                            <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
+                            <MenuItem key={p.value} value={p.value}>
+                              {p.value === 'other' ? t('platforms.other') : p.label}
+                            </MenuItem>
                           ))}
                         </Select>
                         {errors.platform && (
@@ -393,17 +398,17 @@ const EventEdit = () => {
 
               {platform === 'other' && (
                 <TextField
-                  label="Otra Plataforma *"
+                  label={t('fields.otherPlatform')}
                   {...register('other_platform')}
                   error={Boolean(errors.other_platform)}
                   helperText={errors.other_platform?.message || ''}
-                  placeholder="Ingrese el nombre de la plataforma"
+                  placeholder={t('fields.otherPlatformPlaceholder')}
                   fullWidth
                 />
               )}
 
               <TextField
-                label="Precio de Referencia en USD"
+                label={t('fields.referencePrice')}
                 type="number"
                 {...register('reference_price')}
                 error={Boolean(errors.reference_price)}
@@ -419,7 +424,7 @@ const EventEdit = () => {
                     control={control}
                     render={({ field }) => (
                       <EventDateTimeField
-                        label="Fecha/Hora de Inicio"
+                        label={t('fields.start')}
                         value={field.value}
                         onChange={field.onChange}
                         error={errors.date_start?.message}
@@ -433,7 +438,7 @@ const EventEdit = () => {
                     control={control}
                     render={({ field }) => (
                       <EventDateTimeField
-                        label="Fecha/Hora de Fin"
+                        label={t('fields.end')}
                         value={field.value}
                         onChange={field.onChange}
                         error={errors.date_end?.message}
@@ -444,11 +449,11 @@ const EventEdit = () => {
               </Grid>
 
               <TextField
-                label="Descripción del Horario"
+                label={t('fields.schedule')}
                 {...register('schedule_description')}
                 error={Boolean(errors.schedule_description)}
                 helperText={errors.schedule_description?.message || ''}
-                placeholder="ej., Todos los martes durante 5 semanas"
+                placeholder={t('fields.schedulePlaceholder')}
                 multiline
                 minRows={3}
                 fullWidth
@@ -466,21 +471,21 @@ const EventEdit = () => {
                   <Stack direction="row" spacing={1} alignItems="center">
                     {isVisible ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      Público
+                      {t('public')}
                     </Typography>
                   </Stack>
                 }
               />
               <Typography variant="caption" color="text.secondary">
-                Los eventos privados no aparecen en el listado público ni en búsquedas, pero pueden compartirse con un enlace directo.
+                {t('visibilityHint')}
               </Typography>
 
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                 <Button type="button" onClick={() => navigate(`/events/${eventId}`)} variant="outlined" color="inherit">
-                  Cancelar
+                  {t('cancel')}
                 </Button>
                 <Button type="submit" disabled={isSubmitting} variant="contained">
-                  {isSubmitting ? 'Actualizando...' : 'Actualizar Evento'}
+                  {isSubmitting ? t('updating') : t('updateEvent')}
                 </Button>
               </Stack>
             </Stack>
@@ -490,29 +495,34 @@ const EventEdit = () => {
 
       <Paper variant="outlined" sx={{ mt: 2.5, p: 2.5, borderColor: 'error.light' }}>
         <Typography variant="h6" color="error" sx={{ mb: 1 }}>
-          Zona de peligro
+          {t('danger.title')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Si eliminas este evento se borrarán también todas las inscripciones y no podrás recuperarlos.
+          {t('danger.body')}
         </Typography>
         <Button type="button" color="error" variant="outlined" onClick={() => setDeleteDialogOpen(true)}>
-          Eliminar evento
+          {t('danger.deleteEvent')}
         </Button>
       </Paper>
 
       <Dialog open={deleteDialogOpen} onClose={() => !isDeletingEvent && setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Eliminar evento</DialogTitle>
+        <DialogTitle>{t('danger.dialogTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            ¿Seguro que deseas eliminar <strong>{title || 'este evento'}</strong>? Se eliminarán todas las inscripciones y esta acción no se puede deshacer.
+            <Trans
+              t={t}
+              i18nKey="danger.confirm"
+              values={{ title: title || t('danger.thisEvent') }}
+              components={{ strong: <strong /> }}
+            />
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeletingEvent}>
-            Cancelar
+            {t('cancel')}
           </Button>
           <Button onClick={handleDeleteEvent} disabled={isDeletingEvent} color="error" variant="contained">
-            {isDeletingEvent ? 'Eliminando...' : 'Eliminar'}
+            {isDeletingEvent ? t('deleting') : t('delete')}
           </Button>
         </DialogActions>
       </Dialog>

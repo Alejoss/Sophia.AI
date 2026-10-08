@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Paper, Stack, Typography } from '@mui/material';
 import { getCurrencyLabel, normalizeCryptoCode } from './eventPaymentUtils';
 
@@ -8,10 +9,11 @@ const PayableCurrencyPicker = ({
   onSelect,
   ownerAcceptedCryptos = [],
 }) => {
+  const { t } = useTranslation('events');
   if (!currencies.length) {
     return (
       <Alert severity="info">
-        La pasarela de pago no está disponible en este momento.
+        {t('currencyPicker.unavailable')}
       </Alert>
     );
   }
@@ -19,7 +21,7 @@ const PayableCurrencyPicker = ({
   return (
     <Stack spacing={1}>
       <Typography variant="body2" color="text.secondary">
-        Selecciona la criptomoneda con la que pagarás:
+        {t('currencyPicker.select')}
       </Typography>
       {currencies.map((code) => {
         const selected = selectedCurrency === code;
@@ -47,7 +49,7 @@ const PayableCurrencyPicker = ({
         );
       })}
       <Alert severity="info" variant="outlined">
-        Tras confirmar, recibirás una dirección de pago única generada por NOWPayments. Tienes 24 horas para completar la transacción.
+        {t('currencyPicker.afterConfirm')}
       </Alert>
     </Stack>
   );

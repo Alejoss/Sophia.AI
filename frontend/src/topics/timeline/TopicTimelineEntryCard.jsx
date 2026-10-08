@@ -20,12 +20,14 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import LinkIcon from '@mui/icons-material/Link';
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useDateLocales } from '../../hooks/useDateLocales';
 import TopicTimelineContentPreview from './TopicTimelineContentPreview';
 
-const formatDate = (value) => {
+const formatDate = (value, locale) => {
   if (!value) return null;
   try {
-    return new Date(`${value}T00:00:00`).toLocaleDateString('es-ES', {
+    return new Date(`${value}T00:00:00`).toLocaleDateString(locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -33,14 +35,6 @@ const formatDate = (value) => {
   } catch {
     return value;
   }
-};
-
-const getEntryDateLabel = (entry, index) => {
-  if (entry.start_date && entry.end_date) {
-    return `${formatDate(entry.start_date)} - ${formatDate(entry.end_date)}`;
-  }
-  if (entry.start_date) return formatDate(entry.start_date);
-  return `Etapa ${index + 1}`;
 };
 
 const TopicTimelineEntryCard = ({
@@ -58,14 +52,18 @@ const TopicTimelineEntryCard = ({
   isLast,
 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation('topics');
+  const { intl } = useDateLocales();
   const [expanded, setExpanded] = useState(false);
   const links = [...(entry.contents || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const dateLabel = getEntryDateLabel(entry, index);
+  const dateLabel = entry.start_date && entry.end_date
+    ? `${formatDate(entry.start_date, intl)} - ${formatDate(entry.end_date, intl)}`
+    : entry.start_date
+      ? formatDate(entry.start_date, intl)
+      : t('timeline.stage', { index: index + 1 });
   const hasCollapsibleContent = Boolean(entry.description) || links.length > 0;
   const canExpand = hasCollapsibleContent || canSuggest;
-  const relatedContentLabel = links.length === 1
-    ? '1 contenido relacionado'
-    : `${links.length} contenidos relacionados`;
+  const relatedContentLabel = t('timeline.related', { count: links.length });
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '28px 1fr', sm: '56px 1fr' }, gap: { xs: 1.5, sm: 2 } }}>
@@ -133,14 +131,14 @@ const TopicTimelineEntryCard = ({
               <Stack direction="row" spacing={0.5}>
                 {canReorder && (
                   <>
-                    <Tooltip title="Subir">
+                    <Tooltip title={t('timeline.moveUp')}>
                       <span>
                         <IconButton size="small" onClick={() => onMoveUp(entry.id)} disabled={isFirst}>
                           <KeyboardArrowUpIcon />
                         </IconButton>
                       </span>
                     </Tooltip>
-                    <Tooltip title="Bajar">
+                    <Tooltip title={t('timeline.moveDown')}>
                       <span>
                         <IconButton size="small" onClick={() => onMoveDown(entry.id)} disabled={isLast}>
                           <KeyboardArrowDownIcon />
@@ -149,12 +147,12 @@ const TopicTimelineEntryCard = ({
                     </Tooltip>
                   </>
                 )}
-                <Tooltip title="Editar">
+                <Tooltip title={t('common.edit')}>
                   <IconButton size="small" onClick={() => onEdit(entry)}>
                     <EditIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Eliminar">
+                <Tooltip title={t('common.delete')}>
                   <IconButton size="small" color="error" onClick={() => onDelete(entry)}>
                     <DeleteIcon fontSize="small" />
                   </IconButton>
@@ -175,11 +173,11 @@ const TopicTimelineEntryCard = ({
               {entry.title}
             </Typography>
             {expanded && canSuggest && (
-              <Tooltip title="Sugerir contenido para esta entrada">
+              <Tooltip title={t('timeline.suggestContentAria')}>
                 <IconButton
                   size="small"
                   onClick={() => navigate(`/content/topics/${topicId}/timeline/${entry.id}/suggest-content`)}
-                  aria-label="Sugerir contenido para esta entrada"
+                  aria-label={t('timeline.suggestContentAria')}
                   sx={{ mt: -0.25, flexShrink: 0 }}
                 >
                   <LightbulbOutlinedIcon fontSize="small" />
@@ -187,11 +185,11 @@ const TopicTimelineEntryCard = ({
               </Tooltip>
             )}
             {canExpand && (
-              <Tooltip title={expanded ? 'Ocultar detalles' : 'Ver detalles'}>
+              <Tooltip title={expanded ? t('timeline.hideDetails') : t('timeline.showDetails')}>
                 <IconButton
                   size="small"
                   onClick={() => setExpanded((prev) => !prev)}
-                  aria-label={expanded ? 'Ocultar detalles' : 'Ver detalles'}
+                  aria-label={expanded ? t('timeline.hideDetails') : t('timeline.showDetails')}
                   aria-expanded={expanded}
                   sx={{ mt: -0.25, flexShrink: 0 }}
                 >

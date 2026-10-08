@@ -16,21 +16,24 @@ import {
 } from '@mui/material';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import { useTranslation } from 'react-i18next';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import i18n from '../i18n';
 
 const schema = yup.object({
   title: yup
     .string()
     .trim()
-    .required('El título es requerido.'),
+    .required(() => i18n.t('paths:common.titleRequired')),
   description: yup
     .string()
     .trim()
-    .required('La descripción es requerida.'),
+    .required(() => i18n.t('paths:create.descriptionRequired')),
 });
 
 const KnowledgePathCreationForm = () => {
+  const { t } = useTranslation('paths');
   const navigate = useNavigate();
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -72,13 +75,13 @@ const KnowledgePathCreationForm = () => {
       const imageErrors = err?.response?.data?.image;
       if (imageErrors) {
         const imageMsg = Array.isArray(imageErrors) ? imageErrors.join(' ') : String(imageErrors);
-        setGeneralError(`Imagen: ${imageMsg}`);
+        setGeneralError(t('create.imageError', { message: imageMsg }));
       }
 
       const { generalError: parsed } = applyApiErrorsToForm(
         err,
         setError,
-        'Error al crear el camino de conocimiento',
+        t('create.error'),
       );
 
       if (!imageErrors && parsed) {
@@ -94,7 +97,7 @@ const KnowledgePathCreationForm = () => {
           <Grid item xs={12} md={7}>
             <Box sx={{ mb: 2 }}>
               <Typography variant="h4" component="h1" sx={{ mb: 1.5 }}>
-                Crear Camino de Conocimiento
+                {t('create.title')}
               </Typography>
               {generalError && (
                 <Alert severity="error" sx={{ whiteSpace: 'pre-line' }}>
@@ -107,7 +110,7 @@ const KnowledgePathCreationForm = () => {
               <form onSubmit={handleSubmit(onSubmit)} noValidate>
                 <Box sx={{ mb: 3 }}>
                   <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
-                    Imagen de Portada (Opcional)
+                    {t('create.cover')}
                   </Typography>
                   <Box
                     sx={{
@@ -175,11 +178,11 @@ const KnowledgePathCreationForm = () => {
                             borderRadius: 2,
                           }}
                         >
-                          Subir portada
+                          {t('create.uploadCover')}
                         </Button>
                       </label>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                        Recomendado: imagen 16:9 para mejor visualización.
+                        {t('create.coverHint')}
                       </Typography>
                     </Box>
                   </Box>
@@ -188,25 +191,25 @@ const KnowledgePathCreationForm = () => {
                 <TextField
                   fullWidth
                   id="title"
-                  label="Título"
+                  label={t('common.title')}
                   {...register('title')}
                   error={!!errors.title}
                   helperText={errors.title?.message}
-                  placeholder="Ingresa el título del camino de conocimiento"
+                  placeholder={t('create.titlePlaceholder')}
                   sx={{ mb: 2 }}
                 />
 
                 <TextField
                   fullWidth
                   id="description"
-                  label="Descripción"
+                  label={t('common.description')}
                   {...register('description')}
                   error={!!errors.description}
                   helperText={errors.description?.message}
                   multiline
                   minRows={8}
                   maxRows={24}
-                  placeholder="Describe tu camino de conocimiento"
+                  placeholder={t('create.descriptionPlaceholder')}
                   sx={{ mb: 3 }}
                 />
 
@@ -218,7 +221,7 @@ const KnowledgePathCreationForm = () => {
                     disabled={isSubmitting}
                     sx={{ minWidth: { xs: '100%', md: 'auto' } }}
                   >
-                    {isSubmitting ? 'Creando...' : 'Crear Camino de Conocimiento'}
+                    {isSubmitting ? t('common.creating') : t('create.submit')}
                   </Button>
                   <Button
                     type="button"
@@ -228,7 +231,7 @@ const KnowledgePathCreationForm = () => {
                     disabled={isSubmitting}
                     sx={{ minWidth: { xs: '100%', md: 'auto' } }}
                   >
-                    Cancelar
+                    {t('common.cancel')}
                   </Button>
                 </Stack>
               </form>
@@ -262,53 +265,53 @@ const KnowledgePathCreationForm = () => {
                   <LightbulbIcon fontSize="small" />
                 </Box>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  ¿Cómo crear un buen camino?
+                  {t('create.guideTitle')}
                 </Typography>
               </Box>
 
               <Typography variant="body2" color="text.secondary">
-                Crear un Camino de Conocimiento es un ejercicio de claridad: estás diseñando el recorrido ideal para que otra persona se acerque a un tema paso a paso.
+                {t('create.guideLead')}
               </Typography>
 
               <Box sx={{ mt: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                  Piensa en el recorrido:
+                  {t('create.journeyTitle')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • ¿En qué orden debería una persona acercarse a este tema?
+                  {t('create.journey1')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • ¿Hay distintos grados de complejidad para este tema?
+                  {t('create.journey2')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • ¿Cómo puede avanzar paso a paso?
+                  {t('create.journey3')}
                 </Typography>
               </Box>
 
               <Box sx={{ mt: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                  No es solo agrupar contenido:
+                  {t('create.notJustTitle')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Un buen camino no es una lista de enlaces, sino una experiencia de aprendizaje: cada nodo prepara el siguiente.
+                  {t('create.notJustBody')}
                 </Typography>
               </Box>
 
               <Box sx={{ mt: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                  Preguntas que pueden ayudarte:
+                  {t('create.questionsTitle')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • ¿Si no supieras nada sobre este tema, qué sería lo primero?
+                  {t('create.questions1')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  • ¿Qué contenidos son gemas sobre este tema, qué le hace a alguien listo para apreciarlos?
+                  {t('create.questions2')}
                 </Typography>
               </Box>
 
               <Box sx={{ mt: 2 }}>
                 <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                  Imagina que diseñas el mapa ideal para alguien que quiere aprender esto sin frustrarse ni perder tiempo.
+                  {t('create.closing')}
                 </Typography>
               </Box>
             </Paper>

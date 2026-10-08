@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
+import { useDateLocales } from '../hooks/useDateLocales';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { Link, useParams } from 'react-router-dom';
@@ -35,6 +37,8 @@ const certificateSchema = yup.object({
 });
 
 const ManageEvent = () => {
+  const { t } = useTranslation('events');
+  const { intl } = useDateLocales();
   const { eventId } = useParams();
   const { handleAuthError, getErrorMessage } = useAuthErrorHandler({
     strategy: AUTH_ERROR_STRATEGY.REDIRECT,
@@ -91,15 +95,15 @@ const ManageEvent = () => {
         return;
       }
       console.error('Error loading event data:', err);
-      setError(getErrorMessage(err, 'Error al cargar los datos del evento'));
+      setError(getErrorMessage(err, t('errors.loadManage')));
     } finally {
       setLoading(false);
     }
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'No especificado';
-      return new Date(dateString).toLocaleDateString('es-ES', {
+    if (!dateString) return t('notSpecified');
+      return new Date(dateString).toLocaleDateString(intl, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -108,22 +112,13 @@ const ManageEvent = () => {
     });
   };
 
-  const getPaymentStatusLabel = (paymentStatus) => {
-    const statusMap = {
-      'PENDING': 'Pago Pendiente',
-      'PAID': 'Pago Aceptado',
-      'REFUNDED': 'Pago Reembolsado'
-    };
-    return statusMap[paymentStatus] || paymentStatus;
-  };
+  const getPaymentStatusLabel = (paymentStatus) => (
+    t(`manage.paymentStatus.${paymentStatus}`, { defaultValue: paymentStatus })
+  );
 
-  const getRegistrationStatusLabel = (registrationStatus) => {
-    const statusMap = {
-      'REGISTERED': 'Registrado',
-      'CANCELLED': 'Cancelado'
-    };
-    return statusMap[registrationStatus] || registrationStatus;
-  };
+  const getRegistrationStatusLabel = (registrationStatus) => (
+    t(`manage.registrationStatus.${registrationStatus}`, { defaultValue: registrationStatus })
+  );
 
   const canSendCertificate = (registration) => {
     // Must be registered (not cancelled)
@@ -173,16 +168,16 @@ const ManageEvent = () => {
       if (action === 'send_certificate') {
         setSnackbar({
           open: true,
-          message: '¡Certificado generado y enviado exitosamente!',
+          message: t('manage.certificateSuccess'),
           severity: 'success'
         });
       }
     } catch (err) {
       console.error('Error updating participant status:', err);
-      setError(err.error || 'Error al actualizar el estado del participante');
+      setError(err.error || t('manage.statusError'));
       setSnackbar({
         open: true,
-        message: err.error || 'Error al actualizar el estado del participante',
+        message: err.error || t('manage.statusError'),
         severity: 'error'
       });
     } finally {
@@ -225,12 +220,12 @@ const ManageEvent = () => {
       
       setSnackbar({
         open: true,
-        message: '¡Pago aceptado exitosamente!',
+        message: t('manage.paymentSuccess'),
         severity: 'success'
       });
     } catch (err) {
       console.error('Error accepting payment:', err);
-      const errorMessage = err.error || 'Error al aceptar el pago';
+      const errorMessage = err.error || t('manage.paymentError');
       setError(errorMessage);
       setSnackbar({
         open: true,
@@ -264,7 +259,7 @@ const ManageEvent = () => {
       setSelectedRegistration(null);
       setSnackbar({
         open: true,
-        message: '¡Certificado generado y enviado exitosamente!',
+        message: t('manage.certificateSuccess'),
         severity: 'success',
       });
     } catch (err) {
@@ -272,7 +267,7 @@ const ManageEvent = () => {
       const { generalError } = applyApiErrorsToForm(
         err,
         setCertificateFormError,
-        'Error al generar el certificado',
+        t('manage.certificateError'),
         { note: 'certificateNote' },
       );
       if (generalError) {
@@ -291,9 +286,9 @@ const ManageEvent = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={1.5} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>Gestionar Evento</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>{t('manageEvent')}</Typography>
           <CircularProgress size={28} />
-          <Typography variant="body2" color="text.secondary">Cargando datos del evento...</Typography>
+          <Typography variant="body2" color="text.secondary">{t('loadingEventData')}</Typography>
         </Stack>
       </Container>
     );
@@ -303,10 +298,10 @@ const ManageEvent = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={2} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>Gestionar Evento</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>{t('manageEvent')}</Typography>
           <Alert severity="error">{error}</Alert>
           <Button component={Link} to="/events" variant="contained">
-            Volver a Eventos
+            {t('backToEvents')}
           </Button>
         </Stack>
       </Container>
@@ -317,10 +312,10 @@ const ManageEvent = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={2} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>Gestionar Evento</Typography>
-          <Alert severity="warning">Evento no encontrado.</Alert>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>{t('manageEvent')}</Typography>
+          <Alert severity="warning">{t('notFound')}</Alert>
           <Button component={Link} to="/events" variant="contained">
-            Volver a Eventos
+            {t('backToEvents')}
           </Button>
         </Stack>
       </Container>
@@ -336,14 +331,14 @@ const ManageEvent = () => {
       )}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
         <Typography variant="h4" sx={{ fontWeight: 600 }}>
-          Gestionar Evento: {event.title}
+          {t('manageTitle', { title: event.title })}
         </Typography>
         <Stack direction="row" spacing={1.2} sx={{ flexWrap: 'wrap' }}>
           <Button component={Link} to={`/events/${eventId}`} variant="outlined" color="inherit">
-            Ver Evento
+            {t('viewEvent')}
           </Button>
           <Button component={Link} to={`/events/${eventId}/edit`} variant="contained">
-            Editar Evento
+            {t('editEvent')}
           </Button>
         </Stack>
       </Box>
@@ -352,15 +347,15 @@ const ManageEvent = () => {
       <Card variant="outlined" sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 1.5 }}>
-            Resumen del Evento
+            {t('manage.summary')}
           </Typography>
           <Box sx={{ display: 'grid', gap: 1.2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' } }}>
-            <Typography variant="body2"><strong>Tipo de Evento:</strong> {event.event_type}</Typography>
-            <Typography variant="body2"><strong>Fecha de Inicio:</strong> {formatDate(event.date_start)}</Typography>
-            <Typography variant="body2"><strong>Fecha de Fin:</strong> {formatDate(event.date_end)}</Typography>
-            <Typography variant="body2"><strong>Plataforma:</strong> {event.platform || 'No especificado'}</Typography>
-            <Typography variant="body2"><strong>Precio:</strong> {event.reference_price > 0 ? `$${event.reference_price}` : 'Gratis'}</Typography>
-            <Typography variant="body2"><strong>Participantes:</strong> {participants.length}</Typography>
+            <Typography variant="body2"><strong>{t('manage.type')}</strong> {t(`eventTypes.${event.event_type}`, { defaultValue: event.event_type })}</Typography>
+            <Typography variant="body2"><strong>{t('card.startDate')}</strong> {formatDate(event.date_start)}</Typography>
+            <Typography variant="body2"><strong>{t('card.endDate')}</strong> {formatDate(event.date_end)}</Typography>
+            <Typography variant="body2"><strong>{t('card.platform')}</strong> {event.platform || t('notSpecified')}</Typography>
+            <Typography variant="body2"><strong>{t('manage.price')}</strong> {event.reference_price > 0 ? `$${event.reference_price}` : t('free')}</Typography>
+            <Typography variant="body2"><strong>{t('manage.participants')}</strong> {participants.length}</Typography>
           </Box>
         </CardContent>
       </Card>
@@ -368,7 +363,7 @@ const ManageEvent = () => {
       {/* Tab Navigation */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
         <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value)}>
-          <Tab value="participants" label={`Participantes (${participants.length})`} />
+          <Tab value="participants" label={t('manage.participantsTab', { count: participants.length })} />
         </Tabs>
       </Box>
 
@@ -377,7 +372,7 @@ const ManageEvent = () => {
         {activeTab === 'participants' && (
           <Box>
             {participants.length === 0 ? (
-              <Alert severity="info">Aún no hay participantes registrados.</Alert>
+              <Alert severity="info">{t('manage.none')}</Alert>
             ) : (
               <Stack spacing={1.5}>
                 {participants.map((registration) => (
@@ -391,7 +386,7 @@ const ManageEvent = () => {
                           {registration.user_email}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Registrado: {formatDate(registration.registered_at)}
+                          {t('manage.registeredAt', { date: formatDate(registration.registered_at) })}
                         </Typography>
                       </Box>
                       <Stack direction="row" spacing={0.8} sx={{ alignSelf: 'flex-start' }}>
@@ -405,7 +400,7 @@ const ManageEvent = () => {
                           size="small"
                           onClick={() => handleMessageUser(registration.user.id)}
                         >
-                          Enviar Mensaje
+                          {t('manage.sendMessage')}
                         </Button>
                         
                         {/* Only show actions for registered participants */}
@@ -422,7 +417,7 @@ const ManageEvent = () => {
                                 onClick={() => openPaymentConfirmationDialog(registration)}
                                 disabled={updatingStatus === registration.id}
                               >
-                                {updatingStatus === registration.id ? 'Actualizando...' : 'Aceptar Pago'}
+                                {updatingStatus === registration.id ? t('manage.updating') : t('manage.acceptPayment')}
                               </Button>
                             )}
                             
@@ -435,8 +430,8 @@ const ManageEvent = () => {
                                 onClick={() => hasCertificate(registration) ? null : openCertificateDialog(registration)}
                                 disabled={updatingStatus === registration.id || hasCertificate(registration)}
                               >
-                                {updatingStatus === registration.id ? 'Enviando...' : 
-                                 hasCertificate(registration) ? 'Certificado Enviado' : 'Enviar Certificado'}
+                                {updatingStatus === registration.id ? t('manage.sending') :
+                                 hasCertificate(registration) ? t('manage.certificateSent') : t('manage.sendCertificate')}
                               </Button>
                             )}
                             
@@ -449,7 +444,7 @@ const ManageEvent = () => {
                                 onClick={() => handleStatusUpdate(registration.id, 'cancel_registration')}
                                 disabled={updatingStatus === registration.id}
                               >
-                                {updatingStatus === registration.id ? 'Cancelando...' : 'Cancelar Registro'}
+                                {updatingStatus === registration.id ? t('manage.cancelling') : t('manage.cancelRegistration')}
                               </Button>
                             )}
                           </>
@@ -475,7 +470,7 @@ const ManageEvent = () => {
           onSubmit={handleCertificateSubmit(onCertificateSubmit)}
           noValidate
         >
-          <DialogTitle>Enviar Certificado</DialogTitle>
+          <DialogTitle>{t('manage.sendCertificate')}</DialogTitle>
           <DialogContent>
             <Box sx={{ mt: 2 }}>
               {certificateGeneralError && (
@@ -484,14 +479,14 @@ const ManageEvent = () => {
                 </Alert>
               )}
               <Alert severity="info" sx={{ mb: 2 }}>
-                <strong>Nota:</strong> Cualquier mensaje que agregue a continuación será visible para el estudiante en su certificado.
+                <strong>{t('manage.noteLabel')}</strong> {t('manage.noteBody')}
               </Alert>
               <TextField
                 fullWidth
                 multiline
                 rows={4}
-                label="Mensaje Personal (opcional)"
-                placeholder="Agregue un mensaje personal para felicitar al estudiante o agregar notas especiales..."
+                label={t('manage.personalMessage')}
+                placeholder={t('manage.personalPlaceholder')}
                 variant="outlined"
                 error={!!certificateErrors.certificateNote}
                 helperText={certificateErrors.certificateNote?.message}
@@ -502,7 +497,7 @@ const ManageEvent = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseCertificateDialog} disabled={isCertificateSubmitting}>
-              Cancelar
+              {t('cancel')}
             </Button>
             <Button
               type="submit"
@@ -510,7 +505,7 @@ const ManageEvent = () => {
               color="primary"
               disabled={isCertificateSubmitting}
             >
-              {isCertificateSubmitting ? 'Enviando...' : 'Enviar Certificado'}
+              {isCertificateSubmitting ? t('manage.sending') : t('manage.sendCertificate')}
             </Button>
           </DialogActions>
         </Box>
@@ -523,33 +518,33 @@ const ManageEvent = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Confirmar Aceptación de Pago</DialogTitle>
+        <DialogTitle>{t('manage.paymentTitle')}</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
             <Alert severity="warning" sx={{ mb: 2 }}>
-              <strong>Importante:</strong> Esta acción marcará el pago como aceptado y no se puede deshacer.
+              <strong>{t('manage.important')}</strong> {t('manage.paymentWarning')}
             </Alert>
             {selectedPaymentRegistration && (
               <Box sx={{ mb: 2 }}>
-                <Typography variant="body2"><strong>Usuario:</strong> {selectedPaymentRegistration.user.username}</Typography>
-                <Typography variant="body2"><strong>Correo:</strong> {selectedPaymentRegistration.user_email}</Typography>
-                <Typography variant="body2"><strong>Evento:</strong> {event.title}</Typography>
-                <Typography variant="body2"><strong>Cantidad:</strong> ${event.reference_price}</Typography>
+                <Typography variant="body2"><strong>{t('manage.user')}</strong> {selectedPaymentRegistration.user.username}</Typography>
+                <Typography variant="body2"><strong>{t('manage.email')}</strong> {selectedPaymentRegistration.user_email}</Typography>
+                <Typography variant="body2"><strong>{t('manage.event')}</strong> {event.title}</Typography>
+                <Typography variant="body2"><strong>{t('manage.amount')}</strong> ${event.reference_price}</Typography>
               </Box>
             )}
-            <Typography variant="body2">¿Estás seguro de que quieres aceptar este pago?</Typography>
+            <Typography variant="body2">{t('manage.confirmPayment')}</Typography>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPaymentConfirmationDialog(false)}>
-            Cancelar
+            {t('cancel')}
           </Button>
           <Button 
             onClick={handleConfirmPayment}
             variant="contained"
             color="success"
           >
-            Aceptar Pago
+            {t('manage.acceptPayment')}
           </Button>
         </DialogActions>
       </Dialog>

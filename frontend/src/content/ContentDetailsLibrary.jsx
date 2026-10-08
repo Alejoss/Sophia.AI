@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Card, Typography, Box, Button, Alert } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { AuthContext } from '../context/AuthContext';
 import ContentReferences from './ContentReferences';
@@ -15,6 +16,7 @@ import ContentDetailSkeleton from '../components/ContentDetailSkeleton';
 
 // ContentDisplay Mode: "detailed" - Full content detail view in library context
 const ContentDetailsLibrary = () => {
+    const { t } = useTranslation('content');
     const [content, setContent] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -84,7 +86,7 @@ const ContentDetailsLibrary = () => {
 
     if (loading) return <ContentDetailSkeleton />;
     if (error) return <div>Error: {error}</div>;
-    if (!content) return <div>No se encontró contenido</div>;
+    if (!content) return <div>{t('detailsLibrary.notFound')}</div>;
 
     const profile = content.selected_profile;
     const isOwner = profile?.user && currentUser && parseInt(profile.user) === parseInt(currentUser.id);
@@ -129,7 +131,7 @@ const ContentDetailsLibrary = () => {
             await contentApi.acceptFileSuggestion(suggestionId);
             await Promise.all([refreshFileSuggestions(), refreshContentData()]);
         } catch (err) {
-            setSuggestionError(err?.response?.data?.error || 'No se pudo aceptar la sugerencia.');
+            setSuggestionError(err?.response?.data?.error || t('detailsLibrary.acceptError'));
         }
     };
 
@@ -138,7 +140,7 @@ const ContentDetailsLibrary = () => {
             await contentApi.rejectFileSuggestion(suggestionId, '');
             await refreshFileSuggestions();
         } catch (err) {
-            setSuggestionError(err?.response?.data?.error || 'No se pudo rechazar la sugerencia.');
+            setSuggestionError(err?.response?.data?.error || t('detailsLibrary.rejectError'));
         }
     };
 
@@ -154,14 +156,14 @@ const ContentDetailsLibrary = () => {
                             startIcon={<ArrowBackIcon />}
                             onClick={() => navigate('/content/library_user')}
                         >
-                            Ir a tu biblioteca
+                            {t('detailsLibrary.goToLibrary')}
                         </Button>
                         <Button
                             variant="outlined"
                             startIcon={<EditIcon />}
                             onClick={() => navigate(`/content/${contentId}/edit`)}
                         >
-                            Editar perfil de contenido
+                            {t('detailsLibrary.editProfile')}
                         </Button>
                     </>
                 ) : (
@@ -206,7 +208,7 @@ const ContentDetailsLibrary = () => {
                     color="text.secondary"
                     sx={{ display: "block", mt: 1 }}
                 >
-                    Luego podrás editar la imagen miniatura
+                    {t('detailsLibrary.editThumbnailLater')}
                 </Typography>
 
                 <ContentTranscriptLink contentId={contentId} context="library" />
@@ -222,7 +224,7 @@ const ContentDetailsLibrary = () => {
                 {isOriginalUploader && !hasFileAvailable && pendingSuggestions.length > 0 && (
                     <Box sx={{ mt: 3 }}>
                         <Typography variant="h6" gutterBottom>
-                            Sugerencias de archivo pendientes
+                            {t('detailsLibrary.pendingSuggestions')}
                         </Typography>
                         {pendingSuggestions.map((suggestion) => (
                             <Box
@@ -236,7 +238,9 @@ const ContentDetailsLibrary = () => {
                                 }}
                             >
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                    Sugerido por: {suggestion?.suggested_by?.username || 'Usuario'}
+                                    {t('detailsLibrary.suggestedBy', {
+                                        name: suggestion?.suggested_by?.username || t('common.userFallback'),
+                                    })}
                                 </Typography>
                                 {suggestion?.message && (
                                     <Typography variant="body2" sx={{ mb: 1 }}>
@@ -250,7 +254,7 @@ const ContentDetailsLibrary = () => {
                                             variant="outlined"
                                             onClick={() => window.open(suggestion.file, '_blank')}
                                         >
-                                            Ver archivo sugerido
+                                            {t('detailsLibrary.viewSuggestedFile')}
                                         </Button>
                                     )}
                                     <Button
@@ -258,7 +262,7 @@ const ContentDetailsLibrary = () => {
                                         variant="contained"
                                         onClick={() => handleAcceptSuggestion(suggestion.id)}
                                     >
-                                        Aceptar
+                                        {t('actions.accept')}
                                     </Button>
                                     <Button
                                         size="small"
@@ -266,7 +270,7 @@ const ContentDetailsLibrary = () => {
                                         color="error"
                                         onClick={() => handleRejectSuggestion(suggestion.id)}
                                     >
-                                        Rechazar
+                                        {t('actions.reject')}
                                     </Button>
                                 </Box>
                             </Box>
@@ -280,7 +284,7 @@ const ContentDetailsLibrary = () => {
                 onClose={() => setSuggestDialogOpen(false)}
                 contentId={contentId}
                 onSuccess={async () => {
-                    setSuggestionSuccess('Sugerencia enviada correctamente.');
+                    setSuggestionSuccess(t('fileSuggestion.sent'));
                     setSuggestionError('');
                     await refreshFileSuggestions();
                 }}

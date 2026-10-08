@@ -75,7 +75,7 @@ describe('EventDetail', () => {
 
     expect(screen.getByText('Cargando evento...')).toBeInTheDocument();
 
-    expect(await screen.findByText('Evento de prueba')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 4, name: 'Evento de prueba' })).toBeInTheDocument();
     expect(screen.queryByText('Cargando evento...')).not.toBeInTheDocument();
 
     await waitFor(() => {
@@ -89,14 +89,14 @@ describe('EventDetail', () => {
 
     renderEventDetail();
 
-    expect(await screen.findByText('Evento de prueba')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 4, name: 'Evento de prueba' })).toBeInTheDocument();
     expect(fetchEventById).not.toHaveBeenCalled();
   });
 
   it('issues only one request under StrictMode double mount', async () => {
     renderEventDetail({ strict: true });
 
-    expect(await screen.findByText('Evento de prueba')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 4, name: 'Evento de prueba' })).toBeInTheDocument();
 
     await waitFor(() => {
       expect(fetchEventById).toHaveBeenCalledTimes(1);
@@ -107,7 +107,7 @@ describe('EventDetail', () => {
     const authState = { isAuthenticated: true, user: { id: 5, username: 'owner' } };
     const { rerender } = renderEventDetail({ authState, strict: false });
 
-    expect(await screen.findByText('Evento de prueba')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 4, name: 'Evento de prueba' })).toBeInTheDocument();
     expect(fetchEventById).toHaveBeenCalledTimes(1);
 
     rerender(
@@ -146,7 +146,7 @@ describe('EventDetail', () => {
       strict: false,
     });
 
-    expect(await screen.findByText('Evento de prueba')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 4, name: 'Evento de prueba' })).toBeInTheDocument();
     expect(getUserEventRegistrations).not.toHaveBeenCalled();
   });
 });

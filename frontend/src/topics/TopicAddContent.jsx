@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
+import { useTranslation } from 'react-i18next';
 import LibrarySelectMultiple from '../content/LibrarySelectMultiple';
 import UploadContentForm from '../content/UploadContentForm';
 import contentApi from '../api/contentApi';
@@ -18,6 +19,7 @@ import contentApi from '../api/contentApi';
 const TopicAddContent = () => {
     const { topicId } = useParams();
     const navigate = useNavigate();
+    const { t } = useTranslation('topics');
     const [topicData, setTopicData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -35,13 +37,13 @@ const TopicAddContent = () => {
                 const data = await contentApi.getTopicDetailsSimple(topicId);
                 setTopicData(data);
             } catch (err) {
-                setError('Error al cargar el tema');
+                setError(t('addContent.loadTopicError'));
             } finally {
                 setLoading(false);
             }
         };
         fetchTopic();
-    }, [topicId]);
+    }, [topicId, t]);
 
     const goToTopicView = () => {
         navigate(`/content/topics/${topicId}`);
@@ -55,11 +57,11 @@ const TopicAddContent = () => {
         try {
             setSaving(true);
             await contentApi.addContentToTopic(topicId, selectedIds);
-            setSuccessMessage('Contenido agregado al tema correctamente.');
+            setSuccessMessage(t('addContent.success'));
             setAddSourceMode(null);
         } catch (err) {
             console.error('TopicAddContent - Failed to add content to topic:', err);
-            setError('Error al agregar contenido al tema');
+            setError(t('addContent.addError'));
             throw err;
         } finally {
             setSaving(false);
@@ -72,11 +74,11 @@ const TopicAddContent = () => {
         try {
             setSaving(true);
             await contentApi.addContentToTopic(topicId, [profileId]);
-            setSuccessMessage('Contenido agregado al tema correctamente.');
+            setSuccessMessage(t('addContent.success'));
             setAddSourceMode(null);
         } catch (err) {
             console.error('Failed to add uploaded content to topic:', err);
-            setError('Error al agregar el contenido al tema');
+            setError(t('addContent.addTheError'));
         } finally {
             setSaving(false);
         }
@@ -94,14 +96,14 @@ const TopicAddContent = () => {
     };
 
     if (loading) {
-        return <Typography>Cargando...</Typography>;
+        return <Typography>{t('common.loading')}</Typography>;
     }
     if (error) {
         return (
             <Box sx={{ p: 3 }}>
                 <Typography color="error">{error}</Typography>
                 <Button onClick={goToTopicView} sx={{ textTransform: 'none', mt: 2 }}>
-                    Volver al tema
+                    {t('edit.backToTopic')}
                 </Button>
             </Box>
         );
@@ -118,12 +120,12 @@ const TopicAddContent = () => {
                         sx={{ textTransform: 'none' }}
                         disabled={saving}
                     >
-                        Volver
+                        {t('common.back')}
                     </Button>
                 </Box>
                 <LibrarySelectMultiple
-                    title={topicTitle ? `Agregar contenido al tema — ${topicTitle}` : 'Agregar contenido al tema'}
-                    description="Selecciona contenido de tu biblioteca para agregar a este tema"
+                    title={topicTitle ? t('addContent.libraryTitle', { title: topicTitle }) : t('addContent.pageTitle')}
+                    description={t('addContent.libraryDescription')}
                     onCancel={handleBackToSourceChoice}
                     onSave={handleSave}
                     onSelectionChange={handleSelectionChange}
@@ -146,17 +148,17 @@ const TopicAddContent = () => {
                         sx={{ textTransform: 'none' }}
                         disabled={saving}
                     >
-                        Volver
+                        {t('common.back')}
                     </Button>
                 </Box>
                 <Paper sx={{ p: 3 }}>
                     <Typography variant="h6" gutterBottom sx={{ mb: 1 }}>
-                        Agregar contenido al tema{topicTitle ? ` — ${topicTitle}` : ''}
+                        {topicTitle ? t('addContent.libraryTitle', { title: topicTitle }) : t('addContent.pageTitle')}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         {uploadMode === 'url'
-                            ? 'Agregar contenido desde URL'
-                            : 'Subir archivo'}
+                            ? t('addContent.fromUrlHelp')
+                            : t('suggestion.uploadFile')}
                     </Typography>
                     <UploadContentForm
                         onContentUploaded={handleContentUploaded}
@@ -182,7 +184,7 @@ const TopicAddContent = () => {
                         fontSize: '1.25rem',
                     }}
                 >
-                    Agregar contenido al tema
+                    {t('addContent.pageTitle')}
                 </Typography>
                 {topicTitle && (
                     <Typography variant="subtitle1" sx={{ mb: 2 }}>
@@ -201,7 +203,7 @@ const TopicAddContent = () => {
                     </Typography>
                 )}
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    Elige de la biblioteca, desde una URL o sube un archivo.
+                    {t('addContent.choiceHelp')}
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <Button
@@ -211,7 +213,7 @@ const TopicAddContent = () => {
                         onClick={() => setAddSourceMode('library')}
                         sx={{ textTransform: 'none', py: 2 }}
                     >
-                        Elegir de la biblioteca
+                        {t('suggestion.chooseLibrary')}
                     </Button>
                     <Button
                         variant="outlined"
@@ -219,7 +221,7 @@ const TopicAddContent = () => {
                         onClick={() => { setUploadMode('url'); setAddSourceMode('upload'); }}
                         sx={{ textTransform: 'none', py: 2 }}
                     >
-                        Desde URL
+                        {t('suggestion.fromUrl')}
                     </Button>
                     <Button
                         variant="outlined"
@@ -227,7 +229,7 @@ const TopicAddContent = () => {
                         onClick={() => { setUploadMode('file'); setAddSourceMode('upload'); }}
                         sx={{ textTransform: 'none', py: 2 }}
                     >
-                        Subir archivo
+                        {t('suggestion.uploadFile')}
                     </Button>
                 </Box>
                 <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -236,7 +238,7 @@ const TopicAddContent = () => {
                         onClick={goToTopicView}
                         sx={{ width: '100%', textTransform: 'none' }}
                     >
-                        Volver al tema
+                        {t('edit.backToTopic')}
                     </Button>
                     <Button
                         component={Link}
@@ -246,7 +248,7 @@ const TopicAddContent = () => {
                         startIcon={<EditIcon />}
                         sx={{ textTransform: 'none', alignSelf: 'center' }}
                     >
-                        Editar contenido del tema
+                        {t('addContent.editTopicContent')}
                     </Button>
                 </Box>
             </Paper>

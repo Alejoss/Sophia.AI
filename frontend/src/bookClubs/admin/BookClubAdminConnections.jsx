@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link as RouterLink, useOutletContext, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -18,13 +19,14 @@ import knowledgePathsApi from '../../api/knowledgePathsApi';
 import { extractApiError } from '../clubTheme';
 
 const MEDIA_TYPES = [
-  { key: 'VIDEO', label: 'Videos' },
-  { key: 'IMAGE', label: 'Imágenes' },
-  { key: 'AUDIO', label: 'Podcasts' },
-  { key: 'TEXT', label: 'Textos' },
+  { key: 'VIDEO' },
+  { key: 'IMAGE' },
+  { key: 'AUDIO' },
+  { key: 'TEXT' },
 ];
 
 const BookClubAdminConnections = () => {
+  const { t } = useTranslation('bookClubs');
   const { slug } = useParams();
   const { club, reload } = useOutletContext();
   const [paths, setPaths] = useState([]);
@@ -112,8 +114,8 @@ const BookClubAdminConnections = () => {
       await bookClubsApi.updateClub(slug, payload);
       setSuccess(
         topic
-          ? 'Conexiones guardadas. La pestaña Investigación del hub usará este tema.'
-          : 'Conexiones guardadas. Investigación quedará vacía hasta vincular un tema.'
+          ? t('connections.savedWithTopic')
+          : t('connections.savedWithoutTopic')
       );
       await reload();
     } catch (err) {
@@ -123,18 +125,15 @@ const BookClubAdminConnections = () => {
     }
   };
 
-  const selectedTopicInList = topics.some((t) => String(t.id) === String(topic));
+  const selectedTopicInList = topics.some((item) => String(item.id) === String(topic));
 
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        Conexiones
+        {t('connections.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 720 }}>
-        El <strong>knowledge path</strong> alimenta las misiones del hub. El <strong>tema</strong>{' '}
-        alimenta la pestaña <strong>Investigación</strong> (línea de tiempo + conteos de videos,
-        imágenes, podcasts y textos). Si al crear el club no elegiste path, se generó uno vacío
-        automáticamente.
+        <Trans t={t} i18nKey="connections.intro" components={{ strong: <strong /> }} />
       </Typography>
 
       {error && (
@@ -151,20 +150,20 @@ const BookClubAdminConnections = () => {
       <Stack spacing={3} maxWidth={720}>
         <Box>
           <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
-            Misiones
+            {t('connections.missions')}
           </Typography>
           <FormControl fullWidth>
-            <InputLabel id="path-label">Knowledge path</InputLabel>
+            <InputLabel id="path-label">{t('connections.pathLabel')}</InputLabel>
             <Select
               labelId="path-label"
-              label="Knowledge path"
+              label={t('connections.pathLabel')}
               value={knowledgePath}
               onChange={(e) => setKnowledgePath(e.target.value)}
             >
               <MenuItem value="">
                 {club?.knowledge_path_title
-                  ? `Actual: ${club.knowledge_path_title}`
-                  : 'Sin cambiar'}
+                  ? t('connections.currentPath', { title: club.knowledge_path_title })
+                  : t('connections.noChange')}
               </MenuItem>
               {paths.map((path) => (
                 <MenuItem key={path.id} value={String(path.id)}>
@@ -174,7 +173,7 @@ const BookClubAdminConnections = () => {
               {club?.knowledge_path &&
                 !paths.some((p) => String(p.id) === String(club.knowledge_path)) && (
                   <MenuItem value={String(club.knowledge_path)}>
-                    {club.knowledge_path_title || `Path #${club.knowledge_path}`}
+                    {club.knowledge_path_title || t('connections.pathFallback', { id: club.knowledge_path })}
                   </MenuItem>
                 )}
             </Select>
@@ -186,37 +185,37 @@ const BookClubAdminConnections = () => {
               variant="outlined"
               sx={{ mt: 1.5 }}
             >
-              Editar misiones del path
+              {t('connections.editPathMissions')}
             </Button>
           )}
         </Box>
 
         <Box>
           <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 0.5 }}>
-            Investigación
+            {t('connections.investigation')}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            Elige el tema cuya línea de tiempo y biblioteca se muestran dentro del hub, sin sacar al
-            lector del club. Para curar entradas de timeline o subir contenido, usa las herramientas
-            del tema.
+            {t('connections.topicHelp')}
           </Typography>
           <FormControl fullWidth>
-            <InputLabel id="topic-label">Tema de investigación</InputLabel>
+            <InputLabel id="topic-label">{t('connections.topicLabel')}</InputLabel>
             <Select
               labelId="topic-label"
-              label="Tema de investigación"
+              label={t('connections.topicLabel')}
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
             >
-              <MenuItem value="">Sin tema (Investigación vacía)</MenuItem>
-              {topics.map((t) => (
-                <MenuItem key={t.id} value={String(t.id)}>
-                  {t.title} (#{t.id})
+              <MenuItem value="">{t('connections.noTopic')}</MenuItem>
+              {topics.map((item) => (
+                <MenuItem key={item.id} value={String(item.id)}>
+                  {item.title} (#{item.id})
                 </MenuItem>
               ))}
               {topic && !selectedTopicInList && (
                 <MenuItem value={String(topic)}>
-                  {topicPreview?.title || `Tema #${topic}`} (actual)
+                  {t('connections.topicCurrent', {
+                    title: topicPreview?.title || t('connections.topicFallback', { id: topic }),
+                  })}
                 </MenuItem>
               )}
             </Select>
@@ -236,7 +235,7 @@ const BookClubAdminConnections = () => {
               {previewLoading ? (
                 <Stack direction="row" spacing={1} alignItems="center">
                   <CircularProgress size={18} />
-                  <Typography variant="body2">Cargando vista previa…</Typography>
+                  <Typography variant="body2">{t('connections.loadingPreview')}</Typography>
                 </Stack>
               ) : topicPreview ? (
                 <>
@@ -251,11 +250,11 @@ const BookClubAdminConnections = () => {
                   <Stack direction="row" spacing={2} sx={{ mt: 1.5 }} flexWrap="wrap" useFlexGap>
                     {MEDIA_TYPES.map((m) => (
                       <Typography key={m.key} variant="body2">
-                        <strong>{topicPreview.counts?.[m.key] ?? 0}</strong> {m.label}
+                        <strong>{topicPreview.counts?.[m.key] ?? 0}</strong> {t(`media.${m.key}`)}
                       </Typography>
                     ))}
                     <Typography variant="body2">
-                      <strong>{timelineEntries ?? 0}</strong> entradas en timeline
+                      <strong>{timelineEntries ?? 0}</strong> {t('connections.timelineEntries')}
                     </Typography>
                   </Stack>
                   <Stack direction="row" spacing={1} sx={{ mt: 2 }} flexWrap="wrap" useFlexGap>
@@ -265,7 +264,7 @@ const BookClubAdminConnections = () => {
                       component={RouterLink}
                       to={`/club-de-lectura/${slug}/investigacion`}
                     >
-                      Ver en el hub
+                      {t('connections.viewInHub')}
                     </Button>
                     <Button
                       size="small"
@@ -275,7 +274,7 @@ const BookClubAdminConnections = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Abrir tema ↗
+                      {t('connections.openTopic')}
                     </Button>
                     <Button
                       size="small"
@@ -285,7 +284,7 @@ const BookClubAdminConnections = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Editar timeline ↗
+                      {t('connections.editTimeline')}
                     </Button>
                     <Button
                       size="small"
@@ -295,13 +294,13 @@ const BookClubAdminConnections = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Gestionar contenido ↗
+                      {t('connections.manageContent')}
                     </Button>
                   </Stack>
                 </>
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  No se pudo cargar la vista previa del tema #{topic}.
+                  {t('connections.previewError', { id: topic })}
                 </Typography>
               )}
             </Box>
@@ -313,7 +312,7 @@ const BookClubAdminConnections = () => {
             variant="text"
             sx={{ mt: 1, px: 0 }}
           >
-            Ir al listado de temas / crear uno nuevo
+            {t('connections.topicList')}
           </Button>
         </Box>
 
@@ -323,7 +322,7 @@ const BookClubAdminConnections = () => {
           disabled={saving}
           sx={{ alignSelf: 'flex-start' }}
         >
-          {saving ? 'Guardando…' : 'Guardar conexiones'}
+          {saving ? t('connections.saving') : t('connections.save')}
         </Button>
       </Stack>
     </Box>

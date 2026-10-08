@@ -14,6 +14,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import PermMediaIcon from '@mui/icons-material/PermMedia';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../../api/contentApi';
 import { useAuth } from '../../context/AuthContext';
 import { parseApiValidationErrors } from '../../utils/apiFormErrors';
@@ -30,6 +31,7 @@ const TopicTimelineEntryPage = () => {
   const { topicId, entryId } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { t } = useTranslation('topics');
   const { user, isAuthenticated } = useAuth();
   const isEdit = Boolean(entryId);
   const fromEdit = searchParams.get('from') === 'edit';
@@ -96,7 +98,7 @@ const TopicTimelineEntryPage = () => {
       setCanEdit(allowed);
 
       if (!allowed) {
-        setLoadError('No tienes permiso para editar la linea de tiempo de este tema.');
+        setLoadError(t('timeline.noPermission'));
         return;
       }
 
@@ -105,7 +107,7 @@ const TopicTimelineEntryPage = () => {
           (item) => String(item.id) === String(entryId),
         );
         if (!found) {
-          setLoadError('No se encontro la entrada de la linea de tiempo.');
+          setLoadError(t('timeline.entryNotFound'));
           return;
         }
         setEntry(found);
@@ -115,13 +117,13 @@ const TopicTimelineEntryPage = () => {
     } catch (err) {
       const { generalError } = parseApiValidationErrors(
         err,
-        'No se pudo cargar la linea de tiempo.',
+        t('timeline.loadTimelineError'),
       );
       setLoadError(generalError);
     } finally {
       setLoading(false);
     }
-  }, [entryId, isAuthenticated, isEdit, topicId, user?.id]);
+  }, [entryId, isAuthenticated, isEdit, topicId, user?.id, t]);
 
   useEffect(() => {
     loadPageData();
@@ -168,7 +170,7 @@ const TopicTimelineEntryPage = () => {
   const linkContentsToEntry = async ({ contents, newProfiles }) => {
     const targetEntryId = entry?.id || entryId;
     if (!targetEntryId) {
-      throw new Error('No se encontro la entrada.');
+      throw new Error(t('timeline.entryMissing'));
     }
 
     const profileIds = (newProfiles || [])
@@ -204,34 +206,34 @@ const TopicTimelineEntryPage = () => {
     return (
       <Stack alignItems="center" spacing={1.5} sx={{ py: 8 }}>
         <CircularProgress size={28} />
-        <Typography color="text.secondary">Cargando formulario...</Typography>
+        <Typography color="text.secondary">{t('timeline.loadingForm')}</Typography>
       </Stack>
     );
   }
 
   const pageTitle = (() => {
-    if (!isEdit) return 'Nueva entrada de la linea de tiempo';
-    if (justCreated && isContentTab) return 'Vincular contenidos a la entrada';
-    return 'Editar entrada de la linea de tiempo';
+    if (!isEdit) return t('timeline.newEntryPage');
+    if (justCreated && isContentTab) return t('timeline.linkContentsPage');
+    return t('timeline.editEntryPage');
   })();
 
   const breadcrumbLabel = (() => {
-    if (!isEdit) return 'Nueva entrada';
-    if (justCreated && isContentTab) return 'Vincular contenidos';
-    return 'Editar entrada';
+    if (!isEdit) return t('timeline.newEntry');
+    if (justCreated && isContentTab) return t('timeline.linkContents');
+    return t('timeline.editEntry');
   })();
 
   return (
     <Box sx={{ maxWidth: 960, mx: 'auto', py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 } }}>
       <Breadcrumbs sx={{ mb: 2 }}>
         <MuiLink component={RouterLink} to="/content/topics" underline="hover" color="inherit">
-          Temas
+          {t('list.title')}
         </MuiLink>
         <MuiLink component={RouterLink} to={`/content/topics/${topicId}`} underline="hover" color="inherit">
-          {topicTitle || 'Tema'}
+          {topicTitle || t('user.topicFallback')}
         </MuiLink>
         <MuiLink component={RouterLink} to={timelineUrl} underline="hover" color="inherit">
-          Linea de tiempo
+          {t('timeline.title')}
         </MuiLink>
         <Typography color="text.primary">
           {breadcrumbLabel}
@@ -247,7 +249,7 @@ const TopicTimelineEntryPage = () => {
           color="text.secondary"
           variant="body2"
         >
-          Volver a la linea de tiempo
+          {t('timeline.backToTimeline')}
         </MuiLink>
       </Stack>
 
@@ -255,7 +257,7 @@ const TopicTimelineEntryPage = () => {
         {pageTitle}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: isEdit ? 2 : 3 }}>
-        {topicTitle ? `Tema: ${topicTitle}` : ''}
+        {topicTitle ? t('timeline.topicLine', { title: topicTitle }) : ''}
         {entry?.title ? ` · ${entry.title}` : ''}
       </Typography>
 
@@ -275,14 +277,14 @@ const TopicTimelineEntryPage = () => {
         >
           <Tab
             value={EDIT_TABS.details}
-            label="Detalles"
+            label={t('timeline.details')}
             icon={<EventNoteIcon />}
             iconPosition="start"
             sx={{ textTransform: 'none', minHeight: 48 }}
           />
           <Tab
             value={EDIT_TABS.content}
-            label={linkedContentCount > 0 ? `Contenidos (${linkedContentCount})` : 'Contenidos'}
+            label={linkedContentCount > 0 ? t('timeline.contentsCount', { count: linkedContentCount }) : t('timeline.contents')}
             icon={<PermMediaIcon />}
             iconPosition="start"
             sx={{ textTransform: 'none', minHeight: 48 }}
@@ -292,7 +294,7 @@ const TopicTimelineEntryPage = () => {
 
       {canEdit && !loadError && justCreated && isContentTab && (
         <Alert severity="success" sx={{ mb: 2 }}>
-          Entrada creada. Ahora puedes vincular contenidos que evidencien ese evento de la línea de tiempo o que aporten un comentario relevante.
+          {t('timeline.createdLinkHelp')}
         </Alert>
       )}
 
@@ -302,7 +304,7 @@ const TopicTimelineEntryPage = () => {
           saving={saving}
           onCancel={handleCancel}
           onSubmit={handleEntrySubmit}
-          submitLabel="Crear entrada"
+          submitLabel={t('timeline.createEntry')}
         />
       )}
 
@@ -312,7 +314,7 @@ const TopicTimelineEntryPage = () => {
           saving={saving}
           onCancel={handleCancel}
           onSubmit={handleEntrySubmit}
-          submitLabel="Guardar"
+          submitLabel={t('common.save')}
         />
       )}
 

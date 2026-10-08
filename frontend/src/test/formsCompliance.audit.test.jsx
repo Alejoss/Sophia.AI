@@ -147,8 +147,12 @@ describe('forms compliance audit', () => {
       path.join(SRC_ROOT, 'components', 'SocialLogin.jsx'),
       'utf8',
     );
+    const spanishMisc = fs.readFileSync(
+      path.join(SRC_ROOT, 'locales', 'es', 'misc.json'),
+      'utf8',
+    );
     expect(socialLogin).not.toMatch(/Failed to login with Google/);
     expect(socialLogin).not.toMatch(/Failed to initialize Google login/);
-    expect(socialLogin).toMatch(/No se pudo iniciar sesión con Google/);
+    expect(spanishMisc).toMatch(/No se pudo iniciar sesión con Google/);
   });
 });

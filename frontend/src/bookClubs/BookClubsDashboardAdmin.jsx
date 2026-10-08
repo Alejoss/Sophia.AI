@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Alert,
@@ -10,7 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 import bookClubsApi from '../api/bookClubsApi';
-import { extractApiError, STATUS_LABELS } from './clubTheme';
+import { extractApiError } from './clubTheme';
 
 const STATUS_COLORS = {
   draft: 'default',
@@ -19,6 +20,7 @@ const STATUS_COLORS = {
 };
 
 const BookClubsDashboardAdmin = () => {
+  const { t } = useTranslation('bookClubs');
   const [clubs, setClubs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,11 +32,11 @@ const BookClubsDashboardAdmin = () => {
       setClubs(Array.isArray(data) ? data : []);
       setError(null);
     } catch (err) {
-      setError(extractApiError(err, 'No se pudieron cargar los clubs.'));
+      setError(extractApiError(err, t('errors.loadClubs')));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadClubs();
@@ -59,15 +61,14 @@ const BookClubsDashboardAdmin = () => {
       >
         <Box>
           <Typography variant="h5" gutterBottom>
-            Clubs de lectura
+            {t('adminList.title')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Crea y gestiona book clubs. La edición se hace en subpáginas: general, conexiones,
-            reuniones y preguntas.
+            {t('adminList.intro')}
           </Typography>
         </Box>
         <Button variant="contained" component={RouterLink} to="/dashboard/book-clubs/nuevo">
-          Nuevo club
+          {t('adminList.new')}
         </Button>
       </Stack>
 
@@ -78,7 +79,7 @@ const BookClubsDashboardAdmin = () => {
       )}
 
       {clubs.length === 0 ? (
-        <Typography color="text.secondary">Todavía no hay clubs de lectura.</Typography>
+        <Typography color="text.secondary">{t('adminList.empty')}</Typography>
       ) : (
         <Stack spacing={1.5}>
           {clubs.map((club) => (
@@ -102,16 +103,16 @@ const BookClubsDashboardAdmin = () => {
                   </Typography>
                   <Chip
                     size="small"
-                    label={STATUS_LABELS[club.status] || club.status}
+                    label={t(`status.${club.status}`, { defaultValue: club.status })}
                     color={STATUS_COLORS[club.status] || 'default'}
                   />
                 </Stack>
                 <Typography variant="body2" color="text.secondary">
                   /{club.slug}
                   {club.knowledge_path_title
-                    ? ` · Path: ${club.knowledge_path_title}`
-                    : ' · Sin path'}
-                  {` · ${club.member_count ?? 0} miembros`}
+                    ? t('adminList.withPath', { title: club.knowledge_path_title })
+                    : t('adminList.noPath')}
+                  {t('adminList.members', { count: club.member_count ?? 0 })}
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1} flexShrink={0}>
@@ -121,10 +122,10 @@ const BookClubsDashboardAdmin = () => {
                   component={RouterLink}
                   to={`/dashboard/book-clubs/${club.slug}/general`}
                 >
-                  Editar
+                  {t('adminList.edit')}
                 </Button>
                 <Button size="small" component={RouterLink} to={`/club-de-lectura/${club.slug}`}>
-                  Ver club
+                  {t('adminList.view')}
                 </Button>
               </Stack>
             </Box>

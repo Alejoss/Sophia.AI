@@ -55,7 +55,7 @@ describe('UnlimitedConsultationsAdmin', () => {
       screen.getByText(/ningún usuario tiene consultas ilimitadas/i),
     ).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText(/user id/i), '5');
+    await user.type(screen.getByLabelText(/id de usuario/i), '5');
     await user.type(screen.getByLabelText(/nota/i), 'qa');
     await user.click(screen.getByRole('button', { name: /agregar/i }));
 
@@ -89,7 +89,7 @@ describe('UnlimitedConsultationsAdmin', () => {
     renderWithProviders(<UnlimitedConsultationsAdmin />, { auth: staffAuth });
     expect(await screen.findByText('alice')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /quitar ilimitado a user 7/i }));
+    await user.click(screen.getByRole('button', { name: /quitar el acceso ilimitado al usuario 7/i }));
 
     await waitFor(() => {
       expect(mockRemoveUnlimited).toHaveBeenCalledWith(7);

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import { 
   Box, 
   Typography,
@@ -15,6 +16,7 @@ import {
 import { AuthContext } from '../context/AuthContext';
 
 const LoginSuccessful = () => {
+  const { t } = useTranslation('profiles');
   const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
   const theme = useTheme();
@@ -41,16 +43,16 @@ const LoginSuccessful = () => {
   const sections = [
     {
       id: 'knowledge-paths',
-      title: 'Caminos del Conocimiento',
-      subtitle: 'Explora rutas de aprendizaje estructuradas',
+      title: t('loginSuccess.pathsTitle'),
+      subtitle: t('loginSuccess.pathsSubtitle'),
       path: '/knowledge_path',
       icon: <SchoolIcon sx={{ fontSize: 60 }} />,
       imageUrl: '/images/knowledge_path_art.jpg'
     },
     {
       id: 'topics',
-      title: 'Temas',
-      subtitle: 'Descubre contenido por temas de interés',
+      title: t('loginSuccess.topicsTitle'),
+      subtitle: t('loginSuccess.topicsSubtitle'),
       path: '/content/topics',
       icon: <TopicIcon sx={{ fontSize: 60 }} />,
       imageUrl: '/images/topic_art.jpg'
@@ -69,7 +71,7 @@ const LoginSuccessful = () => {
       }}>
         <Box sx={{ textAlign: 'center' }}>
           <Typography variant="h6" color="text.secondary">
-            Cargando...
+            {t('loginSuccess.loading')}
           </Typography>
         </Box>
       </Box>
@@ -117,40 +119,23 @@ const LoginSuccessful = () => {
                 overflowWrap: 'anywhere'
               }}
             >
-              {isReturningUser 
-                ? (
-                  <>
-                    ¡Qué bueno verte de nuevo,{' '}
-                    <Link 
-                      to="/profiles/my_profile" 
-                      style={{ 
-                        color: 'inherit', 
+              <Trans
+                t={t}
+                i18nKey={isReturningUser ? 'loginSuccess.welcomeBack' : 'loginSuccess.hello'}
+                values={{ username: user.username }}
+                components={{
+                  profile: (
+                    <Link
+                      to="/profiles/my_profile"
+                      style={{
+                        color: 'inherit',
                         textDecoration: 'underline',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
                       }}
-                    >
-                      {user.username}
-                    </Link>
-                    !
-                  </>
-                )
-                : (
-                  <>
-                    ¡Hola,{' '}
-                    <Link 
-                      to="/profiles/my_profile" 
-                      style={{ 
-                        color: 'inherit', 
-                        textDecoration: 'underline',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {user.username}
-                    </Link>
-                    !
-                  </>
-                )
-              }
+                    />
+                  ),
+                }}
+              />
             </Typography>
           </Box>
         </Fade>

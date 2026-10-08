@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchIcon from "@mui/icons-material/Search";
+import { useTranslation } from "react-i18next";
 import contentApi from "../api/contentApi";
 import VoteComponent from "../votes/VoteComponent";
 import ContentDisplay from "./ContentDisplay";
@@ -19,6 +20,7 @@ import ContentReferences from "./ContentReferences";
 
 // ContentDisplay Mode: "detailed" - Full content detail view from search results
 const ContentDetailsSearch = () => {
+  const { t } = useTranslation("content");
   const { contentId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -50,14 +52,14 @@ const ContentDetailsSearch = () => {
         }
       } catch (err) {
         console.error("Error fetching content details:", err);
-        setError("Error al cargar el contenido");
+        setError(t("detailsSearch.loadError"));
       } finally {
         setLoading(false);
       }
     };
 
     fetchContent();
-  }, [contentId, location.search]);
+  }, [contentId, location.search, t]);
 
   if (loading)
     return (
@@ -76,7 +78,7 @@ const ContentDetailsSearch = () => {
   if (!content)
     return (
       <Container sx={{ pt: 12 }}>
-        <Typography>Contenido no encontrado</Typography>
+        <Typography>{t("detailsSearch.notFound")}</Typography>
       </Container>
     );
 
@@ -109,14 +111,14 @@ const ContentDetailsSearch = () => {
           startIcon={<SearchIcon />}
           onClick={handleBackToSearch}
         >
-          Hacer otra búsqueda
+          {t("detailsSearch.searchAgain")}
         </Button>
       </Box>
 
       {searchQuery && (
         <Paper sx={{ p: 2, mb: 3, bgcolor: "info.light" }}>
           <Typography variant="body1">
-            Estás viendo este contenido como resultado de buscar:{" "}
+            {t("detailsSearch.viewingResult")}{" "}
             <strong>"{searchQuery}"</strong>
           </Typography>
         </Paper>
@@ -156,7 +158,7 @@ const ContentDetailsSearch = () => {
               fontSize: "20px"
             }}
           >
-            Referencias
+            {t("detailsSearch.references")}
           </Typography>
           <ContentReferences references={references} />
         </Paper>

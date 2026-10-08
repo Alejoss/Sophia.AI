@@ -1,3 +1,5 @@
+import i18n from '../i18n';
+
 export const MONERO_CONTACT_USER_ID = 2;
 
 export const MONERO_PAYMENT_DESCRIPTION =
@@ -5,8 +7,8 @@ export const MONERO_PAYMENT_DESCRIPTION =
 
 export const buildMoneroPaymentMessage = ({
   title,
-  productLabel = 'producto',
+  productLabel,
 } = {}) => {
-  const product = title || productLabel;
-  return `Hola, quiero pagar con Monero «${product}», larga vida al criptoanarquismo!`;
+  const product = title || productLabel || i18n.t('payments:genericProduct');
+  return i18n.t('payments:monero.message', { product });
 };

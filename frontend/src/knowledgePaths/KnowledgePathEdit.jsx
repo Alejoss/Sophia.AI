@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   AlertTitle,
@@ -53,12 +54,6 @@ import ImageUploadModal from "../components/ImageUploadModal";
 import { useAuth } from "../context/AuthContext";
 import { downloadSnapshotForHashVerification } from "./snapshotDownload";
 
-const TRANSCRIPT_ISSUE_LABELS = {
-  NO_CONTENT: "Sin contenido vinculado",
-  NO_TRANSCRIPT_TEXT: "Sin transcript",
-  EMPTY_TRANSCRIPT: "Transcript vacío",
-};
-
 const buildSnapshotNodeRows = (preview) => {
   if (!preview) return [];
 
@@ -77,14 +72,11 @@ const buildSnapshotNodeRows = (preview) => {
       return {
         key: item.nodeId || `digest-${index}`,
         position: item.position ?? index + 1,
-        title: item.nodeTitle || "Sin título",
+        title: item.nodeTitle || "",
         mediaType: item.mediaType || "",
         contentId: item.contentId || "",
         ready,
         issueCode,
-        statusLabel: ready
-          ? "Transcript listo"
-          : TRANSCRIPT_ISSUE_LABELS[issueCode] || "Texto no listo",
       };
     });
   }
@@ -97,19 +89,17 @@ const buildSnapshotNodeRows = (preview) => {
     return {
       key: node.nodeId || `node-${index}`,
       position: node.position ?? index + 1,
-      title: node.title || "Sin título",
+      title: node.title || "",
       mediaType: node.mediaType || "",
       contentId: material.contentId || "",
       ready,
       issueCode,
-      statusLabel: ready
-        ? "Transcript listo"
-        : TRANSCRIPT_ISSUE_LABELS[issueCode] || "Texto no listo",
     };
   });
 };
 
 const KnowledgePathEdit = () => {
+  const { t } = useTranslation("paths");
   const { pathId } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -120,8 +110,8 @@ const KnowledgePathEdit = () => {
     ? "/dashboard/snapshots"
     : `/knowledge_path/${pathId}`;
   const backLabel = fromDashboard
-    ? "Volver al panel de snapshots"
-    : "Volver";
+    ? t("edit.backToSnapshots")
+    : t("edit.back");
 
   const [knowledgePath, setKnowledgePath] = useState(null);
   const [nodes, setNodes] = useState([]);
@@ -193,11 +183,11 @@ const KnowledgePathEdit = () => {
     const chips = [];
     chips.push(
       isVisible
-        ? { label: "Público", color: "success", icon: <VisibilityIcon fontSize="small" /> }
-        : { label: "Privado", color: "error", icon: <VisibilityOffIcon fontSize="small" /> }
+        ? { label: t("common.public"), color: "success", icon: <VisibilityIcon fontSize="small" />, private: false }
+        : { label: t("common.private"), color: "error", icon: <VisibilityOffIcon fontSize="small" />, private: true }
     );
     return chips;
-  }, [isVisible, canBePublic]);
+  }, [isVisible, canBePublic, t]);
 
   const headerDescription = description || knowledgePath?.description || "";
   // Support stored `<br>` tags while staying safe (no HTML execution):
@@ -252,10 +242,10 @@ const KnowledgePathEdit = () => {
             : {};
           setQuizzesByNodeId(map);
         } catch (quizErr) {
-          setQuizWarning("No pudimos cargar la información de cuestionarios. Puedes seguir editando nodos.");
+          setQuizWarning(t("edit.quizWarning"));
         }
       } catch (err) {
-        setLoadError(err.response?.data?.error || err.message || "Error al cargar el camino de conocimiento");
+        setLoadError(err.response?.data?.error || err.message || t("common.loadPathError"));
       } finally {
         setLoading(false);
       }
@@ -287,7 +277,7 @@ const KnowledgePathEdit = () => {
       setSnapshotPreview(data);
     } catch (err) {
       setSnapshotError(
-        err.response?.data?.error || err.message || "No se pudo cargar el snapshot"
+        err.response?.data?.error || err.message || t("edit.snapshotLoadError")
       );
       setSnapshotPreview(null);
     } finally {
@@ -297,7 +287,7 @@ const KnowledgePathEdit = () => {
 
   const handleDownloadPreviewCanonical = () => {
     if (!snapshotPreview?.canonical) {
-      setSnapshotError("No hay bytes canónicos JCS en la vista previa.");
+      setSnapshotError(t("edit.noPreviewBytes"));
       return;
     }
     try {
@@ -309,13 +299,13 @@ const KnowledgePathEdit = () => {
         label: "preview",
       });
     } catch (err) {
-      setSnapshotError(err?.message || "No se pudo descargar la vista previa");
+      setSnapshotError(err?.message || t("edit.previewDownloadError"));
     }
   };
 
   const handleDownloadPublishedSnapshot = () => {
     if (!publishedSnapshot?.canonical) {
-      setSnapshotError("No hay snapshot publicado para descargar.");
+      setSnapshotError(t("edit.noPublishedSnapshot"));
       return;
     }
     try {
@@ -327,7 +317,7 @@ const KnowledgePathEdit = () => {
         version: publishedSnapshot.version,
       });
     } catch (err) {
-      setSnapshotError(err?.message || "No se pudo descargar el snapshot");
+      setSnapshotError(err?.message || t("edit.snapshotDownloadError"));
     }
   };
 
@@ -341,13 +331,16 @@ const KnowledgePathEdit = () => {
       setPublishedSnapshot(created);
       setSnapshotPublishSuccess(
         created.created
-          ? `Snapshot v${created.version} guardado. Digest: ${String(created.digest || "").slice(0, 16)}…`
-          : `Sin cambios. Se mantiene el snapshot v${created.version}.`,
+          ? t("edit.snapshotSaved", {
+              version: created.version,
+              digest: String(created.digest || "").slice(0, 16),
+            })
+          : t("edit.snapshotUnchanged", { version: created.version }),
       );
       await loadSnapshotPreview();
     } catch (err) {
       setSnapshotError(
-        err.response?.data?.error || err.message || "No se pudo tomar el snapshot",
+        err.response?.data?.error || err.message || t("edit.snapshotError"),
       );
     } finally {
       setSnapshotPublishing(false);
@@ -404,7 +397,7 @@ const KnowledgePathEdit = () => {
     } catch (err) {
       setSaveState({
         status: "error",
-        message: err.response?.data?.error || err.message || "Error al actualizar la imagen",
+        message: err.response?.data?.error || err.message || t("edit.imageError"),
         updatedAt: null,
       });
     }
@@ -421,7 +414,7 @@ const KnowledgePathEdit = () => {
     } catch (err) {
       setSaveState({
         status: "error",
-        message: err.response?.data?.error || err.message || "Error al actualizar el foco de la imagen",
+        message: err.response?.data?.error || err.message || t("edit.focalError"),
         updatedAt: null,
       });
     }
@@ -478,11 +471,11 @@ const KnowledgePathEdit = () => {
         imageUrl: updated?.image ?? lastSavedRef.current.imageUrl,
       };
 
-      setSaveState({ status: "saved", message: "Guardado", updatedAt: Date.now() });
+      setSaveState({ status: "saved", message: t("common.saved"), updatedAt: Date.now() });
     } catch (err) {
       setSaveState({
         status: "error",
-        message: err.response?.data?.error || err.message || "No se pudo guardar",
+        message: err.response?.data?.error || err.message || t("edit.saveError"),
         updatedAt: null,
       });
     }
@@ -493,7 +486,7 @@ const KnowledgePathEdit = () => {
     if (Number.isNaN(price) || price < 0) {
       setPriceSaveState({
         status: "error",
-        message: "El precio debe ser un número mayor o igual a 0.",
+        message: t("edit.priceInvalid"),
       });
       return;
     }
@@ -513,11 +506,11 @@ const KnowledgePathEdit = () => {
         ...lastSavedRef.current,
         referencePrice: savedPrice,
       };
-      setPriceSaveState({ status: "saved", message: "Precio guardado" });
+      setPriceSaveState({ status: "saved", message: t("edit.priceSaved") });
     } catch (err) {
       setPriceSaveState({
         status: "error",
-        message: err.response?.data?.error || err.message || "No se pudo guardar el precio",
+        message: err.response?.data?.error || err.message || t("edit.priceError"),
       });
     }
   };
@@ -563,9 +556,9 @@ const KnowledgePathEdit = () => {
       const nodeOrders = newNodes.map((node, index) => ({ id: node.id, order: index + 1 }));
       const updatedNodes = await knowledgePathsApi.reorderNodes(pathId, nodeOrders);
       setNodes(Array.isArray(updatedNodes) ? updatedNodes : newNodes);
-      setReorderState({ status: "saved", message: "Orden actualizado" });
+      setReorderState({ status: "saved", message: t("edit.orderUpdated") });
     } catch (err) {
-      setReorderState({ status: "error", message: "Error al reordenar los nodos" });
+      setReorderState({ status: "error", message: t("edit.reorderError") });
       // Re-sync with server state
       await refreshPath();
     }
@@ -584,7 +577,7 @@ const KnowledgePathEdit = () => {
       closeDeleteNode();
       await refreshPath();
     } catch (err) {
-      setReorderState({ status: "error", message: err.response?.data?.error || "Error al eliminar el nodo" });
+      setReorderState({ status: "error", message: err.response?.data?.error || t("edit.deleteNodeError") });
     } finally {
       setIsDeletingNode(false);
     }
@@ -605,7 +598,7 @@ const KnowledgePathEdit = () => {
     } catch (err) {
       setReorderState({
         status: "error",
-        message: err.response?.data?.error || "Error al eliminar el camino de conocimiento",
+        message: err.response?.data?.error || t("edit.deletePathError"),
       });
     } finally {
       setIsDeletingPath(false);
@@ -626,12 +619,12 @@ const KnowledgePathEdit = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Alert severity="error" sx={{ borderRadius: 2 }}>
-          <AlertTitle>Error</AlertTitle>
+          <AlertTitle>{t("edit.errorTitle")}</AlertTitle>
           {loadError}
         </Alert>
         <Box sx={{ mt: 2 }}>
           <Button component={Link} to={`/knowledge_path/${pathId}`} variant="outlined">
-            Volver al Camino de Conocimiento
+            {t("edit.backToPath")}
           </Button>
         </Box>
       </Container>
@@ -642,12 +635,12 @@ const KnowledgePathEdit = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Alert severity="info" sx={{ borderRadius: 2 }}>
-          <AlertTitle>No encontrado</AlertTitle>
-          Camino de conocimiento no encontrado
+          <AlertTitle>{t("edit.notFoundTitle")}</AlertTitle>
+          {t("edit.notFound")}
         </Alert>
         <Box sx={{ mt: 2 }}>
           <Button component={Link} to="/knowledge_path" variant="outlined">
-            Volver a la lista
+            {t("edit.backToList")}
           </Button>
         </Box>
       </Container>
@@ -683,7 +676,7 @@ const KnowledgePathEdit = () => {
           <Box
             component="img"
             src={`${imagePreviewUrl || knowledgePath?.image || ""}${imageCacheBuster ? `?t=${imageCacheBuster}` : ""}`}
-            alt={title || knowledgePath?.title || "Knowledge path"}
+            alt={title || knowledgePath?.title || t("edit.entityLabel")}
             sx={{
               width: "100%",
               height: { xs: 180, md: 240 },
@@ -714,7 +707,7 @@ const KnowledgePathEdit = () => {
         <Box sx={{ p: { xs: 2, md: 3 } }}>
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }} noWrap>
-              {title || knowledgePath?.title || "Camino de conocimiento"}
+              {title || knowledgePath?.title || t("edit.fallbackTitle")}
             </Typography>
             {!!headerDescriptionForDisplay.trim() && (
               <Typography
@@ -737,9 +730,9 @@ const KnowledgePathEdit = () => {
                   label={c.label}
                   color={c.color}
                   size="small"
-                  variant={c.label === "Privado" ? "outlined" : (c.color === "default" ? "outlined" : "filled")}
+                  variant={c.private ? "outlined" : (c.color === "default" ? "outlined" : "filled")}
                   sx={
-                    c.label === "Privado"
+                    c.private
                       ? {
                           color: "error.main",
                           borderColor: "error.main",
@@ -750,7 +743,7 @@ const KnowledgePathEdit = () => {
                 />
               ))}
               <Typography variant="caption" color="text.secondary">
-                {knowledgePath?.author ? `Autor: ${knowledgePath.author}` : ""}
+                {knowledgePath?.author ? t("common.author", { name: knowledgePath.author }) : ""}
               </Typography>
             </Stack>
           </Box>
@@ -761,32 +754,32 @@ const KnowledgePathEdit = () => {
         <Box sx={{ px: { xs: 2, md: 3 }, pb: { xs: 2, md: 3 } }}>
           <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }}>
             <Box sx={{ flex: 1 }}>
-              <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} aria-label="knowledge path edit tabs">
-                <Tab icon={<SettingsIcon />} iconPosition="start" label="Detalles" />
-                <Tab icon={<SchoolIcon />} iconPosition="start" label={`Currículum (${nodes.length})`} />
-                <Tab icon={<DataObjectIcon />} iconPosition="start" label="Snapshot" />
+              <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} aria-label={t("edit.tabsAria")}>
+                <Tab icon={<SettingsIcon />} iconPosition="start" label={t("edit.details")} />
+                <Tab icon={<SchoolIcon />} iconPosition="start" label={t("edit.curriculumTab", { count: nodes.length })} />
+                <Tab icon={<DataObjectIcon />} iconPosition="start" label={t("edit.snapshotTab")} />
               </Tabs>
             </Box>
 
             {/* Autosave indicator */}
             <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: "flex-start", md: "flex-end" }}>
               {saveState.status === "saving" && (
-                <Chip size="small" color="info" label="Guardando…" />
+                <Chip size="small" color="info" label={t("common.saving")} />
               )}
               {saveState.status === "saved" && (
-                <Chip size="small" color="success" label="Guardado" />
+                <Chip size="small" color="success" label={t("common.saved")} />
               )}
               {saveState.status === "error" && (
-                <Chip size="small" color="error" label="Error al guardar" />
+                <Chip size="small" color="error" label={t("edit.saveFailed")} />
               )}
               {saveState.status === "error" && (
                 <Button size="small" variant="text" onClick={runAutosave} sx={{ textTransform: "none" }}>
-                  Reintentar
+                  {t("edit.retry")}
                 </Button>
               )}
               {isDirty && saveState.status !== "saving" && (
                 <Typography variant="caption" color="text.secondary">
-                  Cambios sin guardar
+                  {t("edit.unsaved")}
                 </Typography>
               )}
             </Stack>
@@ -800,12 +793,12 @@ const KnowledgePathEdit = () => {
           {/* Publish readiness */}
           {!canBePublic && (
             <Alert severity="warning" icon={<WarningAmberIcon />} sx={{ borderRadius: 2 }}>
-              <AlertTitle sx={{ fontWeight: 700 }}>Aún no puedes publicarlo</AlertTitle>
+              <AlertTitle sx={{ fontWeight: 700 }}>{t("edit.cannotPublish")}</AlertTitle>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                Para que sea público necesitas <strong>al menos 1 nodo</strong>.
+                {t("edit.publishBefore")}<strong>{t("edit.publishHighlight")}</strong>{t("edit.publishAfter")}
               </Typography>
               <Button size="small" variant="outlined" onClick={() => setActiveTab(1)} sx={{ textTransform: "none", borderRadius: 2 }}>
-                Ir a Currículum
+                {t("edit.goToCurriculum")}
               </Button>
             </Alert>
           )}
@@ -829,7 +822,7 @@ const KnowledgePathEdit = () => {
                       <Box
                         component="img"
                         src={`${imagePreviewUrl || knowledgePath?.image || ""}${imageCacheBuster ? `?t=${imageCacheBuster}` : ""}`}
-                        alt={title || "Portada"}
+                        alt={title || t("edit.coverAlt")}
                         sx={{
                           width: "100%",
                           height: "100%",
@@ -861,17 +854,17 @@ const KnowledgePathEdit = () => {
                       onClick={() => setIsImageModalOpen(true)}
                       sx={{ textTransform: "none", borderRadius: 2, mb: 1 }}
                     >
-                      Cambiar portada
+                      {t("edit.changeCover")}
                     </Button>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                      Recomendado: imagen 16:9 o más ancha.
+                      {t("edit.coverHint")}
                     </Typography>
                   </Box>
                 </Stack>
 
                 {/* Visibility */}
                 <Tooltip
-                  title={!canBePublic && !isVisible ? "Necesitas al menos 1 nodo para hacerlo público." : ""}
+                  title={!canBePublic && !isVisible ? t("edit.needsNode") : ""}
                   disableHoverListener={canBePublic || isVisible}
                 >
                   <span>
@@ -890,7 +883,7 @@ const KnowledgePathEdit = () => {
                         <Stack direction="row" spacing={1} alignItems="center">
                           {isVisible ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            Público
+                            {t("common.public")}
                           </Typography>
                         </Stack>
                       }
@@ -911,12 +904,11 @@ const KnowledgePathEdit = () => {
                     <Stack direction="row" spacing={1} alignItems="center">
                       <SchoolIcon fontSize="small" color={certificatesEnabled ? "success" : "disabled"} />
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        Permitir solicitar certificado
+                        {t("edit.allowCertificate")}
                       </Typography>
                     </Stack>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
-                      Actívalo cuando el camino esté completo. En cursos o clubes en vivo, déjalo apagado hasta
-                      publicar todos los nodos.
+                      {t("edit.certificateHelp")}
                     </Typography>
                   </Box>
                 }
@@ -926,7 +918,7 @@ const KnowledgePathEdit = () => {
               <Box sx={{ mt: 1 }}>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "flex-start" }}>
                   <TextField
-                    label="Precio (USD)"
+                    label={t("edit.priceLabel")}
                     type="number"
                     value={referencePrice}
                     onChange={(e) => {
@@ -937,7 +929,7 @@ const KnowledgePathEdit = () => {
                     }}
                     inputProps={{ min: 0, step: "0.01" }}
                     fullWidth
-                    helperText="0 = gratuito. Si es mayor a 0, los alumnos pagan con cripto (NOWPayments) para desbloquear los nodos. Este valor no se guarda automáticamente."
+                    helperText={t("edit.priceHelp")}
                   />
                   <Button
                     variant="contained"
@@ -945,7 +937,7 @@ const KnowledgePathEdit = () => {
                     disabled={!isPriceDirty || priceSaveState.status === "saving"}
                     sx={{ flexShrink: 0, mt: { sm: 0.5 }, minWidth: 140 }}
                   >
-                    {priceSaveState.status === "saving" ? "Guardando…" : "Guardar precio"}
+                    {priceSaveState.status === "saving" ? t("common.saving") : t("edit.savePrice")}
                   </Button>
                 </Stack>
                 {priceSaveState.status === "saved" && (
@@ -961,22 +953,22 @@ const KnowledgePathEdit = () => {
               </Box>
 
               <TextField
-                label="Título"
+                label={t("common.title")}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 fullWidth
-                placeholder="Ej. Introducción a Blockchain"
+                placeholder={t("edit.titlePlaceholder")}
                 sx={{ mt: 1 }}
               />
               <TextField
-                label="Descripción"
+                label={t("common.description")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 fullWidth
                 multiline
                 minRows={5}
                 maxRows={24}
-                placeholder="Explica qué aprenderá el alumno y cómo está organizado el camino."
+                placeholder={t("edit.descriptionPlaceholder")}
                 sx={{ mt: 1 }}
               />
             </Stack>
@@ -997,15 +989,15 @@ const KnowledgePathEdit = () => {
             <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }} justifyContent="space-between">
               <Box>
                 <Typography variant="subtitle1" component="div" sx={{ fontWeight: 700, fontSize: '1.25rem' }}>
-                  Currículum
+                  {t("edit.curriculum")}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Organiza los nodos, agrega contenido y configura cuestionarios.
+                  {t("edit.curriculumHelp")}
                 </Typography>
               </Box>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
                 <Button variant="contained" color="success" startIcon={<AddIcon />} onClick={handleAddNode} sx={{ textTransform: "none", borderRadius: 2 }}>
-                  Agregar nodo
+                  {t("edit.addNode")}
                 </Button>
                 <Button
                   variant="contained"
@@ -1015,7 +1007,7 @@ const KnowledgePathEdit = () => {
                   disabled={nodes.length < 2}
                   sx={{ textTransform: "none", borderRadius: 2 }}
                 >
-                  Agregar cuestionario
+                  {t("edit.addQuiz")}
                 </Button>
               </Stack>
             </Stack>
@@ -1024,8 +1016,8 @@ const KnowledgePathEdit = () => {
 
             {nodes.length === 0 ? (
               <Alert severity="info" sx={{ borderRadius: 2 }}>
-                <AlertTitle sx={{ fontWeight: 700 }}>Tu currículum está vacío</AlertTitle>
-                Agrega tu primer nodo para comenzar a construir el camino.
+                <AlertTitle sx={{ fontWeight: 700 }}>{t("edit.emptyCurriculum")}</AlertTitle>
+                {t("edit.emptyCurriculumHelp")}
               </Alert>
             ) : (
               <Stack spacing={1.5}>
@@ -1053,7 +1045,7 @@ const KnowledgePathEdit = () => {
                           </Box>
                           <Box sx={{ minWidth: 0 }}>
                             <Typography variant="subtitle1" sx={{ fontWeight: 700 }} noWrap>
-                              {node.title || "Sin título"}
+                              {node.title || t("common.untitled")}
                             </Typography>
                             <Stack direction="row" spacing={1} sx={{ mt: 0.5, flexWrap: "wrap" }}>
                               {node.media_type && <Chip size="small" label={node.media_type} variant="outlined" />}
@@ -1086,14 +1078,14 @@ const KnowledgePathEdit = () => {
                         </Stack>
 
                         <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: "wrap" }}>
-                          <Tooltip title="Mover arriba">
+                          <Tooltip title={t("edit.moveUp")}>
                             <span>
                               <IconButton size="small" onClick={() => handleMoveNode(node.id, "up")} disabled={index === 0 || reorderState.status === "saving"}>
                                 <ArrowUpwardIcon fontSize="small" />
                               </IconButton>
                             </span>
                           </Tooltip>
-                          <Tooltip title="Mover abajo">
+                          <Tooltip title={t("edit.moveDown")}>
                             <span>
                               <IconButton size="small" onClick={() => handleMoveNode(node.id, "down")} disabled={index === nodes.length - 1 || reorderState.status === "saving"}>
                                 <ArrowDownwardIcon fontSize="small" />
@@ -1109,7 +1101,7 @@ const KnowledgePathEdit = () => {
                             startIcon={<OpenInNewIcon />}
                             sx={{ textTransform: "none", borderRadius: 2 }}
                           >
-                            Ver
+                            {t("edit.view")}
                           </Button>
                           <Button
                             component={Link}
@@ -1119,7 +1111,7 @@ const KnowledgePathEdit = () => {
                             startIcon={<EditIcon />}
                             sx={{ textTransform: "none", borderRadius: 2 }}
                           >
-                            Editar
+                            {t("common.edit")}
                           </Button>
                           <Button
                             size="small"
@@ -1128,7 +1120,7 @@ const KnowledgePathEdit = () => {
                             onClick={() => openDeleteNode(node)}
                             sx={{ textTransform: "none", borderRadius: 2 }}
                           >
-                            Eliminar
+                            {t("common.delete")}
                           </Button>
                         </Stack>
                       </Stack>
@@ -1154,11 +1146,10 @@ const KnowledgePathEdit = () => {
             >
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Snapshot del knowledge path
+                  {t("edit.snapshotTitle")}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  JSON lógico que se hashea con RFC 8785 JCS → SHA-256. “Tomar snapshot”
-                  guarda esa versión en la base de datos. No la envía al contrato de Ethereum.
+                  {t("edit.snapshotHelp1")} {t("edit.snapshotHelp2")}
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -1169,7 +1160,7 @@ const KnowledgePathEdit = () => {
                   disabled={snapshotLoading || snapshotPublishing}
                   sx={{ textTransform: "none", borderRadius: 2 }}
                 >
-                  Actualizar
+                  {t("edit.refresh")}
                 </Button>
                 <Button
                   variant="outlined"
@@ -1182,7 +1173,7 @@ const KnowledgePathEdit = () => {
                   }
                   sx={{ textTransform: "none", borderRadius: 2 }}
                 >
-                  Descargar preview JCS
+                  {t("edit.downloadPreview")}
                 </Button>
                 {isStaff && (
                   <Button
@@ -1196,7 +1187,7 @@ const KnowledgePathEdit = () => {
                     }
                     sx={{ textTransform: "none", borderRadius: 2 }}
                   >
-                    {snapshotPublishing ? "Guardando…" : "Tomar snapshot"}
+                    {snapshotPublishing ? t("common.saving") : t("edit.takeSnapshot")}
                   </Button>
                 )}
               </Stack>
@@ -1204,15 +1195,13 @@ const KnowledgePathEdit = () => {
 
             {!isStaff && (
               <Alert severity="info" sx={{ borderRadius: 2, mb: 2 }}>
-                Solo el staff puede persistir un snapshot. Puedes revisar la vista previa
-                y descargar el JCS canónico para verificar el digest.
+                {t("edit.staffOnly")}
               </Alert>
             )}
 
             {fromDashboard && (
               <Alert severity="info" sx={{ borderRadius: 2, mb: 2 }}>
-                Viniste desde el panel de snapshots. Usa “Volver al panel de snapshots”
-                para no perder ese enlace.
+                {t("edit.fromDashboard1")} {t("edit.fromDashboard2")}
               </Alert>
             )}
 
@@ -1246,7 +1235,7 @@ const KnowledgePathEdit = () => {
                       onClick={handleDownloadPublishedSnapshot}
                       sx={{ textTransform: "none" }}
                     >
-                      Descargar
+                      {t("edit.download")}
                     </Button>
                   ) : null
                 }
@@ -1263,8 +1252,8 @@ const KnowledgePathEdit = () => {
                     color={snapshotPreview.validForHash ? "success" : "error"}
                     label={
                       snapshotPreview.validForHash
-                        ? "Válido para hash (modo preview)"
-                        : "No válido para hash"
+                        ? t("edit.hashValid")
+                        : t("edit.hashInvalid")
                     }
                   />
                   <Chip
@@ -1272,8 +1261,8 @@ const KnowledgePathEdit = () => {
                     color={snapshotPreview.readyForStrictPublish ? "success" : "warning"}
                     label={
                       snapshotPreview.readyForStrictPublish
-                        ? "Listo para publish (texto embebido en todos los materiales)"
-                        : "No listo: falta texto en algún material"
+                        ? t("edit.publishReady")
+                        : t("edit.publishNotReady")
                     }
                   />
                   {snapshotNodeRows.length > 0 && (
@@ -1285,7 +1274,10 @@ const KnowledgePathEdit = () => {
                           ? "success"
                           : "default"
                       }
-                      label={`Transcripts: ${snapshotNodesReadyCount}/${snapshotNodeRows.length}`}
+                      label={t("edit.transcriptsCount", {
+                        ready: snapshotNodesReadyCount,
+                        total: snapshotNodeRows.length,
+                      })}
                     />
                   )}
                 </Stack>
@@ -1293,11 +1285,10 @@ const KnowledgePathEdit = () => {
                 {snapshotNodeRows.length > 0 && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                      Transcript por nodo
+                      {t("edit.transcriptByNode")}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                      Cada nodo necesita texto certificado del contenido vinculado
-                      (transcript o extracto PDF) para el publish estricto.
+                      {t("edit.transcriptHelp1")} {t("edit.transcriptHelp2")}
                     </Typography>
                     <Stack spacing={1}>
                       {snapshotNodeRows.map((row) => (
@@ -1320,7 +1311,7 @@ const KnowledgePathEdit = () => {
                           >
                             <Stack spacing={0.25} sx={{ minWidth: 0, flex: 1 }}>
                               <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                                {row.position}. {row.title}
+                                {row.position}. {row.title || t("common.untitled")}
                               </Typography>
                               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                                 {row.mediaType ? (
@@ -1351,7 +1342,17 @@ const KnowledgePathEdit = () => {
                                 )
                               }
                               color={row.ready ? "success" : "warning"}
-                              label={row.statusLabel}
+                              label={
+                                row.ready
+                                  ? t("edit.transcriptReady")
+                                  : row.issueCode === "NO_CONTENT"
+                                    ? t("edit.noContent")
+                                    : row.issueCode === "NO_TRANSCRIPT_TEXT"
+                                      ? t("edit.noTranscript")
+                                      : row.issueCode === "EMPTY_TRANSCRIPT"
+                                        ? t("edit.emptyTranscript")
+                                        : t("edit.textNotReady")
+                              }
                               sx={{ flexShrink: 0 }}
                             />
                           </Stack>
@@ -1381,7 +1382,7 @@ const KnowledgePathEdit = () => {
                         disabled={!snapshotPreview.canonical}
                         sx={{ textTransform: "none" }}
                       >
-                        Descargar JCS para verificar
+                        {t("edit.downloadJcs")}
                       </Button>
                     </Stack>
                     <Typography
@@ -1399,15 +1400,14 @@ const KnowledgePathEdit = () => {
                       {snapshotPreview.digest}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
-                      El digest del snapshot publicado puede diferir si cambia <code>publishedAt</code>.
-                      Para verificar un snapshot guardado, descárgalo desde el panel o tras “Tomar snapshot”.
+                      {t("edit.digestNoteBefore")}<code>publishedAt</code>{t("edit.digestNoteAfter")}
                     </Typography>
                   </Box>
                 )}
 
                 {Array.isArray(snapshotPreview.issues) && snapshotPreview.issues.length > 0 && (
                   <Alert severity="warning" sx={{ borderRadius: 2 }}>
-                    <AlertTitle>Pendientes para certificación</AlertTitle>
+                    <AlertTitle>{t("edit.certificationPending")}</AlertTitle>
                     <Box component="ul" sx={{ m: 0, pl: 2 }}>
                       {snapshotPreview.issues.map((issue, index) => {
                         const nodeLabel = issue.nodeTitle
@@ -1467,7 +1467,7 @@ const KnowledgePathEdit = () => {
                 {snapshotPreview.canonical && (
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                      Bytes canónicos JCS (lo que se hashea)
+                      {t("edit.canonicalBytes")}
                     </Typography>
                     <Box
                       component="pre"
@@ -1499,10 +1499,10 @@ const KnowledgePathEdit = () => {
       {/* Zona de peligro: eliminar camino */}
       <Paper elevation={1} sx={{ mt: 4, p: 3, borderRadius: 3, border: "1px solid", borderColor: "error.light" }}>
         <Typography variant="h6" color="error" sx={{ fontWeight: 700, mb: 1 }}>
-          Zona de peligro
+          {t("edit.dangerZone")}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Si eliminas este camino de conocimiento se borrarán también todos sus nodos y no podrás recuperarlos.
+          {t("edit.dangerBody")}
         </Typography>
         <Button
           variant="outlined"
@@ -1511,42 +1511,42 @@ const KnowledgePathEdit = () => {
           onClick={openDeletePathDialog}
           sx={{ textTransform: "none" }}
         >
-          Eliminar camino de conocimiento
+          {t("edit.deletePath")}
         </Button>
       </Paper>
 
       {/* Delete path dialog */}
       <Dialog open={deletePathDialogOpen} onClose={closeDeletePathDialog} maxWidth="xs" fullWidth>
-        <DialogTitle>Eliminar camino de conocimiento</DialogTitle>
+        <DialogTitle>{t("edit.deletePathTitle")}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
-            ¿Seguro que deseas eliminar <strong>{knowledgePath?.title || "este camino"}</strong>? Se eliminarán todos los nodos y esta acción no se puede deshacer.
+            {t("edit.deletePathBefore")}<strong>{knowledgePath?.title || t("edit.thisPath")}</strong>{t("edit.deletePathAfter")}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={closeDeletePathDialog} disabled={isDeletingPath} sx={{ textTransform: "none" }}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={confirmDeletePath} disabled={isDeletingPath} color="error" variant="contained" sx={{ textTransform: "none" }}>
-            {isDeletingPath ? "Eliminando…" : "Eliminar"}
+            {isDeletingPath ? t("common.deleting") : t("common.delete")}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete node dialog */}
       <Dialog open={deleteDialog.open} onClose={closeDeleteNode} maxWidth="xs" fullWidth>
-        <DialogTitle>Eliminar nodo</DialogTitle>
+        <DialogTitle>{t("edit.deleteNodeTitle")}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
-            ¿Seguro que deseas eliminar <strong>{deleteDialog.node?.title || "este nodo"}</strong>? Esta acción no se puede deshacer.
+            {t("edit.deleteNodeBefore")}<strong>{deleteDialog.node?.title || t("edit.thisNode")}</strong>{t("edit.deleteNodeAfter")}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={closeDeleteNode} disabled={isDeletingNode} sx={{ textTransform: "none" }}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={confirmDeleteNode} disabled={isDeletingNode} color="error" variant="contained" sx={{ textTransform: "none" }}>
-            {isDeletingNode ? "Eliminando…" : "Eliminar"}
+            {isDeletingNode ? t("common.deleting") : t("common.delete")}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1575,7 +1575,7 @@ const KnowledgePathEdit = () => {
         existingFocalX={knowledgePath?.image_focal_x ?? 0.5}
         existingFocalY={knowledgePath?.image_focal_y ?? 0.5}
         onFocalOnlyUpdate={handleFocalOnlyUpdate}
-        entityLabel="camino de conocimiento"
+        entityLabel={t("edit.entityLabel")}
       />
     </Container>
   );

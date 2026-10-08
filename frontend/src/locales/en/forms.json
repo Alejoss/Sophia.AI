@@ -1,0 +1,21 @@
+{
+  "email": {
+    "defaultLabel": "email",
+    "required": "The {{label}} is required.",
+    "invalid": "Enter a valid {{label}}."
+  },
+  "password": {
+    "required": "Password is required.",
+    "min": "Must be at least 8 characters",
+    "upper": "Must contain at least one uppercase letter",
+    "lower": "Must contain at least one lowercase letter",
+    "number": "Must contain at least one number",
+    "special": "Must contain at least one special character (!@#$%^&*...)"
+  },
+  "username": {
+    "required": "Username is required.",
+    "min": "Username must be at least 3 characters.",
+    "noAt": "Username cannot contain @. Use only letters, numbers, and underscores (_).",
+    "charset": "Username can only contain letters, numbers, and underscores (_)."
+  }
+}

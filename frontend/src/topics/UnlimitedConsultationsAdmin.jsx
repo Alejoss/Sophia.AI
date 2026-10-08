@@ -16,9 +16,11 @@ import {
   Typography,
 } from '@mui/material';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 
 const UnlimitedConsultationsAdmin = () => {
+  const { t } = useTranslation('topics');
   const [entries, setEntries] = useState([]);
   const [defaultLimit, setDefaultLimit] = useState(3);
   const [loading, setLoading] = useState(true);
@@ -41,12 +43,12 @@ const UnlimitedConsultationsAdmin = () => {
     } catch (err) {
       setError(
         err?.response?.data?.error
-        || 'No se pudo cargar la lista de usuarios sin límite.',
+        || t('unlimited.loadError'),
       );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadEntries();
@@ -56,7 +58,7 @@ const UnlimitedConsultationsAdmin = () => {
     event.preventDefault();
     const userId = Number.parseInt(String(userIdInput).trim(), 10);
     if (!Number.isFinite(userId) || userId <= 0) {
-      setError('Ingresá un user ID numérico válido.');
+      setError(t('unlimited.invalidId'));
       return;
     }
     setSubmitting(true);
@@ -70,11 +72,11 @@ const UnlimitedConsultationsAdmin = () => {
       setEntries((prev) => [created, ...prev.filter((item) => item.user_id !== created.user_id)]);
       setUserIdInput('');
       setNoteInput('');
-      setSuccess(`Usuario ${created.user_id} (${created.username}) ahora tiene consultas ilimitadas.`);
+      setSuccess(t('unlimited.added', { id: created.user_id, username: created.username }));
     } catch (err) {
       setError(
         err?.response?.data?.error
-        || 'No se pudo agregar el usuario a la lista de ilimitados.',
+        || t('unlimited.addError'),
       );
     } finally {
       setSubmitting(false);
@@ -88,11 +90,11 @@ const UnlimitedConsultationsAdmin = () => {
     try {
       await contentApi.removeUnlimitedConsultationUser(userId);
       setEntries((prev) => prev.filter((item) => item.user_id !== userId));
-      setSuccess(`Se quitó el límite ilimitado del usuario ${userId}.`);
+      setSuccess(t('unlimited.removed', { id: userId }));
     } catch (err) {
       setError(
         err?.response?.data?.error
-        || 'No se pudo quitar el usuario de la lista.',
+        || t('unlimited.removeError'),
       );
     } finally {
       setRemovingId(null);
@@ -102,12 +104,10 @@ const UnlimitedConsultationsAdmin = () => {
   return (
     <Box sx={{ mb: 6 }}>
       <Typography variant="h5" gutterBottom>
-        Usuarios sin límite diario
+        {t('unlimited.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Por defecto cada usuario puede crear {defaultLimit} consultas por día
-        (todos los temas). Agregá user IDs aquí para probar consultas sin tope —
-        útil para staff y cuentas de prueba.
+        {t('unlimited.introBefore', { limit: defaultLimit })}
       </Typography>
 
       <Paper
@@ -123,7 +123,7 @@ const UnlimitedConsultationsAdmin = () => {
           alignItems={{ xs: 'stretch', sm: 'flex-start' }}
         >
           <TextField
-            label="User ID"
+            label={t('unlimited.userId')}
             value={userIdInput}
             onChange={(event) => setUserIdInput(event.target.value)}
             size="small"
@@ -132,12 +132,12 @@ const UnlimitedConsultationsAdmin = () => {
             sx={{ width: { xs: '100%', sm: 140 } }}
           />
           <TextField
-            label="Nota (opcional)"
+            label={t('unlimited.note')}
             value={noteInput}
             onChange={(event) => setNoteInput(event.target.value)}
             size="small"
             fullWidth
-            placeholder="p. ej. testing topic chat"
+            placeholder={t('unlimited.notePlaceholder')}
           />
           <Button
             type="submit"
@@ -145,7 +145,7 @@ const UnlimitedConsultationsAdmin = () => {
             disabled={submitting || !userIdInput.trim()}
             sx={{ whiteSpace: 'nowrap', minWidth: 120 }}
           >
-            {submitting ? 'Agregando…' : 'Agregar'}
+            {submitting ? t('unlimited.adding') : t('unlimited.add')}
           </Button>
         </Stack>
       </Paper>
@@ -167,18 +167,18 @@ const UnlimitedConsultationsAdmin = () => {
         </Box>
       ) : entries.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          Ningún usuario tiene consultas ilimitadas todavía.
+          {t('unlimited.empty')}
         </Typography>
       ) : (
         <Paper variant="outlined">
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>User ID</TableCell>
-                <TableCell>Usuario</TableCell>
-                <TableCell>Nota</TableCell>
-                <TableCell>Agregado por</TableCell>
-                <TableCell align="right">Quitar</TableCell>
+                <TableCell>{t('unlimited.userId')}</TableCell>
+                <TableCell>{t('unlimited.username')}</TableCell>
+                <TableCell>{t('unlimited.noteColumn')}</TableCell>
+                <TableCell>{t('unlimited.addedBy')}</TableCell>
+                <TableCell align="right">{t('unlimited.remove')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -200,7 +200,7 @@ const UnlimitedConsultationsAdmin = () => {
                   <TableCell align="right">
                     <IconButton
                       size="small"
-                      aria-label={`Quitar ilimitado a user ${entry.user_id}`}
+                      aria-label={t('unlimited.removeAria', { id: entry.user_id })}
                       disabled={removingId === entry.user_id}
                       onClick={() => handleRemove(entry.user_id)}
                     >

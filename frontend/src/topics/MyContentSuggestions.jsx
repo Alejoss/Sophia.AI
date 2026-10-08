@@ -19,10 +19,14 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import PendingIcon from '@mui/icons-material/Pending';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 const MyContentSuggestions = () => {
     const navigate = useNavigate();
+    const { t } = useTranslation('topics');
+    const { intl } = useDateLocales();
     const [suggestions, setSuggestions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -30,7 +34,7 @@ const MyContentSuggestions = () => {
 
     useEffect(() => {
         fetchSuggestions();
-    }, [statusFilter]);
+    }, [statusFilter, t]);
 
     const fetchSuggestions = async () => {
         try {
@@ -43,7 +47,7 @@ const MyContentSuggestions = () => {
             setSuggestions(Array.isArray(data) ? data : []);
             setError(null);
         } catch (err) {
-            setError('Error al cargar tus sugerencias');
+            setError(t('suggestion.loadMineError'));
             console.error('Error fetching suggestions:', err);
         } finally {
             setLoading(false);
@@ -53,17 +57,17 @@ const MyContentSuggestions = () => {
     const getStatusChip = (status) => {
         const statusConfig = {
             PENDING: { 
-                label: 'Pendiente', 
+                label: t('common.pending'), 
                 color: 'warning',
                 icon: <PendingIcon fontSize="small" />
             },
             ACCEPTED: { 
-                label: 'Aceptada', 
+                label: t('suggestion.statusAccepted'), 
                 color: 'success',
                 icon: <CheckCircleIcon fontSize="small" />
             },
             REJECTED: { 
-                label: 'Rechazada', 
+                label: t('suggestion.statusRejected'), 
                 color: 'error',
                 icon: <CancelIcon fontSize="small" />
             }
@@ -99,26 +103,26 @@ const MyContentSuggestions = () => {
         <Box sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h5" gutterBottom>
-                    Mis Sugerencias de Contenido
+                    {t('suggestion.myTitle')}
                 </Typography>
                 <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel>Filtrar por estado</InputLabel>
+                    <InputLabel>{t('suggestion.filterByStatus')}</InputLabel>
                     <Select
                         value={statusFilter}
-                        label="Filtrar por estado"
+                        label={t('suggestion.filterByStatus')}
                         onChange={(e) => setStatusFilter(e.target.value)}
                     >
-                        <MenuItem value="all">Todas</MenuItem>
-                        <MenuItem value="PENDING">Pendientes</MenuItem>
-                        <MenuItem value="ACCEPTED">Aceptadas</MenuItem>
-                        <MenuItem value="REJECTED">Rechazadas</MenuItem>
+                        <MenuItem value="all">{t('suggestion.allFeminine')}</MenuItem>
+                        <MenuItem value="PENDING">{t('suggestion.statusPendingPlural')}</MenuItem>
+                        <MenuItem value="ACCEPTED">{t('suggestion.statusAcceptedPlural')}</MenuItem>
+                        <MenuItem value="REJECTED">{t('suggestion.statusRejectedPlural')}</MenuItem>
                     </Select>
                 </FormControl>
             </Box>
 
             {suggestions.length === 0 ? (
                 <Alert severity="info">
-                    No tienes sugerencias de contenido.
+                    {t('suggestion.emptyMine')}
                 </Alert>
             ) : (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -128,10 +132,10 @@ const MyContentSuggestions = () => {
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
                                     <Box sx={{ flexGrow: 1 }}>
                                         <Typography variant="h6" gutterBottom>
-                                            {suggestion.content?.original_title || 'Sin título'}
+                                            {suggestion.content?.original_title || t('common.untitled')}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary">
-                                            Tema: {suggestion.topic?.title || 'Tema desconocido'}
+                                            {t('suggestion.topicLine', { title: suggestion.topic?.title || t('suggestion.unknownTopic') })}
                                         </Typography>
                                     </Box>
                                     {getStatusChip(suggestion.status)}
@@ -140,7 +144,7 @@ const MyContentSuggestions = () => {
                                 {suggestion.message && (
                                     <Box sx={{ mb: 2 }}>
                                         <Typography variant="body2" color="text.secondary">
-                                            <strong>Tu mensaje:</strong> {suggestion.message}
+                                            <strong>{t('suggestion.yourMessage')}</strong> {suggestion.message}
                                         </Typography>
                                     </Box>
                                 )}
@@ -148,14 +152,14 @@ const MyContentSuggestions = () => {
                                 {suggestion.status === 'REJECTED' && suggestion.rejection_reason && (
                                     <Alert severity="error" sx={{ mb: 2 }}>
                                         <Typography variant="body2">
-                                            <strong>Razón de rechazo:</strong> {suggestion.rejection_reason}
+                                            <strong>{t('user.rejectionReason')}</strong> {suggestion.rejection_reason}
                                         </Typography>
                                     </Alert>
                                 )}
 
                                 {suggestion.is_duplicate && (
                                     <Chip 
-                                        label="Este contenido ya estaba en el tema" 
+                                        label={t('common.alreadyInTopic')} 
                                         size="small" 
                                         color="warning" 
                                         sx={{ mb: 1 }}
@@ -163,13 +167,13 @@ const MyContentSuggestions = () => {
                                 )}
 
                                 <Typography variant="caption" color="text.secondary">
-                                    Sugerido el {suggestion.created_at ? new Date(suggestion.created_at).toLocaleString() : '-'}
+                                    {t('common.suggestedOn')} {suggestion.created_at ? new Date(suggestion.created_at).toLocaleString(intl) : '-'}
                                 </Typography>
 
                                 {suggestion.reviewed_at && (
                                     <Typography variant="caption" color="text.secondary" display="block">
-                                        Revisado el {new Date(suggestion.reviewed_at).toLocaleString()}
-                                        {suggestion.reviewed_by && ` por ${suggestion.reviewed_by.username}`}
+                                        {t('common.reviewedOn')} {new Date(suggestion.reviewed_at).toLocaleString(intl)}
+                                        {suggestion.reviewed_by && t('suggestion.byUser', { user: suggestion.reviewed_by.username })}
                                     </Typography>
                                 )}
                             </CardContent>
@@ -178,7 +182,7 @@ const MyContentSuggestions = () => {
                                     size="small" 
                                     onClick={() => navigate(`/content/topics/${suggestion.topic?.id}`)}
                                 >
-                                    Ver Tema
+                                    {t('suggestion.viewTopic')}
                                 </Button>
                             </CardActions>
                         </Card>

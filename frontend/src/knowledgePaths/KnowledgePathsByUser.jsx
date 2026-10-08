@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Container,
   Box,
@@ -14,8 +15,11 @@ import {
 } from '@mui/material';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import VoteComponent from '../votes/VoteComponent';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 const KnowledgePathsByUser = ({ userId, authorName }) => {
+  const { t } = useTranslation('paths');
+  const { intl } = useDateLocales();
   const [paths, setPaths] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -35,7 +39,7 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
         setHasPrevious(!!data.previous);
       } catch (err) {
         console.error('Error fetching knowledge paths by user:', err);
-        setError('Error al cargar los caminos de conocimiento');
+        setError(t('common.loadPathsError'));
         setPaths([]);
       } finally {
         setLoading(false);
@@ -43,7 +47,7 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
     };
 
     fetchKnowledgePaths();
-  }, [userId, currentPage]);
+  }, [userId, currentPage, t]);
 
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
@@ -72,7 +76,7 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
     <Container sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" component="h1">
-          Caminos de Conocimiento por {authorName}
+          {t('byUser.title', { name: authorName })}
         </Typography>
       </Box>
 
@@ -175,10 +179,10 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
                     color="text.secondary"
                     sx={{ textDecoration: 'none', '&:hover': { color: 'primary.main' } }}
                   >
-                    Por {path.author}
+                    {t('common.byAuthor', { author: path.author })}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {new Date(path.created_at).toLocaleDateString()}
+                    {new Date(path.created_at).toLocaleDateString(intl)}
                   </Typography>
                 </Box>
               </CardContent>
@@ -190,10 +194,10 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
       {paths.length === 0 && (
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.secondary', mb: 2 }}>
-            Aún no se han creado caminos de conocimiento
+            {t('byUser.emptyTitle')}
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            {authorName} aún no ha creado caminos de conocimiento.
+            {t('byUser.emptyBody', { name: authorName })}
           </Typography>
         </Box>
       )}
@@ -212,10 +216,10 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
               '&:disabled': { bgcolor: 'grey.300', color: 'text.disabled' },
             }}
           >
-            Anterior
+            {t('common.previous')}
           </Button>
           <Typography variant="body2" color="text.secondary">
-            Página {currentPage} de {totalPages}
+            {t('common.page', { current: currentPage, total: totalPages })}
           </Typography>
           <Button
             onClick={() => handlePageChange(currentPage + 1)}
@@ -229,7 +233,7 @@ const KnowledgePathsByUser = ({ userId, authorName }) => {
               '&:disabled': { bgcolor: 'grey.300', color: 'text.disabled' },
             }}
           >
-            Siguiente
+            {t('common.next')}
           </Button>
         </Box>
       )}

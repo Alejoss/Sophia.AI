@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Container,
@@ -21,6 +22,7 @@ import ContentDisplay from "../content/ContentDisplay";
 import { AuthContext } from "../context/AuthContext";
 
 const Bookmarks = () => {
+  const { t } = useTranslation('profiles');
   const { authState } = useContext(AuthContext);
   const [bookmarks, setBookmarks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,7 @@ const Bookmarks = () => {
       setBookmarks(bookmarksData);
     } catch (err) {
       console.error("Failed to load bookmarks:", err);
-      setError("Error al cargar los marcadores");
+      setError(t("bookmarks.loadError"));
     } finally {
       setLoading(false);
     }
@@ -69,7 +71,7 @@ const Bookmarks = () => {
       await deleteBookmark(bookmarkId);
       fetchBookmarks();
     } catch (error) {
-      setError("Error al eliminar el marcador");
+      setError(t("bookmarks.deleteError"));
     }
   };
 
@@ -111,12 +113,12 @@ const Bookmarks = () => {
             fontWeight: 600
           }}>
           
-          Marcadores
+          {t("bookmarks.title")}
         </Typography>
 
         {bookmarks.length === 0 ?
         <Typography variant="body1" align="center" sx={{ py: 4 }}>
-            No hay elementos guardados
+            {t("bookmarks.empty")}
           </Typography> :
 
         <Box>
@@ -155,7 +157,7 @@ const Bookmarks = () => {
 
                         null;
                       })()}
-                            <Tooltip title="Eliminar marcador">
+                            <Tooltip title={t("bookmarks.remove")}>
                               <IconButton
                           onClick={(e) => handleDelete(bookmark.id, e)}
                           color="error"
@@ -202,13 +204,13 @@ const Bookmarks = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="h6" color="text.primary">
                           {bookmark.content_profile?.title ||
-                      "Camino de conocimiento sin título"}
+                      t("bookmarks.untitledPath")}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Camino de conocimiento
+                          {t("bookmarks.path")}
                         </Typography>
                       </Box>
-                      <Tooltip title="Delete bookmark">
+                      <Tooltip title={t("bookmarks.remove")}>
                         <IconButton
                       onClick={(e) => handleDelete(bookmark.id, e)}
                       color="error"
@@ -252,13 +254,13 @@ const Bookmarks = () => {
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="h6" color="text.primary">
                           {bookmark.content_profile?.title ||
-                      "Publicación sin título"}
+                      t("bookmarks.untitledPublication")}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Publicación
+                          {t("bookmarks.publication")}
                         </Typography>
                       </Box>
-                      <Tooltip title="Delete bookmark">
+                      <Tooltip title={t("bookmarks.remove")}>
                         <IconButton
                       onClick={(e) => handleDelete(bookmark.id, e)}
                       color="error"

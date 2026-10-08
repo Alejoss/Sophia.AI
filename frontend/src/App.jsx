@@ -1,7 +1,10 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { I18nextProvider, useTranslation } from 'react-i18next';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import i18n from './i18n';
+import DocumentLanguage from './components/DocumentLanguage';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { NotificationsProvider } from './context/NotificationsContext.jsx';
 import { ThemeProvider, useThemeMode } from './context/ThemeContext.jsx';
@@ -132,7 +135,9 @@ const isTelegramInAppBrowser = () => {
   );
 };
 
-const TelegramNotSupportedMessage = () => (
+const TelegramNotSupportedMessage = () => {
+  const { t } = useTranslation();
+  return (
   <main
     style={{
       minHeight: '70vh',
@@ -154,14 +159,15 @@ const TelegramNotSupportedMessage = () => (
       }}
     >
       <h1 style={{ marginTop: 0, marginBottom: '12px' }}>
-        Esta app no está disponible en el navegador de Telegram
+        {t('errors.telegramTitle')}
       </h1>
       <p style={{ margin: 0, lineHeight: 1.5 }}>
-        Por favor, ábrela en tu navegador externo (Safari, Chrome u otro).
+        {t('errors.telegramBody')}
       </p>
     </section>
   </main>
-);
+  );
+};
 
 const AppContent = () => {
   const { theme } = useThemeMode();
@@ -326,9 +332,12 @@ const AppContent = () => {
 
 const App = () => {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <I18nextProvider i18n={i18n}>
+      <DocumentLanguage />
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </I18nextProvider>
   );
 };
 

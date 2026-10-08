@@ -41,6 +41,8 @@ import SubtitlesIcon from "@mui/icons-material/Subtitles";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import { formatFileSize } from "../utils/fileUtils";
 import { LOGIN_PATH } from "../utils/authErrorHandler";
+import { useTranslation } from "react-i18next";
+import { useDateLocales } from "../hooks/useDateLocales";
 import { AuthContext } from "../context/AuthContext";
 import VoteComponent from "../votes/VoteComponent";
 import {
@@ -64,6 +66,8 @@ const ContentDisplay = ({
   showSuggestFileButton = false,
   onSuggestFile = null
 }) => {
+  const { t } = useTranslation("content");
+  const { intl } = useDateLocales();
   const [renderError, setRenderError] = useState(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -84,7 +88,7 @@ const ContentDisplay = ({
 
   // Get appropriate data from either content or content_profile
   const profile = content.selected_profile || content;
-  const title = profile.title || content.original_title || "Sin título";
+  const title = profile.title || content.original_title || t("common.untitled");
   const author = profile.author || content.original_author;
 
   // For preview mode, expect the PreviewContentProfileSerializer structure
@@ -122,7 +126,7 @@ const ContentDisplay = ({
   const formatDate = (dateString) => {
     if (!dateString) return null;
     try {
-      return new Date(dateString).toLocaleDateString();
+      return new Date(dateString).toLocaleDateString(intl);
     } catch (error) {
       console.error("Error formatting date:", error);
       return null;
@@ -132,7 +136,7 @@ const ContentDisplay = ({
   const formatDateTime = (dateString) => {
     if (!dateString) return null;
     try {
-      return new Date(dateString).toLocaleString();
+      return new Date(dateString).toLocaleString(intl);
     } catch (error) {
       console.error("Error formatting datetime:", error);
       return null;
@@ -141,9 +145,9 @@ const ContentDisplay = ({
 
   /** Friendly site name for "Copiar URL - YouTube" style labels (from full or partial URL). */
   const getSourceSiteLabel = (urlString) => {
-    if (!urlString || typeof urlString !== "string") return "Origen";
+    if (!urlString || typeof urlString !== "string") return t("display.sourceFallback");
     const trimmed = urlString.trim();
-    if (!trimmed) return "Origen";
+    if (!trimmed) return t("display.sourceFallback");
     try {
       const href = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
       const hostname = new URL(href).hostname.replace(/^www\./i, "").toLowerCase();
@@ -172,10 +176,10 @@ const ContentDisplay = ({
       if (map[hostname]) return map[hostname];
       const parts = hostname.split(".").filter(Boolean);
       const base = parts.length >= 2 ? parts[parts.length - 2] : parts[0] || hostname;
-      if (!base) return "Origen";
+      if (!base) return t("display.sourceFallback");
       return base.charAt(0).toUpperCase() + base.slice(1);
     } catch {
-      return "Origen";
+      return t("display.sourceFallback");
     }
   };
 
@@ -190,13 +194,9 @@ const ContentDisplay = ({
 
   const renderMediaTypeRow = () => {
     const mt = (contentData.media_type || "").toUpperCase();
-    const labels = {
-      VIDEO: "Video",
-      AUDIO: "Audio",
-      IMAGE: "Imagen",
-      TEXT: "Texto"
-    };
-    const label = labels[mt] || (mt ? mt.charAt(0) + mt.slice(1).toLowerCase() : "Contenido");
+    const label = ["VIDEO", "AUDIO", "IMAGE", "TEXT"].includes(mt)
+      ? t(`mediaType.${mt}`)
+      : (mt ? mt.charAt(0) + mt.slice(1).toLowerCase() : t("common.contentFallback"));
     const iconSx = { fontSize: 28, color: "primary.main", opacity: 0.9 };
     let icon = <DescriptionIcon sx={iconSx} />;
     if (mt === "VIDEO") icon = <VideocamIcon sx={iconSx} />;else
@@ -237,7 +237,7 @@ const ContentDisplay = ({
       return null;
     } catch (error) {
       console.error("Error getting file URL:", error);
-      setRenderError(`Error getting file URL: ${error.message}`);
+      setRenderError(t("display.fileUrlError", { message: error.message }));
       return null;
     }
   };
@@ -281,16 +281,16 @@ const ContentDisplay = ({
 
   const handleCopyUrl = async (valueToCopy) => {
     if (!valueToCopy) {
-      showSnackbar("No hay URL para copiar", "warning");
+      showSnackbar(t("display.noUrlToCopy"), "warning");
       return;
     }
 
     try {
       await navigator.clipboard.writeText(valueToCopy);
-      showSnackbar("URL copiada al portapapeles", "success");
+      showSnackbar(t("display.urlCopied"), "success");
     } catch (error) {
       console.error("Failed to copy URL:", error);
-      showSnackbar("No se pudo copiar la URL", "error");
+      showSnackbar(t("display.urlCopyError"), "error");
     }
   };
 
@@ -318,7 +318,7 @@ const ContentDisplay = ({
         {message}
       </Typography>
       <Button component={Link} to={loginHref} size="small" variant="outlined">
-        Inicia sesión
+        {t("display.signIn")}
       </Button>
     </Box>
   );
@@ -344,7 +344,7 @@ const ContentDisplay = ({
           if (!thumbUrl) {
             console.warn("No file URL found for image content:", contentData);
             if (!isAuthenticated && hasFileAvailable) {
-              return renderLoginToAccessFile("Inicia sesión para ver esta imagen.");
+              return renderLoginToAccessFile(t("display.signInImage"));
             }
             return (
               <Box
@@ -359,7 +359,7 @@ const ContentDisplay = ({
                 }}>
                 
               <Typography color="text.secondary">
-                Archivo de imagen no disponible
+                {t("display.imageUnavailable")}
               </Typography>
             </Box>);
 
@@ -386,11 +386,11 @@ const ContentDisplay = ({
                 {}
               }}
               onClick={isClickable ? handleContentClick : undefined}
-              title={isClickable ? "Haz clic para abrir la imagen en una nueva pestaña" : undefined}>
+              title={isClickable ? t("display.openImage") : undefined}>
               
             <img
                 src={thumbUrl}
-                alt={title || contentData.original_title || "Content image"}
+                alt={title || contentData.original_title || t("display.imageAlt")}
                 loading={variant === "detailed" ? "eager" : "lazy"}
                 fetchPriority={variant === "detailed" ? "high" : undefined}
                 style={{
@@ -418,7 +418,7 @@ const ContentDisplay = ({
                   color: "text.secondary"
                 }}>
                 
-              <Typography color="text.primary">Error al cargar la imagen</Typography>
+              <Typography color="text.primary">{t("display.imageLoadError")}</Typography>
             </Box>
           </Box>);
 
@@ -452,7 +452,7 @@ const ContentDisplay = ({
                   fetchPriority={variant === "detailed" ? "high" : undefined}
                   fallback={
                   <Typography color="text.secondary">
-                      Archivo de video no disponible
+                      {t("display.videoUnavailable")}
                     </Typography>
                   } />
                 
@@ -460,7 +460,7 @@ const ContentDisplay = ({
 
           }
           if (!isAuthenticated && hasFileAvailable) {
-            return renderLoginToAccessFile("Inicia sesión para reproducir este video.");
+            return renderLoginToAccessFile(t("display.signInVideo"));
           }
           return (
             <Box
@@ -475,7 +475,7 @@ const ContentDisplay = ({
               }}>
               
               <Typography color="text.secondary">
-                Archivo de video no disponible
+                {t("display.videoUnavailable")}
               </Typography>
             </Box>);
 
@@ -523,7 +523,7 @@ const ContentDisplay = ({
                   fetchPriority={variant === "detailed" ? "high" : undefined}
                   fallback={
                   <Typography color="text.secondary">
-                      Archivo de audio no disponible
+                      {t("display.audioUnavailable")}
                     </Typography>
                   } />
                 
@@ -531,7 +531,7 @@ const ContentDisplay = ({
 
           }
           if (!isAuthenticated && hasFileAvailable) {
-            return renderLoginToAccessFile("Inicia sesión para reproducir este audio.");
+            return renderLoginToAccessFile(t("display.signInAudio"));
           }
           return (
             <Box
@@ -546,7 +546,7 @@ const ContentDisplay = ({
               }}>
               
               <Typography color="text.secondary">
-                Archivo de audio no disponible
+                {t("display.audioUnavailable")}
               </Typography>
             </Box>);
 
@@ -561,7 +561,7 @@ const ContentDisplay = ({
             }}>
             
             <audio controls style={{ width: "100%" }} src={fileUrl}>
-              Tu navegador no admite la etiqueta de audio.
+              {t("display.audioUnsupported")}
             </audio>
           </Box>);
 
@@ -605,7 +605,7 @@ const ContentDisplay = ({
                 () => window.open(textOpenUrl, "_blank", "noopener,noreferrer") :
                 undefined
                 }
-                title={textOpenUrl ? "Haz clic para abrir el archivo" : undefined}>
+                title={textOpenUrl ? t("display.openFile") : undefined}>
                 
                 <SequentialThumbnail
                   sources={textPreviewSources}
@@ -647,10 +647,10 @@ const ContentDisplay = ({
                   }
                 }}
                 onClick={() => window.open(resolvedExternal, "_blank")}
-                title="Haz clic para abrir la URL en una nueva pestaña">
+                title={t("display.openUrl")}>
                 
                 <Typography variant="body1" color="text.primary">
-                  Contenido URL:{" "}
+                  {t("display.urlContent")}{" "}
                   <a
                     href={resolvedExternal}
                     target="_blank"
@@ -686,7 +686,7 @@ const ContentDisplay = ({
             }}>
             
             <Typography color="text.secondary">
-              Tipo de medio no soportado: {mediaTypeUpper}
+              {t("display.unsupportedMedia", { type: mediaTypeUpper })}
             </Typography>
           </Box>);
 
@@ -698,7 +698,7 @@ const ContentDisplay = ({
       return (
         <Box sx={{ mt: 3 }}>
           <Typography variant="h6" gutterBottom color="text.secondary">
-            Detalles del contenido
+            {t("display.details")}
           </Typography>
           <Box
             sx={{
@@ -718,7 +718,7 @@ const ContentDisplay = ({
                 color="text.secondary"
                 gutterBottom>
                 
-                Información del archivo
+                {t("display.fileInfo")}
               </Typography>
               <Stack spacing={1.5}>
                 {renderMediaTypeRow()}
@@ -726,8 +726,8 @@ const ContentDisplay = ({
                 {!hasFileAvailable &&
                 <Typography variant="body2" color="text.secondary">
                     {contentExternalUrl && String(contentExternalUrl).trim() ?
-                  "No hay archivo descargable relacionado; solo enlace externo." :
-                  "No hay archivo relacionado."}
+                  t("display.noDownloadableFile") :
+                  t("display.noRelatedFile")}
                   </Typography>
                 }
 
@@ -742,7 +742,7 @@ const ContentDisplay = ({
                   
                     <StorageIcon fontSize="small" color="action" />
                     <Typography variant="body2" color="text.primary">
-                      Archivo:
+                      {t("display.fileLabel")}
                     </Typography>
                     <Button
                     size="small"
@@ -751,7 +751,7 @@ const ContentDisplay = ({
                     window.open(resolveMediaUrl(fileDetails.url ?? fileDetails.file), "_blank")
                     }>
                     
-                      Descargar archivo
+                      {t("display.downloadFile")}
                     </Button>
                   </Box>
                 }
@@ -772,7 +772,7 @@ const ContentDisplay = ({
                       size="small"
                       variant="outlined">
                       
-                      Inicia sesión para descargar
+                      {t("display.signInToDownload")}
                     </Button>
                   </Box>
                 }
@@ -781,10 +781,11 @@ const ContentDisplay = ({
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <StorageIcon fontSize="small" color="action" />
                     <Typography variant="body2" color="text.primary">
-                      Tamaño del archivo:{" "}
-                      {Number(fileDetails.file_size) === 0 ?
-                    "0 bytes" :
-                    formatFileSize(Number(fileDetails.file_size))}
+                      {t("display.fileSize", {
+                        size: Number(fileDetails.file_size) === 0 ?
+                          t("common.zeroBytes") :
+                          formatFileSize(Number(fileDetails.file_size))
+                      })}
                     </Typography>
                   </Box>
                 }
@@ -793,7 +794,7 @@ const ContentDisplay = ({
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <CalendarTodayIcon fontSize="small" color="action" />
                     <Typography variant="body2" color="text.primary">
-                      Perfil creado el: {formatDateTime(profile.created_at)}
+                      {t("display.profileCreated", { date: formatDateTime(profile.created_at) })}
                     </Typography>
                   </Box>
                 }
@@ -818,7 +819,7 @@ const ContentDisplay = ({
                         onClick={() => handleCopyUrl(copyTarget)}
                         sx={{ textTransform: "none" }}>
                         
-                        {`Copiar URL - ${site}`}
+                        {t("display.copyUrl", { site })}
                       </Button>
                     </Box>);
 
@@ -834,7 +835,7 @@ const ContentDisplay = ({
                 color="text.secondary"
                 gutterBottom>
                 
-                  Compartido por
+                  {t("display.sharedBy")}
                 </Typography>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <PersonIcon fontSize="small" color="action" />
@@ -875,13 +876,13 @@ const ContentDisplay = ({
                 color="text.secondary"
                 gutterBottom>
                 
-                  Participación
+                  {t("display.participation")}
                 </Typography>
                 <Stack spacing={1}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <ThumbUpIcon fontSize="small" color="action" />
                     <Typography variant="body2" color="text.primary">
-                      Votos: {contentData.vote_count}
+                      {t("display.votes", { value: contentData.vote_count })}
                     </Typography>
                   </Box>
                 </Stack>
@@ -895,17 +896,17 @@ const ContentDisplay = ({
                 color="text.secondary"
                 gutterBottom>
                 
-                  Accesibilidad en español
+                  {t("display.spanishAccess")}
                 </Typography>
                 <Stack spacing={1}>
                   {contentData.has_spanish_subtitles &&
                 <Typography variant="body2" color="text.primary">
-                      Subtitulado en español
+                      {t("display.subtitled")}
                     </Typography>
                 }
                   {contentData.has_spanish_dubbing &&
                 <Typography variant="body2" color="text.primary">
-                      Doblado al español
+                      {t("display.dubbed")}
                     </Typography>
                 }
                 </Stack>
@@ -964,7 +965,7 @@ const ContentDisplay = ({
                   width: 24,
                   height: 24
                 }}
-                aria-label="Quitar contenido">
+                aria-label={t("display.removeAria")}>
                 
                   <CloseIcon fontSize="small" />
                 </IconButton>
@@ -1001,7 +1002,7 @@ const ContentDisplay = ({
                     noWrap
                     sx={{ fontSize: "0.8rem", mb: 0.5 }}>
                     
-                      Por {author}
+                      {t("common.byAuthor", { name: author })}
                     </Typography>
                   }
                   <Typography
@@ -1036,7 +1037,7 @@ const ContentDisplay = ({
                 }}>
                 
                 <Typography variant="body2" color="text.primary">
-                  Datos de contenido inválidos proporcionados
+                  {t("display.invalidData")}
                 </Typography>
               </Box>);
 
@@ -1068,10 +1069,10 @@ const ContentDisplay = ({
               }}
               title={
               contentExternalUrl && String(contentExternalUrl).trim() ?
-              "Haz clic para abrir el enlace en una nueva pestaña" :
+              t("display.openLinkTab") :
               fileDetails?.file ?
-              "Haz clic para abrir el archivo en una nueva pestaña" :
-              "Haz clic para ver el contenido"
+              t("display.openFileTab") :
+              t("display.clickToView")
               }
               sx={{
                 cursor: "pointer",
@@ -1176,7 +1177,7 @@ const ContentDisplay = ({
                     }
                   }}>
                   
-                  {title || "Contenido sin título"}
+                  {title || t("common.noTitle")}
                 </Typography>
 
                 {showAuthor && author &&
@@ -1185,7 +1186,7 @@ const ContentDisplay = ({
                   color="text.secondary"
                   sx={{ mb: 1 }}>
                   
-                    By {author}
+                    {t("common.byAuthorEn", { name: author })}
                   </Typography>
                 }
 
@@ -1253,7 +1254,7 @@ const ContentDisplay = ({
                   
                   {/* Media Type Badge */}
                   <Chip
-                    label={contentData.media_type || "UNKNOWN"}
+                    label={contentData.media_type || t("mediaType.unknown")}
                     size="small"
                     variant="outlined"
                     color="primary" />
@@ -1273,7 +1274,7 @@ const ContentDisplay = ({
 
                   {contentData.has_spanish_subtitles &&
                   <Chip
-                    label="Subtitulado en español"
+                    label={t("display.subtitled")}
                     size="small"
                     variant="outlined"
                     color="success" />
@@ -1282,7 +1283,7 @@ const ContentDisplay = ({
 
                   {contentData.has_spanish_dubbing &&
                   <Chip
-                    label="Doblado al español"
+                    label={t("display.dubbed")}
                     size="small"
                     variant="outlined"
                     color="success" />
@@ -1303,7 +1304,7 @@ const ContentDisplay = ({
                   {contentExternalUrl &&
                   <Chip
                     icon={<LinkIcon />}
-                    label="URL"
+                    label={t("common.url")}
                     size="small"
                     variant="outlined"
                     color="info" />
@@ -1313,7 +1314,7 @@ const ContentDisplay = ({
                   {hasFileAvailable &&
                   <Chip
                     icon={<StorageIcon />}
-                    label="Archivo Disponible"
+                    label={t("display.fileAvailable")}
                     size="small"
                     variant="outlined"
                     color="info" />
@@ -1323,7 +1324,7 @@ const ContentDisplay = ({
                   {hasTranscript &&
                   <Chip
                     icon={<SubtitlesIcon />}
-                    label="Transcripción Disponible"
+                    label={t("display.transcriptAvailable")}
                     size="small"
                     variant="outlined"
                     color="info" />
@@ -1333,7 +1334,7 @@ const ContentDisplay = ({
                   {transcriptBtcAnchored &&
                   <Chip
                     icon={<VerifiedIcon />}
-                    label="Anclada a Bitcoin"
+                    label={t("display.anchored")}
                     size="small"
                     variant="outlined"
                     color="success" />
@@ -1378,7 +1379,7 @@ const ContentDisplay = ({
                 }}
                 data-action-button>
                 
-                <Tooltip title="Ver detalles (abre en nueva pestaña)">
+                <Tooltip title={t("display.viewDetails")}>
                   <IconButton
                     size="small"
                     onClick={(e) => {
@@ -1439,10 +1440,10 @@ const ContentDisplay = ({
               onClick={handleCardClick}
               title={
               contentExternalUrl && String(contentExternalUrl).trim() ?
-              "Haz clic para abrir el enlace en una nueva pestaña" :
+              t("display.openLinkTab") :
               fileDetails?.file ?
-              "Haz clic para abrir el archivo en una nueva pestaña" :
-              "Haz clic para ver el contenido"
+              t("display.openFileTab") :
+              t("display.clickToView")
               }>
               
               <CardMedia
@@ -1500,7 +1501,7 @@ const ContentDisplay = ({
                 }
                 {showAuthor && author &&
                 <Typography variant="body2" color="text.secondary">
-                    By {author}
+                    {t("common.byAuthorEn", { name: author })}
                   </Typography>
                 }
                 {profile?.user_username &&
@@ -1558,7 +1559,7 @@ const ContentDisplay = ({
                   {hasTranscript &&
                   <Chip
                     icon={<SubtitlesIcon />}
-                    label="Transcripción Disponible"
+                    label={t("display.transcriptAvailable")}
                     size="small"
                     variant="outlined"
                     color="info" />
@@ -1568,7 +1569,7 @@ const ContentDisplay = ({
                   {transcriptBtcAnchored &&
                   <Chip
                     icon={<VerifiedIcon />}
-                    label="Anclada a Bitcoin"
+                    label={t("display.anchored")}
                     size="small"
                     variant="outlined"
                     color="success" />
@@ -1601,7 +1602,7 @@ const ContentDisplay = ({
                     onEdit(e);
                   }}>
                   
-                      Editar
+                      {t("actions.edit")}
                     </Button>
                 }
                   {onRemove &&
@@ -1613,7 +1614,7 @@ const ContentDisplay = ({
                     onRemove(e);
                   }}>
                   
-                      Eliminar
+                      {t("actions.remove")}
                     </Button>
                 }
                   {additionalActions &&
@@ -1646,7 +1647,7 @@ const ContentDisplay = ({
                       onClick={titleIsClickable ? openContentInNewTab : undefined}
                       title={
                         titleIsClickable
-                          ? "Abrir archivo en una nueva pestaña"
+                          ? t("display.openInNewTab")
                           : undefined
                       }
                       sx={{
@@ -1680,7 +1681,7 @@ const ContentDisplay = ({
                   color="text.secondary"
                   gutterBottom>
                   
-                    By {author}
+                    {t("common.byAuthorEn", { name: author })}
                   </Typography>
                 }
 
@@ -1699,7 +1700,7 @@ const ContentDisplay = ({
                   
                     {contentData.original_author &&
                   <Typography variant="body2" color="text.primary">
-                        <strong>autor original:</strong>{" "}
+                        <strong>{t("display.originalAuthor")}</strong>{" "}
                         {contentData.original_author}
                       </Typography>
                   }
@@ -1718,7 +1719,7 @@ const ContentDisplay = ({
                     onSuggestFile();
                   }}>
                   
-                    Sugerir archivo
+                    {t("display.suggestFile")}
                   </Button>
                 </Box>
               }
@@ -1727,7 +1728,7 @@ const ContentDisplay = ({
               {profile?.personal_note &&
               <Box sx={{ mt: 3 }}>
                   <Typography variant="h6" gutterBottom color="text.secondary">
-                    Notas personales
+                    {t("display.personalNotes")}
                   </Typography>
                   <Box sx={{ p: 2, bgcolor: "grey.50", borderRadius: 1 }}>
                     <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }} color="text.primary">
@@ -1750,7 +1751,7 @@ const ContentDisplay = ({
                     onEdit(e);
                   }}>
                   
-                      Cambiar contenido
+                      {t("display.changeContent")}
                     </Button>
                 }
                   {onRemove &&
@@ -1762,7 +1763,7 @@ const ContentDisplay = ({
                     onRemove(e);
                   }}>
                   
-                      Eliminar
+                      {t("actions.remove")}
                     </Button>
                 }
                   {additionalActions &&
@@ -1778,7 +1779,7 @@ const ContentDisplay = ({
         default:
           return (
             <Typography color="error" align="center" sx={{ p: 2 }}>
-              Variante desconocida: {variant}
+              {t("display.unknownVariant", { variant })}
             </Typography>);
 
       }
@@ -1786,7 +1787,7 @@ const ContentDisplay = ({
       console.error("Error in renderContent:", error);
       return (
         <Typography color="error" align="center" sx={{ p: 2 }}>
-          Error al renderizar el contenido: {error.message}
+          {t("display.renderError", { message: error.message })}
         </Typography>);
 
     }
@@ -1817,7 +1818,7 @@ const ContentDisplay = ({
     console.error("Fatal error in ContentDisplay:", error);
     return (
       <Typography color="error" align="center" sx={{ p: 2 }}>
-        Error al mostrar el contenido: {error.message}
+        {t("display.fatalError", { message: error.message })}
       </Typography>);
 
   }

@@ -3,8 +3,10 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { formatDistanceToNow } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { AuthContext } from '../context/AuthContext';
+import { useDateLocales } from '../hooks/useDateLocales';
 import {
     Box,
     Typography,
@@ -29,10 +31,11 @@ const commentBodySchema = yup.object({
     body: yup
         .string()
         .trim()
-        .required('El comentario no puede estar vacío'),
+        .required(() => i18n.t('comments:validation.empty')),
 });
 
 const EditCommentForm = ({ initialBody, onSave, onCancel }) => {
+    const { t } = useTranslation('comments');
     const [generalError, setGeneralError] = useState('');
     const {
         register,
@@ -80,10 +83,10 @@ const EditCommentForm = ({ initialBody, onSave, onCancel }) => {
                     size="small"
                     disabled={isSubmitting}
                 >
-                    {isSubmitting ? 'Guardando...' : 'Guardar'}
+                    {isSubmitting ? t('edit.saving') : t('edit.save')}
                 </Button>
                 <Button size="small" onClick={onCancel} disabled={isSubmitting}>
-                    Cancelar
+                    {t('edit.cancel')}
                 </Button>
             </Box>
         </Box>
@@ -91,6 +94,7 @@ const EditCommentForm = ({ initialBody, onSave, onCancel }) => {
 };
 
 const ReplyCommentForm = ({ onReply, onCancel }) => {
+    const { t } = useTranslation('comments');
     const [generalError, setGeneralError] = useState('');
     const {
         register,
@@ -127,7 +131,7 @@ const ReplyCommentForm = ({ onReply, onCancel }) => {
             <TextField
                 fullWidth
                 multiline
-                placeholder="Escriba una respuesta..."
+                placeholder={t('reply.placeholder')}
                 size="small"
                 error={!!errors.body}
                 helperText={errors.body?.message}
@@ -136,10 +140,10 @@ const ReplyCommentForm = ({ onReply, onCancel }) => {
             />
             <Box sx={{ mt: 1 }}>
                 <Button type="submit" size="small" disabled={isSubmitting}>
-                    {isSubmitting ? 'Enviando...' : 'Enviar'}
+                    {isSubmitting ? t('reply.sending') : t('reply.send')}
                 </Button>
                 <Button size="small" onClick={onCancel} disabled={isSubmitting}>
-                    Cancelar
+                    {t('reply.cancel')}
                 </Button>
             </Box>
         </Box>
@@ -207,6 +211,8 @@ export const Comment = ({
     const [isReplying, setIsReplying] = useState(false);
     const [error, setError] = useState(null);
     const [showReplies, setShowReplies] = useState(true);
+    const { t } = useTranslation('comments');
+    const { dateFns } = useDateLocales();
     const { authState } = useContext(AuthContext);
 
     const canReply = depth < MAX_DEPTH;
@@ -252,7 +258,7 @@ export const Comment = ({
             const { generalError } = applyApiErrorsToForm(
                 err,
                 setFormError,
-                'Error al agregar la respuesta. Por favor, inténtelo de nuevo.',
+                i18n.t('comments:reply.addFailed'),
                 { text: 'body', content: 'body' },
             );
             if (generalError) {
@@ -291,7 +297,7 @@ export const Comment = ({
             const { generalError } = applyApiErrorsToForm(
                 err,
                 setFormError,
-                'Error al editar el comentario. Por favor, inténtelo de nuevo.',
+                i18n.t('comments:comment.editFailed'),
                 { text: 'body', content: 'body' },
             );
             if (generalError) {
@@ -309,7 +315,7 @@ export const Comment = ({
     };
 
     const handleDeleteComment = async () => {
-        if (!window.confirm('¿Está seguro de que desea eliminar este comentario?')) {
+        if (!window.confirm(i18n.t('comments:comment.confirmDelete'))) {
             return;
         }
 
@@ -323,7 +329,7 @@ export const Comment = ({
         try {
             await commentsApi.deleteComment(comment.id);
         } catch (error) {
-            setError('Error al eliminar el comentario. Por favor, inténtelo de nuevo.');
+            setError(i18n.t('comments:comment.deleteFailed'));
             setAllComments(prevComments =>
                 updateCommentInTree(prevComments, comment.id, comment => ({
                     ...comment,
@@ -367,13 +373,13 @@ export const Comment = ({
                                         setIsEditing(true);
                                         handleMenuClose();
                                     }}>
-                                        Editar
+                                        {t('comment.edit')}
                                     </MenuItem>
                                     <MenuItem onClick={() => {
                                         handleDeleteComment();
                                         handleMenuClose();
                                     }}>
-                                        Eliminar
+                                        {t('comment.delete')}
                                     </MenuItem>
                                 </Menu>
                             </>
@@ -392,12 +398,12 @@ export const Comment = ({
 
                     <Box sx={{ mt: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
                         <Typography variant="caption" color="text.secondary">
-                            hace {formatDistanceToNow(new Date(comment.created_at), { locale: es })}
-                            {comment.is_edited && ' (editado)'}
+                            {formatDistanceToNow(new Date(comment.created_at), { locale: dateFns, addSuffix: true })}
+                            {comment.is_edited && t('comment.edited')}
                         </Typography>
                         {canReply && authState?.isAuthenticated && (
                             <Button size="small" onClick={() => setIsReplying(!isReplying)}>
-                                Responder
+                                {t('comment.reply')}
                             </Button>
                         )}
                         {hasReplies && (
@@ -406,7 +412,7 @@ export const Comment = ({
                                 onClick={() => setShowReplies(!showReplies)}
                                 sx={{ ml: 'auto' }}
                             >
-                                {showReplies ? 'Ocultar Respuestas' : `Mostrar ${comment.replies.length} ${comment.replies.length === 1 ? 'Respuesta' : 'Respuestas'}`}
+                                {showReplies ? t('comment.hideReplies') : t('comment.showReplies', { count: comment.replies.length })}
                             </Button>
                         )}
                     </Box>

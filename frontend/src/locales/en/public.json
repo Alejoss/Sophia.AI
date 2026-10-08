@@ -1,0 +1,49 @@
+{
+  "notFound": {
+    "title": "We could not find this page",
+    "lead": "The path you are looking for does not exist, moved, or was never here. Go back home and keep exploring with intention.",
+    "home": "Back to home",
+    "paths": "Explore paths"
+  },
+  "maintenance": {
+    "imageAlt": "Maintenance page",
+    "title": "We are under maintenance... we will be back soon!",
+    "quote": "Knowledge is power",
+    "subtitle": "Learn with autonomy. Explore topics created by the community and build your own learning network."
+  },
+  "welcome": {
+    "title": "Welcome!",
+    "checking": "Checking your session...",
+    "active": "Welcome, {{username}}! Your account is active and you are signed in.",
+    "again": "Welcome back, {{username}}! You are signed in.",
+    "failed": "Session verification failed. Please try to log in.",
+    "error": "An error occurred while verifying your session. Please try to log in.",
+    "next": "What would you like to do now?",
+    "profile": "View your profile",
+    "login": "Go to log in",
+    "fallbackName": "User"
+  },
+  "club": {
+    "imageAlt": "Reading Club — Cypherpunk Seminar. Hijacking Bitcoin by Roger Ver and Steve Patterson.",
+    "started": "The Reading Club has already started",
+    "cycleStarted": "The «{{title}}» cycle started on July 20.",
+    "stillJoin": "You can still join: enter the hub to take part in the missions, the forum, and the community.",
+    "entering": "Entering…",
+    "enter": "Enter the club",
+    "goToHub": "Go to the club hub",
+    "join": "Join the club",
+    "login": "Already have an account? Log in",
+    "none": "There is no active cycle published right now. Come back soon."
+  },
+  "newsletter": {
+    "title": "Join the community",
+    "lead": "Leave your email and we will keep you up to date on the project, Academia Blockchain news, and key documentaries. You will also be able to join open-source investigations, connect with a study community, and share in building this platform with us.",
+    "email": "Email",
+    "placeholder": "you@email",
+    "success": "Thank you for subscribing! We will let you know about what comes next.",
+    "error": "The subscription could not be completed. Try again later.",
+    "sending": "Sending...",
+    "submit": "I want to subscribe",
+    "privacy": "We will only use your email to send relevant information about Academia Blockchain. You can unsubscribe at any time."
+  }
+}

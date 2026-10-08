@@ -16,15 +16,18 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CloseIcon from '@mui/icons-material/Close';
 import SearchIcon from '@mui/icons-material/Search';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 const CANDIDATES_PAGE_SIZE = 36;
 
 const coverSrc = (item) => item.thumbnail_preview || item.thumbnail;
-const bookTitle = (item) => item.title || 'Sin título';
+const bookTitle = (item, untitled) => item.title || untitled;
 
 const CoverImage = ({ item }) => {
-  const title = bookTitle(item);
+  const { t } = useTranslation('content');
+  const title = bookTitle(item, t('featured.untitled'));
   const cover = coverSrc(item);
   return (
     <Box
@@ -51,7 +54,7 @@ const CoverImage = ({ item }) => {
         />
       ) : (
         <Typography variant="caption" color="text.secondary" sx={{ p: 1, textAlign: 'center' }}>
-          Sin portada
+          {t('featured.noCover')}
         </Typography>
       )}
     </Box>
@@ -66,7 +69,8 @@ const CoverCard = ({
   selected = false,
   clickable = true,
 }) => {
-  const title = bookTitle(item);
+  const { t } = useTranslation('content');
+  const title = bookTitle(item, t('featured.untitled'));
   return (
     <Tooltip title={title} arrow enterDelay={400}>
       <Card
@@ -83,7 +87,7 @@ const CoverCard = ({
             onClick={onClick}
             disabled={disabled}
             sx={{ display: 'block' }}
-            aria-label={`Destacar ${title}`}
+            aria-label={t('featured.featureAria', { title })}
           >
             <CoverImage item={item} />
           </CardActionArea>
@@ -97,6 +101,8 @@ const CoverCard = ({
 };
 
 const FeaturedBooksAdmin = () => {
+  const { t } = useTranslation('content');
+  const { intl } = useDateLocales();
   const [featured, setFeatured] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [search, setSearch] = useState('');
@@ -116,12 +122,12 @@ const FeaturedBooksAdmin = () => {
       const data = await contentApi.getAdminFeaturedBooks();
       setFeatured(Array.isArray(data?.results) ? data.results : []);
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'No se pudieron cargar los destacados');
+      setError(err.response?.data?.error || err.message || t('featured.loadError'));
       setFeatured([]);
     } finally {
       setLoadingFeatured(false);
     }
-  }, []);
+  }, [t]);
 
   const loadCandidates = useCallback(async (query, pageNum = 1) => {
     setLoadingCandidates(true);
@@ -139,7 +145,7 @@ const FeaturedBooksAdmin = () => {
       setTotalCount(data?.count || 0);
     } catch (err) {
       setError(
-        err.response?.data?.error || err.message || 'No se pudieron buscar candidatos',
+        err.response?.data?.error || err.message || t('featured.searchError'),
       );
       setCandidates([]);
       setTotalPages(1);
@@ -147,7 +153,7 @@ const FeaturedBooksAdmin = () => {
     } finally {
       setLoadingCandidates(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadFeatured();
@@ -175,7 +181,7 @@ const FeaturedBooksAdmin = () => {
       await contentApi.addAdminFeaturedBook(profileId);
       await Promise.all([loadFeatured(), loadCandidates(search, page)]);
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'No se pudo destacar el libro');
+      setError(err.response?.data?.error || err.message || t('featured.addError'));
     } finally {
       setBusyId(null);
     }
@@ -188,7 +194,7 @@ const FeaturedBooksAdmin = () => {
       await contentApi.removeAdminFeaturedBook(profileId);
       await Promise.all([loadFeatured(), loadCandidates(search, page)]);
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'No se pudo quitar el destacado');
+      setError(err.response?.data?.error || err.message || t('featured.removeError'));
     } finally {
       setBusyId(null);
     }
@@ -207,7 +213,7 @@ const FeaturedBooksAdmin = () => {
       const data = await contentApi.reorderAdminFeaturedBooks(next.map((row) => row.id));
       setFeatured(Array.isArray(data?.results) ? data.results : next);
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'No se pudo reordenar');
+      setError(err.response?.data?.error || err.message || t('featured.reorderError'));
       await loadFeatured();
     } finally {
       setBusyId(null);
@@ -217,8 +223,7 @@ const FeaturedBooksAdmin = () => {
   return (
     <Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Elige las portadas que aparecen en Buscar. Solo textos visibles en colecciones
-        públicas con miniatura. Los elegibles están ordenados por título.
+        {t('featured.intro')}
       </Typography>
 
       {error && (
@@ -228,7 +233,7 @@ const FeaturedBooksAdmin = () => {
       )}
 
       <Typography variant="h6" sx={{ mb: 1 }}>
-        Destacados actuales ({featured.length})
+        {t('featured.current', { value: featured.length })}
       </Typography>
       {loadingFeatured ? (
         <Box sx={{ py: 3, display: 'flex', justifyContent: 'center' }}>
@@ -236,7 +241,7 @@ const FeaturedBooksAdmin = () => {
         </Box>
       ) : featured.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-          Aún no hay libros destacados. Elige portadas abajo.
+          {t('featured.empty')}
         </Typography>
       ) : (
         <Box
@@ -273,7 +278,7 @@ const FeaturedBooksAdmin = () => {
                 >
                   <IconButton
                     size="small"
-                    aria-label="Subir"
+                    aria-label={t('featured.moveUp')}
                     disabled={busyId === item.id || index === 0}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -285,7 +290,7 @@ const FeaturedBooksAdmin = () => {
                   </IconButton>
                   <IconButton
                     size="small"
-                    aria-label="Bajar"
+                    aria-label={t('featured.moveDown')}
                     disabled={busyId === item.id || index === featured.length - 1}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -297,7 +302,7 @@ const FeaturedBooksAdmin = () => {
                   </IconButton>
                   <IconButton
                     size="small"
-                    aria-label="Quitar de destacados"
+                    aria-label={t('featured.removeAria')}
                     disabled={busyId === item.id}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -315,7 +320,7 @@ const FeaturedBooksAdmin = () => {
       )}
 
       <Typography variant="h6" sx={{ mb: 1 }}>
-        Libros elegibles
+        {t('featured.eligible')}
       </Typography>
       <Box
         component="form"
@@ -325,7 +330,7 @@ const FeaturedBooksAdmin = () => {
       >
         <TextField
           size="small"
-          placeholder="Buscar por título, autor o colección…"
+          placeholder={t('featured.searchPlaceholder')}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           sx={{ flexGrow: 1, minWidth: 220 }}
@@ -336,15 +341,19 @@ const FeaturedBooksAdmin = () => {
           startIcon={<SearchIcon />}
           disabled={loadingCandidates}
         >
-          Buscar
+          {t('actions.search')}
         </Button>
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
         {totalCount > 0
-          ? `${totalCount.toLocaleString()} libros · página ${page} de ${totalPages}`
-          : 'Sin resultados'}
-        {' · clic en una portada para destacar'}
+          ? t('featured.summary', {
+              value: totalCount.toLocaleString(intl),
+              page,
+              totalPages,
+            })
+          : t('featured.noResults')}
+        {t('featured.clickHint')}
       </Typography>
 
       {loadingCandidates ? (
@@ -353,7 +362,7 @@ const FeaturedBooksAdmin = () => {
         </Box>
       ) : candidates.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          No hay candidatos disponibles con esos filtros.
+          {t('featured.noCandidates')}
         </Typography>
       ) : (
         <Box
@@ -394,7 +403,7 @@ const FeaturedBooksAdmin = () => {
             disabled={loadingCandidates || page <= 1}
             onClick={() => handlePageChange(page - 1)}
           >
-            Anterior
+            {t('actions.previous')}
           </Button>
           <Typography variant="body2">
             {page} / {totalPages}
@@ -404,7 +413,7 @@ const FeaturedBooksAdmin = () => {
             disabled={loadingCandidates || page >= totalPages}
             onClick={() => handlePageChange(page + 1)}
           >
-            Siguiente
+            {t('actions.next')}
           </Button>
         </Box>
       )}

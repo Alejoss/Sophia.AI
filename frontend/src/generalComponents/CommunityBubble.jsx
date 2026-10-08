@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   Box,
   Collapse,
@@ -11,18 +12,13 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 
-/** Resto del mensaje tras la frase con enlace al inicio. */
-const BUBBLE_REST = `Puedes sugerir contenido.
-Crear caminos del conocimiento.
-Crear Temas.
-Compartir tu Biblioteca.`;
-
 const isBubbleRoute = (pathname) => {
   const path = pathname.replace(/\/+$/, '') || '/';
   return path === '/content/topics' || path === '/knowledge_path';
 };
 
 const CommunityBubble = () => {
+  const { t } = useTranslation('misc');
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
@@ -78,7 +74,7 @@ const CommunityBubble = () => {
           id="community-bubble-panel"
           elevation={8}
           role="dialog"
-          aria-label="Mensaje de la comunidad"
+          aria-label={t('bubble.dialogAria')}
           sx={{
             maxWidth: 320,
             p: 2,
@@ -93,7 +89,7 @@ const CommunityBubble = () => {
           <IconButton
             size="small"
             onClick={close}
-            aria-label="Cerrar"
+            aria-label={t('bubble.close')}
             sx={{ position: 'absolute', top: 4, right: 4 }}
           >
             <CloseIcon fontSize="small" />
@@ -107,20 +103,24 @@ const CommunityBubble = () => {
             }}
           >
             <Box component="span" sx={{ display: 'block', mb: 0.5 }}>
-              Recuerda que Academia Blockchain es un{' '}
-              <MuiLink
-                component={RouterLink}
-                to="/"
-                underline="hover"
-                color="primary"
-                onClick={close}
-              >
-                proyecto comunitario
-              </MuiLink>
-              .
+              <Trans
+                t={t}
+                i18nKey="bubble.remember"
+                components={{
+                  link: (
+                    <MuiLink
+                      component={RouterLink}
+                      to="/"
+                      underline="hover"
+                      color="primary"
+                      onClick={close}
+                    />
+                  ),
+                }}
+              />
             </Box>
             <Box component="span" sx={{ whiteSpace: 'pre-line' }}>
-              {BUBBLE_REST}
+              {t('bubble.rest')}
             </Box>
           </Typography>
         </Paper>
@@ -132,7 +132,7 @@ const CommunityBubble = () => {
         onClick={toggle}
         aria-expanded={open}
         aria-controls="community-bubble-panel"
-        aria-label="Información del proyecto comunitario"
+        aria-label={t('bubble.toggleAria')}
         sx={{
           width: 56,
           height: 56,
@@ -162,7 +162,7 @@ const CommunityBubble = () => {
         <Box
           component="img"
           src="/images/logo.png"
-          alt="Logo Academia Blockchain"
+          alt={t('bubble.logoAlt')}
           sx={{ height: 32, width: 'auto', display: 'block' }}
         />
       </Box>
