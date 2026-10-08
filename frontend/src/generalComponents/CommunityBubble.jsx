@@ -12,6 +12,9 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 
+/** Temporarily hidden; re-enable when the community bubble is ready for general use. */
+export const SHOW_COMMUNITY_BUBBLE = false;
+
 const isBubbleRoute = (pathname) => {
   const path = pathname.replace(/\/+$/, '') || '/';
   return path === '/content/topics' || path === '/knowledge_path';
@@ -23,7 +26,7 @@ const CommunityBubble = () => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const theme = useTheme();
-  const visible = isBubbleRoute(pathname);
+  const visible = SHOW_COMMUNITY_BUBBLE && isBubbleRoute(pathname);
 
   const toggle = useCallback(() => {
     setOpen((v) => !v);
