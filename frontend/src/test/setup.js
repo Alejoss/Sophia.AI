@@ -1,6 +1,13 @@
 import '@testing-library/jest-dom/vitest';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import i18n, { LANGUAGE_STORAGE_KEY } from '../i18n';
+
+beforeEach(async () => {
+  await i18n.changeLanguage('es');
+  localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+  document.documentElement.lang = 'es';
+});
 
 afterEach(() => {
   cleanup();

@@ -1,0 +1,58 @@
+{
+  "dashboard": {
+    "title": "Certificates",
+    "intro": "Choose a knowledge path to see its learners. From here you send credentials to Sepolia. The educational certificate stays in the learner's account. The NFT is the reward, and whoever receives it can transfer it.",
+    "pathsHeading": "Knowledge paths",
+    "untitled": "Untitled",
+    "pathSummary_one": "Snapshot v{{version}} · {{count}} learner",
+    "pathSummary_other": "Snapshot v{{version}} · {{count}} learners",
+    "readySuffix": " · ready",
+    "empty": "There are no knowledge path certificates. Approve a request first.",
+    "waiting": "No snapshot: {{titles}}. Those paths show up here once they have a snapshot.",
+    "loadFailed": "Could not read the contracts",
+    "confirmed": "Sepolia confirmed the operation.",
+    "recipientRequired": "Enter the address that will receive the token.",
+    "registerPending": "The registration was sent to Sepolia. Confirmation continues in the background.",
+    "registerAlready": "Version {{version}} of “{{title}}” was already registered.",
+    "registerDone": "Version {{version}} registered for the certificate.",
+    "registerFailed": "Could not register the version",
+    "mintPending": "The certificate was sent to Sepolia. Confirmation continues in the background.",
+    "mintAlready": "{{learner}}'s certificate is already issued (#{{tokenId}}).",
+    "mintDone": "Certificate #{{tokenId}} issued to {{recipient}}.",
+    "mintFailed": "Could not issue the certificate",
+    "imageSaved": "Image saved for {{learner}}'s NFT.",
+    "imageFailed": "Could not save the image",
+    "rewardPending": "The NFT was sent to Sepolia. Confirmation continues in the background.",
+    "rewardAlready": "{{learner}}'s NFT is already issued (#{{tokenId}}).",
+    "rewardDone": "NFT #{{tokenId}} issued to {{recipient}}.",
+    "rewardFailed": "Could not issue the NFT"
+  },
+  "contract": {
+    "certificateTitle": "Educational certificate",
+    "certificateHint": "Certifies that the learner finished the knowledge path.",
+    "rewardTitle": "Reward NFT",
+    "rewardHint": "A reward for that same achievement.",
+    "disconnected": "Not connected",
+    "notDeployed": "Not deployed yet"
+  },
+  "token": {
+    "owner": "Owner {{address}}",
+    "viewTx": "View transaction"
+  },
+  "student": {
+    "walletLabel": "Learner's Sepolia account",
+    "certificateKicker": "Educational certificate",
+    "certificateBody": "Register the snapshot version, then issue it to the account above.",
+    "certificateDone": "Certificate #{{tokenId}}",
+    "confirming": "Confirming…",
+    "registerVersion": "Register version",
+    "mintCertificate": "Issue certificate",
+    "rewardKicker": "Reward NFT",
+    "rewardBody": "Issued to the same account.",
+    "rewardDone": "NFT #{{tokenId}}",
+    "savingImage": "Saving…",
+    "changeImage": "Change image",
+    "uploadImage": "Upload image",
+    "mintNft": "Issue NFT"
+  }
+}

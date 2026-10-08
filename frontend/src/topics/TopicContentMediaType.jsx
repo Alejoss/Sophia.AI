@@ -9,6 +9,7 @@ import {
   Link } from
 '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { resolveMediaUrl } from '../utils/fileUtils';
 import CommentSection from '../comments/CommentSection';
@@ -19,6 +20,7 @@ import ContentDisplay from '../content/ContentDisplay';
 const TopicContentMediaType = () => {
   const { topicId, mediaType } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation('topics');
   const [topic, setTopic] = useState(null);
   const [contents, setContents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,13 +46,13 @@ const TopicContentMediaType = () => {
           status: err.response?.status,
           data: err.response?.data
         });
-        setError('Error al cargar los detalles del tema o del contenido');
+        setError(t('media.loadError'));
         setLoading(false);
       }
     };
 
     fetchTopicAndContents();
-  }, [topicId, mediaType]);
+  }, [topicId, mediaType, t]);
 
   const renderContentPreview = (content) => {
     if (!content.file_details) return null;
@@ -66,14 +68,14 @@ const TopicContentMediaType = () => {
               objectFit: 'cover'
             }}
             image={resolveMediaUrl(content.file_details?.url) || `https://picsum.photos/800/600?random=${content.id}`}
-            alt={content.selected_profile?.title || 'Content image'} />);
+            alt={content.selected_profile?.title || t('media.imageAlt')} />);
 
 
       case 'text':
         return (
           <CardContent>
                         <Typography variant="body2" color="text.secondary" noWrap>
-                            {content.file_details?.text || 'Vista previa no disponible'}
+                            {content.file_details?.text || t('media.previewUnavailable')}
                         </Typography>
                     </CardContent>);
 
@@ -103,7 +105,7 @@ const TopicContentMediaType = () => {
               }}>
               
                             <Typography variant="body1" color="white">
-                                Haz clic para reproducir el video
+                                {t('media.clickToPlay')}
                             </Typography>
                         </Box>
                     </Box>);
@@ -116,7 +118,7 @@ const TopicContentMediaType = () => {
               style={{ width: '100%' }}>
               
                             <source src={resolveMediaUrl(content.file_details?.url)} type="audio/mpeg" />
-                            Tu navegador no soporta el elemento de audio.
+                            {t('media.audioUnsupported')}
                         </audio>
                     </Box>);
 
@@ -125,9 +127,9 @@ const TopicContentMediaType = () => {
     }
   };
 
-  if (loading) return <Typography>Cargando contenido...</Typography>;
+  if (loading) return <Typography>{t('media.loading')}</Typography>;
   if (error) return <Typography color="error">{error}</Typography>;
-  if (!topic) return <Typography>Tema no encontrado</Typography>;
+  if (!topic) return <Typography>{t('media.notFound')}</Typography>;
 
   return (
     <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
@@ -143,7 +145,7 @@ const TopicContentMediaType = () => {
           startIcon={<ArrowBackIcon />}
           sx={{ mb: 2, textTransform: 'none' }}>
           
-                    Regresar a la vista principal del tema
+                    {t('media.backToTopic')}
                 </Button>
                 <Typography
           variant="h5"
@@ -155,7 +157,7 @@ const TopicContentMediaType = () => {
           }}
           color="text.primary">
           
-                    {mediaType === 'image' ? 'Todas las imágenes' : mediaType === 'text' ? 'Todos los textos' : `Todos los ${mediaType}s`}
+                    {mediaType === 'image' ? t('media.allImages') : mediaType === 'text' ? t('media.allTexts') : t('media.allOfType', { type: `${mediaType}s` })}
                 </Typography>
 
                 <Grid container spacing={3}>

@@ -13,27 +13,30 @@ import {
     CircularProgress,
     Stack,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import ContentSelector from '../content/ContentSelector';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import i18n from '../i18n';
 
 const schema = yup.object({
     title: yup
         .string()
         .trim()
-        .required('El título es requerido.'),
+        .required(() => i18n.t('paths:common.titleRequired')),
     description: yup.string().trim().default(''),
     content_profile_id: yup
         .mixed()
         .nullable()
         .test(
             'required',
-            'Debes seleccionar un contenido.',
+            () => i18n.t('paths:common.contentRequired'),
             (value) => value != null && value !== '',
         ),
 });
 
 const NodeCreate = () => {
+    const { t } = useTranslation('paths');
     const { pathId } = useParams();
     const navigate = useNavigate();
     const [knowledgePath, setKnowledgePath] = useState(null);
@@ -71,14 +74,14 @@ const NodeCreate = () => {
                 setKnowledgePath(data);
             } catch (err) {
                 console.error('Error loading knowledge path:', err);
-                setLoadError('Error al cargar el camino de conocimiento');
+                setLoadError(t('common.loadPathError'));
             } finally {
                 setLoading(false);
             }
         };
 
         fetchKnowledgePath();
-    }, [pathId]);
+    }, [pathId, t]);
 
     const handleContentSelected = useCallback(
         (contentProfile) => {
@@ -120,7 +123,7 @@ const NodeCreate = () => {
             const { generalError: parsed } = applyApiErrorsToForm(
                 err,
                 setError,
-                'Error al agregar el nodo.',
+                t('nodeCreate.addError'),
                 {
                     title: 'title',
                     description: 'description',
@@ -155,10 +158,10 @@ const NodeCreate = () => {
         <Container sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
             <Box sx={{ maxWidth: '800px', mx: 'auto' }}>
                 <Typography variant="h5" component="h1" sx={{ mb: 1 }}>
-                    Agregar Nodo de Contenido
+                    {t('nodeCreate.title')}
                 </Typography>
                 <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                    al Camino de Conocimiento: {knowledgePath?.title}
+                    {t('nodeCreate.subtitle', { title: knowledgePath?.title })}
                 </Typography>
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -189,7 +192,7 @@ const NodeCreate = () => {
                         <TextField
                             fullWidth
                             id="title"
-                            label="Título del Nodo"
+                            label={t('nodeCreate.nodeTitle')}
                             {...register('title')}
                             error={!!errors.title}
                             helperText={errors.title?.message}
@@ -200,7 +203,7 @@ const NodeCreate = () => {
                         <TextField
                             fullWidth
                             id="description"
-                            label="Descripción"
+                            label={t('common.description')}
                             {...register('description')}
                             error={!!errors.description}
                             helperText={errors.description?.message}
@@ -211,7 +214,7 @@ const NodeCreate = () => {
 
                         {isUploadingContent && (
                             <Alert severity="info" sx={{ mb: 1 }}>
-                                Subiendo contenido… Completa el título y la descripción del nodo mientras tanto.
+                                {t('nodeCreate.uploading')}
                             </Alert>
                         )}
 
@@ -228,7 +231,7 @@ const NodeCreate = () => {
                                 }
                                 sx={{ minWidth: { xs: '100%', md: 'auto' } }}
                             >
-                                {isSubmitting ? 'Agregando...' : 'Agregar Nodo'}
+                                {isSubmitting ? t('nodeCreate.adding') : t('nodeCreate.submit')}
                             </Button>
                             <Button
                                 type="button"
@@ -237,7 +240,7 @@ const NodeCreate = () => {
                                 color="inherit"
                                 sx={{ minWidth: { xs: '100%', md: 'auto' } }}
                             >
-                                Cancelar
+                                {t('common.cancel')}
                             </Button>
                         </Stack>
                     </Box>

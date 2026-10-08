@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography } from '@mui/material';
 import { getOwnerAcceptedCryptos } from './eventPaymentUtils';
 
@@ -12,6 +13,7 @@ const EventPaymentMethods = ({
   compact = false,
   showTitle = true,
 }) => {
+  const { t } = useTranslation('events');
   const accepted = getOwnerAcceptedCryptos(ownerAcceptedCryptos);
 
   if (accepted.length === 0) {
@@ -19,11 +21,11 @@ const EventPaymentMethods = ({
       <Box sx={{ mt: compact ? 1 : 1.5 }}>
         {showTitle && (
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-            Métodos de pago del anfitrión
+            {t('paymentMethods.title')}
           </Typography>
         )}
         <Typography variant="body2" color="text.secondary">
-          El anfitrión aún no ha configurado criptomonedas en su perfil.
+          {t('paymentMethods.none')}
         </Typography>
       </Box>
     );
@@ -40,7 +42,7 @@ const EventPaymentMethods = ({
           display="block"
           sx={{ mb: 1, lineHeight: 1.5, fontSize: compact ? '0.8rem' : '0.875rem' }}
         >
-          Métodos de pago preferidos por el anfitrión:{' '}
+          {t('paymentMethods.preferred')}{' '}
           <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
             {cryptoListText}
           </Box>
@@ -53,8 +55,7 @@ const EventPaymentMethods = ({
         display="block"
         sx={{ lineHeight: 1.5, fontSize: compact ? '0.8rem' : '0.875rem' }}
       >
-        Si no tienes éstas no hay problema, la pasarela de pago cripto permite utilizar decenas de otras criptos;
-        solamente se te cobrará un pequeño porcentaje extra (2%) por conversión.
+        {t('paymentMethods.conversion')}
       </Typography>
     </Box>
   );

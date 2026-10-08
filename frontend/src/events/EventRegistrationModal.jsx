@@ -1,4 +1,5 @@
 import React from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   Alert,
   Box,
@@ -23,6 +24,7 @@ const EventRegistrationModal = ({
   formatDate,
   ownerAcceptedCryptos,
 }) => {
+  const { t } = useTranslation('events');
   const isPaidEvent = event?.reference_price > 0;
 
   return (
@@ -44,10 +46,15 @@ const EventRegistrationModal = ({
             <EventAvailableIcon fontSize="large" />
           </Box>
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            {isPaidEvent ? 'Inscripción y pago' : 'Confirmar inscripción'}
+            {isPaidEvent ? t('registration.andPay') : t('registration.confirm')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Estás a punto de inscribirte en <strong>{event?.title}</strong>
+            <Trans
+              t={t}
+              i18nKey="registration.aboutTo"
+              values={{ title: event?.title }}
+              components={{ strong: <strong /> }}
+            />
           </Typography>
         </Stack>
 
@@ -62,23 +69,23 @@ const EventRegistrationModal = ({
         >
           <Stack spacing={1}>
             <Stack direction="row" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">Anfitrión</Typography>
+              <Typography variant="body2" color="text.secondary">{t('card.hostLabel')}</Typography>
               <Typography variant="body2" fontWeight={600}>{event?.owner?.username}</Typography>
             </Stack>
             <Stack direction="row" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">Inicio</Typography>
+              <Typography variant="body2" color="text.secondary">{t('card.startLabel')}</Typography>
               <Typography variant="body2" fontWeight={600}>{formatDate(event?.date_start)}</Typography>
             </Stack>
             <Divider />
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="body2" color="text.secondary">Precio</Typography>
+              <Typography variant="body2" color="text.secondary">{t('card.priceLabel')}</Typography>
               {isPaidEvent ? (
                 <Typography variant="h6" color="primary.main" fontWeight={700}>
                   ${event.reference_price} USD
                 </Typography>
               ) : (
                 <Typography variant="body2" fontWeight={700} color="success.main">
-                  Gratis
+                  {t('free')}
                 </Typography>
               )}
             </Stack>
@@ -94,14 +101,13 @@ const EventRegistrationModal = ({
 
         {isPaidEvent && (
           <Alert severity="info" icon={<PaymentsIcon />} sx={{ mt: 2 }}>
-            Tras confirmar, podrás elegir con qué cripto pagar en la pasarela NOWPayments.
-            Tu inscripción quedará pendiente hasta que se confirme el pago en la red.
+            {t('registration.payHint')}
           </Alert>
         )}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5, pt: 1 }}>
         <Button onClick={onClose} disabled={loading} color="inherit">
-          Volver
+          {t('back')}
         </Button>
         <Button
           onClick={onConfirm}
@@ -110,10 +116,10 @@ const EventRegistrationModal = ({
           size="large"
         >
           {loading
-            ? 'Procesando...'
+            ? t('processing')
             : isPaidEvent
-              ? 'Inscribirme y pagar'
-              : 'Confirmar inscripción'}
+              ? t('registration.registerAndPay')
+              : t('registration.confirm')}
         </Button>
       </DialogActions>
     </Dialog>

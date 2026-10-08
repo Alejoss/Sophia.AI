@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Avatar,
   Container,
@@ -46,9 +47,12 @@ import BookmarkButton from '../bookmarks/BookmarkButton';
 import KnowledgePathDetailSkeleton from '../components/KnowledgePathDetailSkeleton';
 import BookClubReturnLink from '../bookClubs/BookClubReturnLink';
 import PathCheckout from '../payments/adapters/PathCheckout';
+import { useDateLocales } from '../hooks/useDateLocales';
 
 // TODO: Add a progress bar to the knowledge path detail page
 const KnowledgePathDetail = () => {
+  const { t } = useTranslation('paths');
+  const { intl } = useDateLocales();
   const { pathId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -134,7 +138,7 @@ const KnowledgePathDetail = () => {
         if (handleAuthError(err).handled) {
           return;
         }
-        setError(getErrorMessage(err, 'Error al cargar el camino de conocimiento'));
+        setError(getErrorMessage(err, t('common.loadPathError')));
         setLoading(false);
         setLoadingStatus(false);
       }
@@ -145,7 +149,7 @@ const KnowledgePathDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [pathId, clubSlug, user?.username, authState.isAuthenticated, authState.user, handleAuthError, getErrorMessage]);
+  }, [pathId, clubSlug, user?.username, authState.isAuthenticated, authState.user, handleAuthError, getErrorMessage, t]);
 
   const handleAddComment = async (e) => {
     e.preventDefault();
@@ -181,7 +185,7 @@ const KnowledgePathDetail = () => {
       handleCloseModal();
     } catch (error) {
       console.error('Error requesting certificate:', error);
-      const errorMessage = error.response?.data?.error || 'Error al solicitar el certificado';
+      const errorMessage = error.response?.data?.error || t('detail.requestError');
       const errorDetails = error.response?.data?.details || error.message;
       setError(errorMessage);
       setErrorDetails(errorDetails);
@@ -200,7 +204,7 @@ const KnowledgePathDetail = () => {
       setCertificateStatus(statusData);
     } catch (error) {
       console.error('Error cancelling certificate request:', error);
-      const errorMessage = error.response?.data?.error || 'Error al cancelar la solicitud de certificado';
+      const errorMessage = error.response?.data?.error || t('detail.cancelError');
       const errorDetails = error.response?.data?.details || error.message;
       setError(errorMessage);
       setErrorDetails(errorDetails);
@@ -219,7 +223,7 @@ const KnowledgePathDetail = () => {
       setCertificateStatus(statusData);
     } catch (error) {
       console.error('Error accepting certificate request:', error);
-      const errorMessage = error.response?.data?.error || 'Error al aceptar la solicitud de certificado';
+      const errorMessage = error.response?.data?.error || t('detail.acceptError');
       const errorDetails = error.response?.data?.details || error.message;
       setError(errorMessage);
       setErrorDetails(errorDetails);
@@ -246,7 +250,7 @@ const KnowledgePathDetail = () => {
       setShowPaymentModal(true);
     } catch (err) {
       setPurchaseError(
-        err?.response?.data?.error || err?.error || 'No se pudo iniciar la compra',
+        err?.response?.data?.error || err?.error || t('detail.purchaseError'),
       );
     } finally {
       setPurchaseLoading(false);
@@ -292,8 +296,8 @@ const KnowledgePathDetail = () => {
             icon={<CheckCircle />}
             sx={{ borderRadius: 2 }}
           >
-            <AlertTitle sx={{ fontWeight: 600 }}>Certificado Obtenido</AlertTitle>
-            Has obtenido un certificado por completar este camino de conocimiento
+            <AlertTitle sx={{ fontWeight: 600 }}>{t('detail.certificateObtained')}</AlertTitle>
+            {t('detail.certificateObtainedBody')}
           </Alert>
         </Box>
       );
@@ -315,12 +319,12 @@ const KnowledgePathDetail = () => {
                     onClick={handleCancelRequest}
                     disabled={requestingCertificate}
                   >
-                    {requestingCertificate ? 'Cancelando...' : 'Cancelar'}
+                    {requestingCertificate ? t('detail.cancelling') : t('common.cancel')}
                   </Button>
                 }
               >
-                <AlertTitle sx={{ fontWeight: 600 }}>Solicitud Pendiente</AlertTitle>
-                Tu solicitud de certificado está pendiente de revisión
+                <AlertTitle sx={{ fontWeight: 600 }}>{t('detail.pendingTitle')}</AlertTitle>
+                {t('detail.pendingBody')}
               </Alert>
             </Box>
           );
@@ -331,10 +335,10 @@ const KnowledgePathDetail = () => {
                 severity="error" 
                 sx={{ borderRadius: 2 }}
               >
-                <AlertTitle sx={{ fontWeight: 600 }}>Solicitud Rechazada</AlertTitle>
+                <AlertTitle sx={{ fontWeight: 600 }}>{t('detail.rejectedTitle')}</AlertTitle>
                 {request.rejection_reason && (
                   <Typography variant="body2" sx={{ mt: 1 }}>
-                    <strong>Razón:</strong> {request.rejection_reason}
+                    <strong>{t('detail.reason')}</strong> {request.rejection_reason}
                   </Typography>
                 )}
                 <Box sx={{ mt: 2 }}>
@@ -347,7 +351,7 @@ const KnowledgePathDetail = () => {
                       disabled={requestingCertificate}
                       startIcon={<CheckCircle />}
                     >
-                      {requestingCertificate ? 'Aceptando...' : 'Aceptar Solicitud'}
+                      {requestingCertificate ? t('detail.accepting') : t('detail.accept')}
                     </Button>
                   ) : certificatesEnabled ? (
                     <Button
@@ -357,7 +361,7 @@ const KnowledgePathDetail = () => {
                       onClick={handleOpenModal}
                       disabled={requestingCertificate}
                     >
-                      {requestingCertificate ? 'Solicitando...' : 'Solicitar Nuevamente'}
+                      {requestingCertificate ? t('detail.requesting') : t('detail.requestAgain')}
                     </Button>
                   ) : null}
                 </Box>
@@ -368,8 +372,8 @@ const KnowledgePathDetail = () => {
           return (
             <Box sx={{ mt: 4 }}>
               <Alert severity="info" sx={{ borderRadius: 2 }}>
-                <AlertTitle sx={{ fontWeight: 600 }}>Solicitud Cancelada</AlertTitle>
-                Tu solicitud de certificado fue cancelada
+                <AlertTitle sx={{ fontWeight: 600 }}>{t('detail.cancelledTitle')}</AlertTitle>
+                {t('detail.cancelledBody')}
                 <Box sx={{ mt: 2 }}>
                   {certificatesEnabled && (
                     <Button
@@ -379,7 +383,7 @@ const KnowledgePathDetail = () => {
                       onClick={handleOpenModal}
                       disabled={requestingCertificate}
                     >
-                      {requestingCertificate ? 'Solicitando...' : 'Solicitar Nuevamente'}
+                      {requestingCertificate ? t('detail.requesting') : t('detail.requestAgain')}
                     </Button>
                   )}
                 </Box>
@@ -411,7 +415,7 @@ const KnowledgePathDetail = () => {
             fontWeight: 600
           }}
         >
-          {requestingCertificate ? 'Solicitando...' : 'Solicitar Certificado'}
+          {requestingCertificate ? t('detail.requesting') : t('detail.requestCertificate')}
         </Button>
       </Box>
     );
@@ -434,7 +438,7 @@ const KnowledgePathDetail = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Alert severity="error" sx={{ borderRadius: 2 }}>
-          <AlertTitle>Error</AlertTitle>
+          <AlertTitle>{t('detail.errorTitle')}</AlertTitle>
           {error}
         </Alert>
       </Container>
@@ -445,8 +449,8 @@ const KnowledgePathDetail = () => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Alert severity="info" sx={{ borderRadius: 2 }}>
-          <AlertTitle>No encontrado</AlertTitle>
-          Camino de conocimiento no encontrado
+          <AlertTitle>{t('detail.notFoundTitle')}</AlertTitle>
+          {t('detail.notFound')}
         </Alert>
       </Container>
     );
@@ -533,7 +537,7 @@ const KnowledgePathDetail = () => {
                 {knowledgePath.title}
               </Typography>
               <Typography variant="body1" sx={{ mb: 2, opacity: 0.95, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-                Creado por{' '}
+                {t('detail.createdBy')}{' '}
                 <Link 
                   to={`/profiles/user_profile/${knowledgePath.author_id}`}
                   style={{ 
@@ -564,7 +568,7 @@ const KnowledgePathDetail = () => {
                     }
                   }}
                 >
-                  {pendingRequests} solicitud{pendingRequests !== 1 ? 'es' : ''} pendiente{pendingRequests !== 1 ? 's' : ''}
+                  {t('detail.pendingRequests', { count: pendingRequests })}
                 </Button>
               )}
             </Box>
@@ -622,7 +626,7 @@ const KnowledgePathDetail = () => {
                     }
                   }}
                 >
-                  Editar
+                  {t('common.edit')}
                 </Button>
               )}
             </Stack>
@@ -636,10 +640,13 @@ const KnowledgePathDetail = () => {
           <Box sx={{ mb: 2 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
               <Typography variant="subtitle1" component="div" sx={{ fontWeight: 600, fontSize: '1.25rem' }}>
-                Progreso
+                {t('detail.progress')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {knowledgePath.progress.completed_nodes} de {knowledgePath.progress.total_nodes} nodos completados
+                {t('detail.progressNodes', {
+                  completed: knowledgePath.progress.completed_nodes,
+                  total: knowledgePath.progress.total_nodes,
+                })}
               </Typography>
             </Stack>
             <LinearProgress 
@@ -664,7 +671,7 @@ const KnowledgePathDetail = () => {
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
           <Description color="primary" />
           <Typography variant="h5" sx={{ fontWeight: 600 }}>
-            Descripción
+            {t('common.description')}
           </Typography>
         </Stack>
         <Typography
@@ -681,13 +688,13 @@ const KnowledgePathDetail = () => {
             <Stack direction="row" alignItems="center" spacing={1}>
               <Lock color="warning" />
               <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                Camino de pago
+                {t('detail.paidTitle')}
               </Typography>
             </Stack>
             <Typography variant="body1" color="text.secondary">
-              Desbloquea este camino por{' '}
+              {t('detail.paidBefore')}{' '}
               <strong>${Number(knowledgePath.reference_price).toFixed(2)} USD</strong>{' '}
-              para acceder a los nodos y cuestionarios.
+              {t('detail.paidAfter')}
             </Typography>
             {purchaseError && <Alert severity="error">{purchaseError}</Alert>}
             <Button
@@ -698,7 +705,7 @@ const KnowledgePathDetail = () => {
               disabled={purchaseLoading}
               sx={{ alignSelf: 'flex-start', textTransform: 'none' }}
             >
-              {purchaseLoading ? 'Preparando...' : 'Comprar y desbloquear'}
+              {purchaseLoading ? t('detail.preparing') : t('detail.buy')}
             </Button>
           </Stack>
         </Paper>
@@ -710,13 +717,13 @@ const KnowledgePathDetail = () => {
           <Stack direction="row" alignItems="center" spacing={1}>
             <School color="primary" />
             <Typography variant="h5" sx={{ fontWeight: 600 }}>
-              Nodos de Contenido
+              {t('detail.nodesTitle')}
             </Typography>
           </Stack>
           {knowledgePath.progress?.is_completed && (
             <Chip 
               icon={<CheckCircle />}
-              label="Completado" 
+              label={t('detail.completed')} 
               color="success" 
               sx={{ fontWeight: 600 }}
             />
@@ -810,13 +817,15 @@ const KnowledgePathDetail = () => {
                             <Chip
                               label={
                                 node.club_opens_at
-                                  ? `Disponible ${new Date(node.club_opens_at).toLocaleString('es-ES', {
-                                      day: 'numeric',
-                                      month: 'short',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    })}`
-                                  : 'Fecha por confirmar'
+                                  ? t('detail.availableOn', {
+                                      date: new Date(node.club_opens_at).toLocaleString(intl, {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      }),
+                                    })
+                                  : t('detail.dateTbd')
                               }
                               size="small"
                               color="warning"
@@ -827,17 +836,17 @@ const KnowledgePathDetail = () => {
                       </Box>
                       <Stack direction="row" spacing={1} alignItems="center">
                         {isCompleted && (
-                          <Tooltip title="Completado">
+                          <Tooltip title={t('detail.completed')}>
                             <CheckCircle color="success" sx={{ fontSize: 28 }} />
                           </Tooltip>
                         )}
                         {isLocked && (
-                          <Tooltip title="Bloqueado">
+                          <Tooltip title={t('detail.locked')}>
                             <Lock color="disabled" sx={{ fontSize: 28 }} />
                           </Tooltip>
                         )}
                         {node.is_available && !isCompleted && (
-                          <Tooltip title="Disponible">
+                          <Tooltip title={t('detail.available')}>
                             <LockOpen color="primary" sx={{ fontSize: 28 }} />
                           </Tooltip>
                         )}
@@ -860,7 +869,7 @@ const KnowledgePathDetail = () => {
           </Stack>
         ) : (
           <Alert severity="info" sx={{ borderRadius: 2 }}>
-            Aún no se han agregado nodos de contenido
+            {t('detail.emptyNodes')}
           </Alert>
         )}
 
@@ -875,15 +884,15 @@ const KnowledgePathDetail = () => {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle>Solicitar Certificado</DialogTitle>
+          <DialogTitle>{t('detail.requestCertificate')}</DialogTitle>
           <DialogContent>
             <Box sx={{ mt: 2 }}>
               <TextField
                 fullWidth
                 multiline
                 rows={4}
-                label="Mensaje opcional"
-                placeholder="Opcionalmente agrega una nota al creador del camino de conocimiento"
+                label={t('detail.optionalMessage')}
+                placeholder={t('detail.notePlaceholder')}
                 value={requestNote}
                 onChange={(e) => setRequestNote(e.target.value)}
                 variant="outlined"
@@ -905,14 +914,14 @@ const KnowledgePathDetail = () => {
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseModal}>Cancelar</Button>
+            <Button onClick={handleCloseModal}>{t('common.cancel')}</Button>
             <Button 
               onClick={handleRequestCertificate}
               variant="contained"
               color="primary"
               disabled={requestingCertificate}
             >
-              {requestingCertificate ? 'Enviando...' : 'Enviar Solicitud'}
+              {requestingCertificate ? t('detail.sending') : t('detail.sendRequest')}
             </Button>
           </DialogActions>
         </Dialog>

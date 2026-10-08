@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import { Link as RouterLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Box, Tab, Tabs, Typography, CircularProgress } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { AuthContext } from '../context/AuthContext';
 import TopicCreationRequestsAdmin from '../topics/TopicCreationRequestsAdmin';
 import BookClubsDashboardAdmin from '../bookClubs/BookClubsDashboardAdmin';
@@ -34,6 +35,7 @@ const dashboardTabValue = (pathname) => {
 };
 
 const Dashboard = () => {
+  const { t } = useTranslation('nav');
   const { authState, authInitialized } = useContext(AuthContext);
   const location = useLocation();
   const withTabs = showDashboardTabs(location.pathname);
@@ -60,10 +62,10 @@ const Dashboard = () => {
       {withTabs && (
         <>
           <Typography variant="h4" gutterBottom>
-            Dashboard
+            {t('dashboard.title')}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Panel de administración de la plataforma.
+            {t('dashboard.subtitle')}
           </Typography>
           <Tabs
             value={tabValue}
@@ -72,37 +74,37 @@ const Dashboard = () => {
             sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
           >
             <Tab
-              label="Inicio"
+              label={t('dashboard.home')}
               value="home"
               component={RouterLink}
               to="/dashboard"
             />
             <Tab
-              label="Consultas"
+              label={t('dashboard.consultations')}
               value="consultations"
               component={RouterLink}
               to="/dashboard/consultas"
             />
             <Tab
-              label="Libros destacados"
+              label={t('dashboard.featuredBooks')}
               value="featured-books"
               component={RouterLink}
               to="/dashboard/libros-destacados"
             />
             <Tab
-              label="Pagos BCH"
+              label={t('dashboard.bchPayments')}
               value="bch-payments"
               component={RouterLink}
               to="/dashboard/pagos-bch"
             />
             <Tab
-              label="Snapshots"
+              label={t('dashboard.snapshots')}
               value="snapshots"
               component={RouterLink}
               to="/dashboard/snapshots"
             />
             <Tab
-              label="Certificados"
+              label={t('dashboard.certificates')}
               value="certificates"
               component={RouterLink}
               to="/dashboard/certificados"

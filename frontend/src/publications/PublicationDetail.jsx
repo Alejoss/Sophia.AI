@@ -23,9 +23,11 @@ import ProfileHeader from '../profiles/ProfileHeader';
 import AddToLibraryModal from '../components/AddToLibraryModal';
 import { getProfileById } from '../api/profilesApi';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 // ContentDisplay Mode: "card" - Rich card display for publication content
 const PublicationDetail = () => {
+    const { t } = useTranslation('publications');
     const [publication, setPublication] = useState(null);
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -82,10 +84,10 @@ const PublicationDetail = () => {
         const shareUrl = `${window.location.origin}/publications/${publicationId}`;
         try {
             await navigator.clipboard.writeText(shareUrl);
-            showSnackbar('URL copiada al portapapeles', 'success');
+            showSnackbar(t('detail.copySuccess'), 'success');
         } catch (err) {
             console.error('Failed to copy publication URL:', err);
-            showSnackbar('No se pudo copiar la URL', 'error');
+            showSnackbar(t('detail.copyError'), 'error');
         }
     };
 
@@ -108,13 +110,13 @@ const PublicationDetail = () => {
 
     if (error) return (
         <Box sx={{ p: 3 }}>
-            <Typography color="error">Error: {error}</Typography>
+            <Typography color="error">{t('detail.error', { message: error })}</Typography>
         </Box>
     );
 
     if (!publication) return (
         <Box sx={{ p: 3 }}>
-            <Typography>Publicación no encontrada</Typography>
+            <Typography>{t('detail.notFound')}</Typography>
         </Box>
     );
 
@@ -159,7 +161,7 @@ const PublicationDetail = () => {
                             startIcon={<EditIcon />}
                             onClick={() => navigate(`/publications/${publicationId}/edit`)}
                         >
-                            Editar Publicación
+                            {t('detail.edit')}
                         </Button>
                     </Box>
                 </Box>
@@ -167,7 +169,7 @@ const PublicationDetail = () => {
                 {/* Publication Header */}
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                        Publicado el {formatDate(publication.published_at)}
+                        {t('detail.published', { date: formatDate(publication.published_at) })}
                     </Typography>
                 </Box>
 
@@ -177,7 +179,7 @@ const PublicationDetail = () => {
                 {publication.content && (
                     <Box sx={{ mb: 3 }}>
                         <Typography variant="subtitle1" gutterBottom>
-                            Contenido Referenciado:
+                            {t('detail.referenced')}
                         </Typography>
                         
                         <Box sx={{ mb: 2 }}>
@@ -198,10 +200,10 @@ const PublicationDetail = () => {
                 </Typography>
             </Paper>
 
-            <Tooltip title="Compartir publicación" placement="left">
+            <Tooltip title={t('detail.shareTooltip')} placement="left">
                 <Fab
                     color="primary"
-                    aria-label="compartir publicación"
+                    aria-label={t('detail.shareAria')}
                     onClick={handleSharePublication}
                     sx={{
                         position: 'fixed',

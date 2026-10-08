@@ -1,0 +1,21 @@
+{
+  "email": {
+    "defaultLabel": "correo electrónico",
+    "required": "El {{label}} es requerido.",
+    "invalid": "Introduce un {{label}} válido."
+  },
+  "password": {
+    "required": "La contraseña es requerida.",
+    "min": "Debe tener al menos 8 caracteres",
+    "upper": "Debe contener al menos una letra mayúscula",
+    "lower": "Debe contener al menos una letra minúscula",
+    "number": "Debe contener al menos un número",
+    "special": "Debe contener al menos un carácter especial (!@#$%^&*...)"
+  },
+  "username": {
+    "required": "El nombre de usuario es requerido.",
+    "min": "El nombre de usuario debe tener al menos 3 caracteres.",
+    "noAt": "El nombre de usuario no puede contener el símbolo @. Usa solo letras, números y guiones bajos (_).",
+    "charset": "El nombre de usuario solo puede contener letras, números y guiones bajos (_)."
+  }
+}

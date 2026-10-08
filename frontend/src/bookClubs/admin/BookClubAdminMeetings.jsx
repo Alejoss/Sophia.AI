@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useOutletContext, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -16,6 +17,7 @@ import { getUserCreatedEvents } from '../../api/eventsApi';
 import { extractApiError, formatClubDate } from '../clubTheme';
 
 const BookClubAdminMeetings = () => {
+  const { t } = useTranslation('bookClubs');
   const { slug } = useParams();
   const { reload } = useOutletContext();
   const [linked, setLinked] = useState([]);
@@ -39,11 +41,11 @@ const BookClubAdminMeetings = () => {
       setMyEvents(list);
       setError(null);
     } catch (err) {
-      setError(extractApiError(err, 'No se pudieron cargar las reuniones.'));
+      setError(extractApiError(err, t('errors.loadMeetings')));
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, t]);
 
   useEffect(() => {
     load();
@@ -57,28 +59,28 @@ const BookClubAdminMeetings = () => {
     try {
       await bookClubsApi.linkEvent(slug, Number(eventId));
       setEventId('');
-      setSuccess('Reunión vinculada.');
+      setSuccess(t('meetingAdmin.linked'));
       await load();
       await reload?.();
     } catch (err) {
-      setError(extractApiError(err, 'No se pudo vincular el evento.'));
+      setError(extractApiError(err, t('errors.linkEvent')));
     } finally {
       setSaving(false);
     }
   };
 
   const handleUnlink = async (linkId) => {
-    if (!window.confirm('¿Desvincular esta reunión del club?')) return;
+    if (!window.confirm(t('meetingAdmin.confirmUnlink'))) return;
     setUnlinkingId(linkId);
     setError(null);
     setSuccess(null);
     try {
       await bookClubsApi.unlinkEvent(slug, linkId);
-      setSuccess('Reunión desvinculada.');
+      setSuccess(t('meetingAdmin.unlinked'));
       await load();
       await reload?.();
     } catch (err) {
-      setError(extractApiError(err, 'No se pudo desvincular el evento.'));
+      setError(extractApiError(err, t('errors.unlinkEvent')));
     } finally {
       setUnlinkingId(null);
     }
@@ -90,11 +92,10 @@ const BookClubAdminMeetings = () => {
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        Reuniones del club
+        {t('meetingAdmin.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Vincula eventos existentes (lives / encuentros) a este club. Puedes crear nuevos en la sección
-        de eventos.
+        {t('meetingAdmin.intro')}
       </Typography>
 
       {error && (
@@ -110,15 +111,15 @@ const BookClubAdminMeetings = () => {
 
       <Stack spacing={2} maxWidth={640} sx={{ mb: 4 }}>
         <FormControl fullWidth>
-          <InputLabel id="event-label">Evento a vincular</InputLabel>
+          <InputLabel id="event-label">{t('meetingAdmin.eventLabel')}</InputLabel>
           <Select
             labelId="event-label"
-            label="Evento a vincular"
+            label={t('meetingAdmin.eventLabel')}
             value={eventId}
             onChange={(e) => setEventId(e.target.value)}
             disabled={loading}
           >
-            <MenuItem value="">Selecciona un evento</MenuItem>
+            <MenuItem value="">{t('meetingAdmin.selectEvent')}</MenuItem>
             {available.map((ev) => (
               <MenuItem key={ev.id} value={String(ev.id)}>
                 {ev.title}
@@ -128,19 +129,19 @@ const BookClubAdminMeetings = () => {
         </FormControl>
         <Stack direction="row" spacing={1}>
           <Button variant="contained" onClick={handleLink} disabled={saving || !eventId}>
-            Vincular
+            {t('meetingAdmin.link')}
           </Button>
           <Button component={RouterLink} to="/events/create" variant="outlined">
-            Crear evento
+            {t('meetingAdmin.createEvent')}
           </Button>
         </Stack>
       </Stack>
 
       <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
-        Ya vinculadas
+        {t('meetingAdmin.alreadyLinked')}
       </Typography>
       {!linked.length ? (
-        <Typography color="text.secondary">Ninguna aún.</Typography>
+        <Typography color="text.secondary">{t('meetingAdmin.none')}</Typography>
       ) : (
         <Stack spacing={1.5}>
           {linked.map((ev) => (
@@ -160,12 +161,12 @@ const BookClubAdminMeetings = () => {
               <Box>
                 <Typography fontWeight={600}>{ev.title}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {formatClubDate(ev.date_start) || 'Sin fecha'}
+                  {formatClubDate(ev.date_start) || t('dates.none')}
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1}>
                 <Button size="small" component={RouterLink} to={`/events/${ev.event_id}`}>
-                  Abrir evento
+                  {t('meetingAdmin.openEvent')}
                 </Button>
                 <Button
                   size="small"
@@ -173,7 +174,7 @@ const BookClubAdminMeetings = () => {
                   disabled={unlinkingId === ev.id}
                   onClick={() => handleUnlink(ev.id)}
                 >
-                  {unlinkingId === ev.id ? 'Quitando…' : 'Desvincular'}
+                  {unlinkingId === ev.id ? t('meetingAdmin.unlinking') : t('meetingAdmin.unlink')}
                 </Button>
               </Stack>
             </Box>

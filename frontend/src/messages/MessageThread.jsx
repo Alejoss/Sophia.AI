@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useContext, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { useParams, Link } from 'react-router-dom';
+import { useDateLocales } from '../hooks/useDateLocales';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -23,10 +26,12 @@ const messageSchema = yup.object({
   text: yup
     .string()
     .trim()
-    .required('Escribe un mensaje antes de enviar.'),
+    .required(() => i18n.t('messages:validation.writeBeforeSend')),
 });
 
 const MessageThread = () => {
+  const { t } = useTranslation('messages');
+  const { intl } = useDateLocales();
   const { userId } = useParams();
   const { authState } = useContext(AuthContext);
   const currentUser = authState.user;
@@ -59,7 +64,7 @@ const MessageThread = () => {
       try {
         const threadRes = await fetchOrCreateThread(userId);
         if (!threadRes.data) {
-          throw new Error('Error al crear o obtener el hilo');
+          throw new Error(t('thread.createFailed'));
         }
         setThread(threadRes.data);
         const threadId = threadRes.data.id;
@@ -69,13 +74,13 @@ const MessageThread = () => {
         setError(null);
       } catch (err) {
         console.error('Error loading messages:', err);
-        setError('Error al cargar los mensajes.');
+        setError(t('thread.loadFailed'));
       } finally {
         setLoading(false);
       }
     };
     loadThreadAndMessages();
-  }, [userId]);
+  }, [userId, t]);
 
   const onSubmit = async ({ text }) => {
     if (!thread) return;
@@ -93,7 +98,7 @@ const MessageThread = () => {
       const { generalError: parsed } = applyApiErrorsToForm(
         err,
         setFormError,
-        'Error al enviar el mensaje.',
+        t('thread.sendFailed'),
         { message: 'text', content: 'text' },
       );
       if (parsed) {
@@ -110,7 +115,7 @@ const MessageThread = () => {
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress /></Box>;
   if (error) return <Box sx={{ p: 3 }}><Typography color="error">{error}</Typography></Box>;
-  if (!thread) return <Box sx={{ p: 3 }}><Typography>No se encontró el hilo.</Typography></Box>;
+  if (!thread) return <Box sx={{ p: 3 }}><Typography>{t('thread.notFound')}</Typography></Box>;
 
   const otherUser = getOtherUser();
 
@@ -118,7 +123,7 @@ const MessageThread = () => {
     <Box sx={{ maxWidth: 600, mx: 'auto', p: 3 }}>
       <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
         <Typography variant="h5" gutterBottom>
-          Conversación con{' '}
+          {t('thread.withUser')}{' '}
           <Link
             to={`/profiles/user_profile/${otherUser?.id}`}
             style={{
@@ -129,12 +134,12 @@ const MessageThread = () => {
               }
             }}
           >
-            {otherUser ? otherUser.username : 'Usuario'}
+            {otherUser ? otherUser.username : t('thread.unknownUser')}
           </Link>
         </Typography>
         <List sx={{ maxHeight: 400, overflowY: 'auto', mb: 2 }}>
           {(!messages || messages.length === 0) && (
-            <ListItem><ListItemText primary="Aún no hay mensajes." /></ListItem>
+            <ListItem><ListItemText primary={t('thread.empty')} /></ListItem>
           )}
           {messages && messages.map(msg => {
             const isOwn = msg.sender.id === currentUser.id;
@@ -175,7 +180,7 @@ const MessageThread = () => {
                       mt: 0.5
                     }}
                   >
-                    {msg.sender.username} &bull; {new Date(msg.timestamp).toLocaleString('es-ES')}
+                    {msg.sender.username} &bull; {new Date(msg.timestamp).toLocaleString(intl)}
                   </Typography>
                 </Box>
               </ListItem>
@@ -197,7 +202,7 @@ const MessageThread = () => {
               fullWidth
               variant="outlined"
               size="small"
-              placeholder="Escriba su mensaje..."
+              placeholder={t('thread.placeholder')}
               error={!!errors.text}
               helperText={errors.text?.message}
               disabled={isSubmitting}
@@ -209,7 +214,7 @@ const MessageThread = () => {
               color="primary"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Enviando...' : 'Enviar'}
+              {isSubmitting ? t('thread.sending') : t('thread.send')}
             </Button>
           </Box>
         </Box>

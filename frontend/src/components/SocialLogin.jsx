@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { socialLogin } from '../api/profilesApi';
 import { GoogleLogin } from '@react-oauth/google';
+import { useTranslation } from 'react-i18next';
 import {
   getUserFromLocalStorage,
   isAuthenticated,
@@ -35,6 +36,7 @@ const ErrorMessage = styled.div`
  * @param {'signin_with'|'signup_with'|'continue_with'|'signin'} [text]
  */
 const SocialLogin = ({ redirectTo, text = 'continue_with' } = {}) => {
+  const { t, i18n } = useTranslation('misc');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -74,11 +76,11 @@ const SocialLogin = ({ redirectTo, text = 'continue_with' } = {}) => {
         setError(
           err?.response?.data?.error
           || err?.error
-          || 'No se pudo iniciar sesión con Google. Inténtalo de nuevo.',
+          || t('social.loginFailed'),
         );
       }
     },
-    [updateAuthState, navigate, redirectTo, searchParams, location.state]
+    [updateAuthState, navigate, redirectTo, searchParams, location.state, t]
   );
 
   return (
@@ -88,12 +90,12 @@ const SocialLogin = ({ redirectTo, text = 'continue_with' } = {}) => {
         onSuccess={handleCredentialResponse}
         onError={(err) => {
           console.error('Google OAuth error:', err);
-          setError('No se pudo iniciar el inicio de sesión con Google.');
+          setError(t('social.startFailed'));
         }}
         theme="filled_blue"
         shape="rectangular"
         text={text}
-        locale="es"
+        locale={i18n.resolvedLanguage || i18n.language || 'es'}
       />
     </SocialLoginContainer>
   );

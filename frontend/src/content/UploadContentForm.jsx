@@ -38,12 +38,15 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import { useTranslation } from 'react-i18next';
 import { getMediaType } from './mediaTypeFromFile';
+import i18n from '../i18n';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 import { bindMuiRhfField } from '../utils/muiRhfField';
 
 // URL Preview Component
 const URLPreview = ({ previewData, isLoading, error }) => {
+  const { t } = useTranslation('content');
   if (isLoading) {
     return (
       <Card sx={{ mt: 2, mb: 3, display: 'flex', alignItems: 'start', position: 'relative', zIndex: 1 }}>
@@ -96,7 +99,7 @@ const URLPreview = ({ previewData, isLoading, error }) => {
             objectFit: 'cover'
           }}
           image={previewData.image}
-          alt={previewData.title || 'Preview image'} />
+          alt={previewData.title || t('upload.previewAlt')} />
         
           {isYouTube &&
         <Box
@@ -171,14 +174,14 @@ const URLPreview = ({ previewData, isLoading, error }) => {
 const createSchema = () => yup.object({
   file: yup.mixed().when('isUrlMode', {
     is: false,
-    then: () => yup.mixed().required('El archivo es requerido'),
+    then: () => yup.mixed().required(() => i18n.t('content:upload.fileRequired')),
     otherwise: () => yup.mixed().nullable()
   }),
   url: yup.string().when('isUrlMode', {
     is: true,
     then: () => yup.string().
-    required('La URL es requerida').
-    test('is-url', 'Debe ser una URL válida', function (value) {
+    required(() => i18n.t('content:upload.urlRequired')).
+    test('is-url', () => i18n.t('content:upload.urlInvalid'), function (value) {
       if (!value) return true; // required check handles empty
       // Normalize URL by adding https:// if missing
       const normalized = value.match(/^https?:\/\//i) ? value : `https://${value}`;
@@ -189,11 +192,11 @@ const createSchema = () => yup.object({
   }),
   media_type: yup.string().when('isUrlMode', {
     is: true,
-    then: () => yup.string().oneOf(['VIDEO', 'AUDIO', 'TEXT', 'IMAGE'], 'Por favor selecciona un tipo de medio válido').required('El tipo de medio es requerido'),
+    then: () => yup.string().oneOf(['VIDEO', 'AUDIO', 'TEXT', 'IMAGE'], () => i18n.t('content:upload.mediaTypeInvalid')).required(() => i18n.t('content:upload.mediaTypeRequired')),
     otherwise: () => yup.string().nullable()
   }),
-  title: yup.string().max(255, 'El título no debe exceder 255 caracteres'),
-  author: yup.string().max(255, 'El autor no debe exceder 255 caracteres'),
+  title: yup.string().max(255, () => i18n.t('content:upload.titleMax')),
+  author: yup.string().max(255, () => i18n.t('content:upload.authorMax')),
   has_spanish_subtitles: yup.boolean(),
   has_spanish_dubbing: yup.boolean(),
   is_producer: yup.boolean(),
@@ -204,6 +207,7 @@ const createSchema = () => yup.object({
 const schema = createSchema();
 
 const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = null, isEditMode = false, contentId = null, contentProfileId = null, onUploadingChange, initialUrlMode = null, showModeToggle = true, onHasPendingContentChange }) => {
+  const { t } = useTranslation('content');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null); // 0-100 for file uploads, null when not uploading or URL mode
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -230,7 +234,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
   const fileInputRef = React.useRef(null);
   const [titleAuthorExpanded, setTitleAuthorExpanded] = useState(false);
 
-  const MEDIA_TYPE_LABELS = { IMAGE: 'Imagen', VIDEO: 'Video', AUDIO: 'Audio', TEXT: 'Texto' };
+  const mediaTypeLabel = (code) => t(`mediaType.${code}`, { defaultValue: code });
 
   // Determine initial isUrlMode value
   const initialIsUrlMode = initialUrlMode !== null ? initialUrlMode : !!initialData?.url;
@@ -433,7 +437,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
           setPreviewError(
             error?.response?.data?.error
             || error?.error
-            || 'No se pudo cargar la vista previa para esta URL',
+            || t('upload.previewError'),
           );
         }
       } finally {
@@ -466,11 +470,11 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
 
           const file = data.file[0];
           if (!file) {
-            throw new Error('No se seleccionó ningún archivo');
+            throw new Error(t('upload.noFileSelected'));
           }
           const mediaType = getMediaType(file);
           if (!mediaType) {
-            throw new Error('Tipo de archivo no soportado');
+            throw new Error(t('upload.unsupportedType'));
           }
           const response = await contentApi.uploadContentViaS3(
             file,
@@ -503,7 +507,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
           setHasSavedSuccessfully(true);
           setSnackbar({
             open: true,
-            message: '¡Nuevo contenido creado exitosamente! El perfil de contenido ha sido actualizado para referenciar el nuevo archivo.',
+            message: t('upload.createdWithProfile'),
             severity: 'success'
           });
         } else {
@@ -530,7 +534,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
           setHasSavedSuccessfully(true);
           setSnackbar({
             open: true,
-            message: '¡Contenido actualizado exitosamente!',
+            message: t('upload.updated'),
             severity: 'success'
           });
         }
@@ -561,9 +565,9 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
         } else {
 
           const file = data.file[0];
-          if (!file) throw new Error('No se seleccionó ningún archivo');
+          if (!file) throw new Error(t('upload.noFileSelected'));
           const mediaType = getMediaType(file);
-          if (!mediaType) throw new Error('Tipo de archivo no soportado');
+          if (!mediaType) throw new Error(t('upload.unsupportedType'));
           const response = await contentApi.uploadContentViaS3(
             file,
             {
@@ -589,13 +593,13 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
         setPreviewData(null);
         setSnackbar({
           open: true,
-          message: '¡Contenido subido exitosamente!',
+          message: t('upload.uploaded'),
           severity: 'success'
         });
       }
     } catch (error) {
       console.error('Upload failed:', error);
-      const fallback = 'Error al subir contenido. Por favor, inténtalo de nuevo.';
+      const fallback = t('upload.uploadError');
       const { fieldErrors, generalError: parsed } = applyApiErrorsToForm(
         error,
         setError,
@@ -713,7 +717,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
       {showModeToggle &&
       <>
           <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-            {isEditMode ? 'Cambiar fuente del contenido' : 'Selecciona cómo agregar contenido'}
+            {isEditMode ? t('upload.changeSource') : t('upload.chooseHow')}
           </Typography>
 
           {/* Toggle Buttons - Styled as option cards */}
@@ -754,11 +758,11 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
               }
             }}>
             
-              <ToggleButton value="url" aria-label="subir contenido desde url">
-                Desde URL
+              <ToggleButton value="url" aria-label={t('upload.fromUrlAria')}>
+                {t('upload.fromUrl')}
               </ToggleButton>
-              <ToggleButton value="file" aria-label="subir archivo">
-                Subir Archivo
+              <ToggleButton value="file" aria-label={t('upload.uploadFileAria')}>
+                {t('upload.uploadFile')}
               </ToggleButton>
             </ToggleButtonGroup>
           </Box>
@@ -768,7 +772,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
       <form
         noValidate
         onSubmit={handleSubmit(onSubmit, () => {
-          setGeneralError('Por favor completa todos los campos requeridos correctamente.');
+          setGeneralError(t('upload.invalidForm'));
         })}
       >
         {generalError && (
@@ -780,7 +784,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
         {!isUrlMode ?
         <FormControl fullWidth error={!!errors.file} sx={{ mb: 3 }}>
             <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 500 }}>
-              Archivo:
+              {t('upload.fileLabel')}
             </Typography>
             <Box
             onClick={() => fileInputRef.current?.click()}
@@ -804,7 +808,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
                 sx={{ textTransform: 'none' }}
                 disabled={isUploading}>
                 
-                  Seleccionar archivo
+                  {t('upload.selectFile')}
                 </Button>
                 <input
                 type="file"
@@ -821,17 +825,17 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
                 style={{ display: 'none' }} />
               
                 <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
-                  {watch('file')?.[0]?.name ? watch('file')[0].name : 'Ningún archivo seleccionado'}
+                  {watch('file')?.[0]?.name ? watch('file')[0].name : t('upload.noneSelected')}
                 </Typography>
               </Stack>
               {watch('file')?.[0] && (() => {
               const inferredType = getMediaType(watch('file')[0]);
               return inferredType ?
               <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary">Tipo detectado:</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('upload.detectedType')}</Typography>
                     <Chip
                   size="small"
-                  label={MEDIA_TYPE_LABELS[inferredType] ?? inferredType}
+                  label={mediaTypeLabel(inferredType)}
                   color="primary"
                   variant="outlined" />
                 
@@ -839,7 +843,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
               null;
             })()}
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                O arrastra y suelta un archivo aquí
+                {t('upload.dropHint')}
               </Typography>
             </Box>
             {errors.file &&
@@ -852,7 +856,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
         <>
             <FormControl fullWidth sx={{ mb: 3 }}>
               <TextField
-              label="URL"
+              label={t('common.url')}
               variant="outlined"
               {...urlField}
               onChange={(e) => {
@@ -874,7 +878,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
             
             {/* Media Type Selector for URL Content */}
             <FormControl fullWidth error={!!errors.media_type} sx={{ mb: 3 }}>
-              <InputLabel id="media-type-label">Tipo de contenido</InputLabel>
+              <InputLabel id="media-type-label">{t('upload.contentType')}</InputLabel>
               <Controller
                 name="media_type"
                 control={control}
@@ -882,17 +886,17 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
                   <Select
                     {...field}
                     labelId="media-type-label"
-                    label="Tipo de contenido"
+                    label={t('upload.contentType')}
                     value={field.value || ''}
                     onChange={(e) => {
                       field.onChange(e.target.value);
                       setHasSavedSuccessfully(false);
                     }}
                   >
-                    <MenuItem value="VIDEO">Video</MenuItem>
-                    <MenuItem value="AUDIO">Audio</MenuItem>
-                    <MenuItem value="TEXT">Texto</MenuItem>
-                    <MenuItem value="IMAGE">Imagen</MenuItem>
+                    <MenuItem value="VIDEO">{t('mediaType.VIDEO')}</MenuItem>
+                    <MenuItem value="AUDIO">{t('mediaType.AUDIO')}</MenuItem>
+                    <MenuItem value="TEXT">{t('mediaType.TEXT')}</MenuItem>
+                    <MenuItem value="IMAGE">{t('mediaType.IMAGE')}</MenuItem>
                   </Select>
                 )}
               />
@@ -920,13 +924,13 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
               '&:hover': { backgroundColor: 'action.hover' }
             }}>
             
-              Título y autor (opcional)
+              {t('upload.titleAuthorOptional')}
             </Button>
             <Collapse in={titleAuthorExpanded}>
               <Box sx={{ pl: 0, pr: 0, pt: 0, pb: 1 }}>
                 <FormControl fullWidth sx={{ mb: 2 }}>
                   <TextField
-                  label="Autor"
+                  label={t('common.author')}
                   variant="outlined"
                   {...authorField}
                   onChange={(e) => {
@@ -939,7 +943,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
                 </FormControl>
                 <FormControl fullWidth sx={{ mb: 0 }}>
                   <TextField
-                  label="Título"
+                  label={t('common.title')}
                   variant="outlined"
                   {...titleField}
                   onChange={(e) => {
@@ -957,7 +961,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
         <>
             <FormControl fullWidth sx={{ mb: 3 }}>
               <TextField
-              label="Autor"
+              label={t('common.author')}
               variant="outlined"
               {...authorField}
               onChange={(e) => {
@@ -970,7 +974,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
             </FormControl>
             <FormControl fullWidth sx={{ mb: 3 }}>
               <TextField
-              label="Título"
+              label={t('common.title')}
               variant="outlined"
               {...titleField}
               onChange={(e) => {
@@ -996,7 +1000,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
               {...register('has_spanish_subtitles')} />
 
             }
-            label="Tiene subtítulos en español" />
+            label={t('upload.spanishSubtitles')} />
           
           <FormControlLabel
             control={
@@ -1009,7 +1013,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
               {...register('has_spanish_dubbing')} />
 
             }
-            label="Está doblado al español" />
+            label={t('upload.spanishDubbing')} />
           
         </Box>
 
@@ -1024,7 +1028,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
               {...register('is_producer')} />
 
             }
-            label="He producido este contenido" />
+            label={t('upload.iProduced')} />
           
             {watch('is_producer') &&
           <Box sx={{ ml: 3 }}>
@@ -1036,10 +1040,10 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
                 {...register('is_visible')} />
 
               }
-              label="Visible en los resultados de búsqueda" />
+              label={t('upload.visibleInSearch')} />
             
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                  Nota: Solo el productor del contenido puede hacerlo invisible en los resultados de búsqueda.
+                  {t('upload.producerVisibilityNote')}
                 </Typography>
               </Box>
           }
@@ -1062,8 +1066,8 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
             </Stack>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
               {uploadProgress !== null ?
-            'Subiendo archivo… no cierres esta pestaña.' :
-            'Subiendo…'}
+            t('upload.uploadingFile') :
+            t('common.uploadingEllipsis')}
             </Typography>
           </Box>
         }
@@ -1074,7 +1078,7 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
           severity="success"
           sx={{ mt: 2 }}>
           
-            Guardado en tu biblioteca
+            {t('upload.savedInLibrary')}
           </Alert>
         }
 
@@ -1088,10 +1092,10 @@ const UploadContentForm = ({ onContentUploaded, onFileSelected, initialData = nu
             startIcon={isUploading ? <CircularProgress size={20} color="inherit" /> : null}>
             
             {isUploading ?
-            'Subiendo...' :
+            t('common.uploading') :
             hasSavedSuccessfully ?
-            isEditMode ? 'Contenido actualizado' : 'Contenido guardado' :
-            isEditMode ? 'Actualizar contenido' : 'Guardar Contenido'}
+            isEditMode ? t('upload.contentUpdated') : t('upload.contentSaved') :
+            isEditMode ? t('upload.updateContent') : t('upload.saveContent')}
           </Button>
         </Stack>
       </form>

@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useDateLocales } from '../hooks/useDateLocales';
 import { Typography } from '@mui/material';
 import {
   formatExpiryLocalTime,
@@ -11,6 +13,8 @@ import {
  * Falls back to a static validity message if ``expires_at`` is missing.
  */
 const BchOrderExpiryNotice = ({ bchOrder, ttlMinutes = 30 }) => {
+  const { t } = useTranslation('payments');
+  const { intl } = useDateLocales();
   const expiresAt = bchOrder?.expires_at;
   const pending = bchOrder?.status === 'pending';
   const [remaining, setRemaining] = useState(() => secondsUntilExpiry(expiresAt));
@@ -32,22 +36,23 @@ const BchOrderExpiryNotice = ({ bchOrder, ttlMinutes = 30 }) => {
     if (remaining <= 0) {
       return (
         <Typography variant="caption" color="warning.main">
-          Esta orden expiró. Genera una nueva para obtener un monto actualizado.
+          {t('expiry.expired')}
         </Typography>
       );
     }
     return (
       <Typography variant="caption" color="text.secondary">
-        Tiempo restante: {formatRemainingCountdown(remaining)}
-        {' · '}
-        válida hasta {formatExpiryLocalTime(expiresAt)}
+        {t('expiry.remaining', {
+          countdown: formatRemainingCountdown(remaining),
+          until: formatExpiryLocalTime(expiresAt, intl),
+        })}
       </Typography>
     );
   }
 
   return (
     <Typography variant="caption" color="text.secondary">
-      Tienes {ttlMinutes} minutos para realizar el pago con el monto exacto de esta orden.
+      {t('expiry.fallback', { minutes: ttlMinutes })}
     </Typography>
   );
 };

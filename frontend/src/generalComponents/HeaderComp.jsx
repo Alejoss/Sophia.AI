@@ -24,11 +24,13 @@ import Brightness4Icon from '@mui/icons-material/Brightness4';
 import Brightness7Icon from '@mui/icons-material/Brightness7';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import { useTranslation } from 'react-i18next';
 import { AuthContext } from '../context/AuthContext.jsx';
 import { useThemeMode } from '../context/ThemeContext.jsx';
 import { useNotifications } from '../context/NotificationsContext.jsx';
 import { getProfileMenuConfig } from '../profiles/ProfileVerticalNavigation.jsx';
 import { mergeMenuConfigs } from '../utils/menuUtils';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import '../styles/header.css';
 
 const navLinkSx = {
@@ -46,6 +48,7 @@ const navLinkSx = {
 };
 
 const HeaderComp = () => {
+  const { t } = useTranslation('nav');
   const { authState } = useContext(AuthContext);
   const { isAuthenticated, user } = authState;
   const { mode, toggleMode } = useThemeMode();
@@ -56,7 +59,7 @@ const HeaderComp = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
 
-  const profileMenuOpen = Boolean(profileMenuAnchor);
+  const labelOf = (item) => (item.labelKey ? t(item.labelKey) : item.label);
 
   const handleProfileMenuOpen = (event) => {
     setProfileMenuAnchor(event.currentTarget);
@@ -104,7 +107,7 @@ const HeaderComp = () => {
       return (
         <ListItem key={item.key} sx={{ borderTop: 1, borderColor: 'divider', pt: 2, mt: 2 }}>
           <ListItemText 
-            primary={item.label}
+            primary={labelOf(item)}
             primaryTypographyProps={{
               fontWeight: 600,
               color: 'text.secondary'
@@ -134,7 +137,7 @@ const HeaderComp = () => {
               primary={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   {item.icon && <item.icon sx={{ fontSize: 16 }} />}
-                  {item.label}
+                  {labelOf(item)}
                   {item.badge && (
                     <Box
                       component="span"
@@ -168,11 +171,15 @@ const HeaderComp = () => {
     }
 
     return (
-      <Tooltip title="Notificaciones" arrow>
+      <Tooltip title={t('notifications')} arrow>
         <IconButton
           component={Link}
           to="/profiles/my_profile?section=notifications"
-          aria-label={`Notificaciones${unreadCount > 0 ? `, ${unreadCount} sin leer` : ''}`}
+          aria-label={
+            unreadCount > 0
+              ? t('notificationsUnread', { count: unreadCount })
+              : t('notifications')
+          }
           sx={{
             color: 'text.primary',
             ...sx,
@@ -204,22 +211,22 @@ const HeaderComp = () => {
     </IconButton>
   );
   const navLinks = [
-    { to: '/search', label: 'Biblioteca' },
-    { to: '/knowledge_path', label: 'Caminos' },
-    { to: '/content/topics', label: 'Temas' },
-    { to: '/events', label: 'Eventos' },
+    { to: '/search', labelKey: 'library' },
+    { to: '/knowledge_path', labelKey: 'paths' },
+    { to: '/content/topics', labelKey: 'topics' },
+    { to: '/events', labelKey: 'events' },
   ];
 
   const guestLinks = [
-    { to: '/profiles/login', label: 'Iniciar sesión' },
-    { to: '/profiles/register', label: 'Registrarse' },
+    { to: '/profiles/login', labelKey: 'login' },
+    { to: '/profiles/register', labelKey: 'register' },
   ];
 
   const mobileAuthLinks = isAuthenticated
     ? [
         { to: '/profiles/my_profile', label: user.username },
-        { to: '/content/library_user', label: 'Mi Biblioteca' },
-        { to: '/profiles/logout', label: 'Cerrar sesión' },
+        { to: '/content/library_user', labelKey: 'myLibrary' },
+        { to: '/profiles/logout', labelKey: 'logout' },
       ]
     : guestLinks;
 
@@ -258,7 +265,7 @@ const HeaderComp = () => {
           <Box
             component="img"
             src="/images/logo.png"
-            alt="Logo Academia Blockchain"
+            alt={t('logoAlt')}
             sx={{
               height: { xs: '24px', lg: '28px' },
               width: 'auto',
@@ -295,16 +302,16 @@ const HeaderComp = () => {
               to={link.to}
               sx={navLinkSx}
             >
-              {link.label}
+              {labelOf(link)}
             </Typography>
           ))}
           {isAuthenticated ? (
             <>
               <Button
                 id="profile-menu-button"
-                aria-controls={profileMenuOpen ? 'profile-menu' : undefined}
+                aria-controls={profileMenuAnchor ? 'profile-menu' : undefined}
                 aria-haspopup="true"
-                aria-expanded={profileMenuOpen ? 'true' : undefined}
+                aria-expanded={profileMenuAnchor ? 'true' : undefined}
                 onClick={handleProfileMenuOpen}
                 endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 18 }} />}
                 sx={{
@@ -319,7 +326,7 @@ const HeaderComp = () => {
               <Menu
                 id="profile-menu"
                 anchorEl={profileMenuAnchor}
-                open={profileMenuOpen}
+                open={Boolean(profileMenuAnchor)}
                 onClose={handleProfileMenuClose}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                 transformOrigin={{ vertical: 'top', horizontal: 'right' }}
@@ -332,21 +339,21 @@ const HeaderComp = () => {
                   to="/profiles/my_profile"
                   onClick={handleProfileMenuClose}
                 >
-                  Mi perfil
+                  {t('myProfile')}
                 </MenuItem>
                 <MenuItem
                   component={Link}
                   to="/content/library_user"
                   onClick={handleProfileMenuClose}
                 >
-                  Mi Biblioteca
+                  {t('myLibrary')}
                 </MenuItem>
                 <MenuItem
                   component={Link}
                   to="/profiles/logout"
                   onClick={handleProfileMenuClose}
                 >
-                  Cerrar sesión
+                  {t('logout')}
                 </MenuItem>
               </Menu>
             </>
@@ -358,22 +365,24 @@ const HeaderComp = () => {
                 to={link.to}
                 sx={navLinkSx}
               >
-                {link.label}
+                {labelOf(link)}
               </Typography>
             ))
           )}
 
           {renderNotificationBell({ ml: 0.5 })}
+          <LanguageSwitcher sx={{ ml: 0.5 }} />
           {renderDarkModeToggle({ ml: 0.5 })}
         </Box>
 
         {/* Mobile Menu Button and Dark Mode Toggle */}
         <Box sx={{ display: { xs: 'flex', lg: 'none' }, alignItems: 'center', gap: 0.5 }}>
           {renderNotificationBell()}
+          <LanguageSwitcher />
           {renderDarkModeToggle()}
           <IconButton
             onClick={() => setIsOpen(!isOpen)}
-            aria-label="menu"
+            aria-label={t('openMenu')}
           >
             <MenuIcon />
           </IconButton>
@@ -411,7 +420,7 @@ const HeaderComp = () => {
                 }}
               >
                 <ListItemText
-                  primary={link.label}
+                  primary={labelOf(link)}
                   primaryTypographyProps={{
                     fontSize: '14px',
                     color: 'text.primary',
@@ -443,7 +452,7 @@ const HeaderComp = () => {
                         color: 'text.primary',
                       }}
                     >
-                      {link.label}
+                      {labelOf(link)}
                     </Typography>
                   }
                 />
@@ -465,7 +474,7 @@ const HeaderComp = () => {
                 }}
               >
                 <ListItemText
-                  primary={mode === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+                  primary={mode === 'dark' ? t('lightMode') : t('darkMode')}
                   primaryTypographyProps={{
                     fontSize: '14px',
                     color: 'text.primary',

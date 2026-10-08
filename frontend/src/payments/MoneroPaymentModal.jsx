@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -18,7 +19,6 @@ import { useAuth } from '../context/AuthContext';
 import { fetchOrCreateThread, sendMessage } from '../api/messagesApi';
 import {
   MONERO_CONTACT_USER_ID,
-  MONERO_PAYMENT_DESCRIPTION,
   buildMoneroPaymentMessage,
 } from './moneroPayment';
 
@@ -35,8 +35,9 @@ const MoneroPaymentModal = ({
   onBackToMethods,
   title,
   priceUsd,
-  productLabel = 'producto',
+  productLabel,
 }) => {
+  const { t } = useTranslation('payments');
   const navigate = useNavigate();
   const { authState } = useAuth();
   const currentUser = authState?.user;
@@ -52,9 +53,13 @@ const MoneroPaymentModal = ({
       setError(null);
       return undefined;
     }
-    setText(buildMoneroPaymentMessage({ title, priceUsd, productLabel }));
+    setText(buildMoneroPaymentMessage({
+      title,
+      priceUsd,
+      productLabel: productLabel || t('genericProduct'),
+    }));
     return undefined;
-  }, [open, title, priceUsd, productLabel]);
+  }, [open, title, priceUsd, productLabel, t]);
 
   const handleSend = async () => {
     const message = text.trim();
@@ -66,13 +71,13 @@ const MoneroPaymentModal = ({
       const threadRes = await fetchOrCreateThread(MONERO_CONTACT_USER_ID);
       const thread = threadRes?.data;
       if (!thread?.id) {
-        throw new Error('No se pudo abrir la conversación');
+        throw new Error(t('monero.openThreadError'));
       }
       await sendMessage(thread.id, message);
       onClose?.();
       navigate(`/messages/thread/${MONERO_CONTACT_USER_ID}`);
     } catch (err) {
-      setError(formatApiError(err, 'No se pudo enviar el mensaje'));
+      setError(formatApiError(err, t('monero.sendError')));
     } finally {
       setBusy(false);
     }
@@ -83,9 +88,9 @@ const MoneroPaymentModal = ({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ pr: 6 }}>
-        Pagar con Monero
+        {t('monero.title')}
         <IconButton
-          aria-label="Cerrar"
+          aria-label={t('close')}
           onClick={onClose}
           sx={{ position: 'absolute', right: 8, top: 8 }}
         >
@@ -101,16 +106,16 @@ const MoneroPaymentModal = ({
             </Typography>
           )}
           <Typography variant="body1">
-            {MONERO_PAYMENT_DESCRIPTION}
+            {t('monero.description')}
           </Typography>
           {isSelf && (
             <Alert severity="info">
-              Esta opción envía un mensaje a tu propia cuenta. Usa otra sesión para probar el pago.
+              {t('monero.self')}
             </Alert>
           )}
           {error && <Alert severity="error">{error}</Alert>}
           <TextField
-            label="Mensaje"
+            label={t('monero.messageLabel')}
             value={text}
             onChange={(event) => setText(event.target.value)}
             multiline
@@ -128,14 +133,14 @@ const MoneroPaymentModal = ({
           onClick={handleSend}
           startIcon={busy ? <CircularProgress size={16} color="inherit" /> : null}
         >
-          {busy ? 'Enviando...' : 'Enviar mensaje'}
+          {busy ? t('sending') : t('monero.send')}
         </Button>
         <Button onClick={onClose} fullWidth>
-          Cerrar
+          {t('close')}
         </Button>
         {onBackToMethods && (
           <Button size="small" onClick={onBackToMethods}>
-            Volver a métodos de pago
+            {t('backToMethods')}
           </Button>
         )}
       </DialogActions>

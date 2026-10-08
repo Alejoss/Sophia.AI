@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -18,15 +19,19 @@ import {
 import { submitSuggestion } from '../api/profilesApi';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 
-const schema = yup.object({
-    message: yup
-        .string()
-        .trim()
-        .required('Por favor, ingresa tu sugerencia.')
-        .min(10, 'La sugerencia debe tener al menos 10 caracteres.'),
-});
-
 const SuggestionModal = ({ open, onClose }) => {
+    const { t } = useTranslation('profiles');
+    const schema = useMemo(
+        () =>
+            yup.object({
+                message: yup
+                    .string()
+                    .trim()
+                    .required(() => t('suggestions.required'))
+                    .min(10, () => t('suggestions.min')),
+            }),
+        [t],
+    );
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const [generalError, setGeneralError] = useState('');
@@ -60,9 +65,9 @@ const SuggestionModal = ({ open, onClose }) => {
             return errors.message.message;
         }
         if (messageValue.length > 0) {
-            return `${messageValue.length} caracteres`;
+            return t('suggestions.charCount', { current: messageValue.length });
         }
-        return 'Mínimo 10 caracteres';
+        return t('suggestions.minHelper');
     };
 
     const onSubmit = async ({ message }) => {
@@ -81,7 +86,7 @@ const SuggestionModal = ({ open, onClose }) => {
             const { generalError: parsed } = applyApiErrorsToForm(
                 err,
                 setError,
-                'Error al enviar la sugerencia. Por favor, intenta nuevamente.',
+                t('suggestions.sendError'),
                 { message: 'message' },
             );
             if (parsed) {
@@ -116,7 +121,7 @@ const SuggestionModal = ({ open, onClose }) => {
                         pt: isMobile ? 2 : 3,
                     }}
                 >
-                    Enviar Sugerencia
+                    {t('suggestions.title')}
                 </DialogTitle>
                 <DialogContent
                     sx={{
@@ -134,20 +139,20 @@ const SuggestionModal = ({ open, onClose }) => {
                     >
                         {success && (
                             <Alert severity="success">
-                                ¡Gracias! Tu sugerencia ha sido enviada exitosamente.
+                                {t('suggestions.success')}
                             </Alert>
                         )}
                         {generalError && (
                             <Alert severity="error">{generalError}</Alert>
                         )}
                         <TextField
-                            label="Tu sugerencia"
+                            label={t('suggestions.label')}
                             {...register('message')}
                             multiline
                             rows={isMobile ? 8 : 8}
                             fullWidth
                             required
-                            placeholder="Comparte tus ideas, sugerencias o comentarios sobre la plataforma..."
+                            placeholder={t('suggestions.placeholder')}
                             disabled={isSubmitting || success}
                             error={!!errors.message}
                             helperText={getHelperText()}
@@ -177,7 +182,7 @@ const SuggestionModal = ({ open, onClose }) => {
                         disabled={isSubmitting}
                         fullWidth={isMobile}
                     >
-                        Cancelar
+                        {t('cancel')}
                     </Button>
                     <Button
                         type="submit"
@@ -187,7 +192,7 @@ const SuggestionModal = ({ open, onClose }) => {
                         startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
                         fullWidth={isMobile}
                     >
-                        {isSubmitting ? 'Enviando...' : success ? 'Enviado' : 'Enviar'}
+                        {isSubmitting ? t('suggestions.sending') : success ? t('suggestions.sent') : t('suggestions.send')}
                     </Button>
                 </DialogActions>
             </Box>

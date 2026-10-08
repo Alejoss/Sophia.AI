@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useDateLocales } from '../hooks/useDateLocales';
 import {
   Alert,
   Box,
@@ -25,6 +27,8 @@ import {
 } from '../api/eventsApi';
 
 const UserEvents = ({ isOwnProfile = false, userId = null }) => {
+  const { t } = useTranslation('events');
+  const { intl } = useDateLocales();
   const [registrations, setRegistrations] = useState([]);
   const [createdEvents, setCreatedEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +68,7 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
         setCreatedEvents(createdEventsData);
       } catch (err) {
         console.error('Error loading user events:', err);
-        setError('Error al cargar los eventos');
+        setError(t('errors.loadUserEvents'));
       } finally {
         setLoading(false);
       }
@@ -74,8 +78,8 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
   }, [isOwnProfile, userId]);
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Por determinar';
-    return new Date(dateString).toLocaleDateString('es-ES', {
+    if (!dateString) return t('toBeDetermined');
+    return new Date(dateString).toLocaleDateString(intl, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -84,39 +88,23 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
     });
   };
 
-  const getEventTypeLabel = (eventType) => {
-    const typeMap = {
-      'LIVE_COURSE': 'Curso en Vivo',
-      'LIVE_CERTIFICATION': 'Certificación en Vivo',
-      'LIVE_MASTER_CLASS': 'Clase Magistral en Vivo'
-    };
-    return typeMap[eventType] || eventType;
-  };
+  const getEventTypeLabel = (eventType) => t(`eventTypes.${eventType}`, { defaultValue: eventType });
 
-  const getPaymentStatusLabel = (paymentStatus) => {
-    const paymentMap = {
-      'PENDING': 'Pendiente',
-      'PAID': 'Pagado',
-      'REFUNDED': 'Reembolsado'
-    };
-    return paymentMap[paymentStatus] || paymentStatus;
-  };
+  const getPaymentStatusLabel = (paymentStatus) => (
+    t(`userEvents.payment.${paymentStatus}`, { defaultValue: paymentStatus })
+  );
 
-  const getRegistrationStatusLabel = (registrationStatus) => {
-    const statusMap = {
-      'REGISTERED': 'Registrado',
-      'CANCELLED': 'Cancelado'
-    };
-    return statusMap[registrationStatus] || registrationStatus;
-  };
+  const getRegistrationStatusLabel = (registrationStatus) => (
+    t(`userEvents.registration.${registrationStatus}`, { defaultValue: registrationStatus })
+  );
 
   if (loading) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={1.5} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>Eventos</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>{t('listTitle')}</Typography>
           <CircularProgress size={28} />
-          <Typography variant="body2" color="text.secondary">Cargando eventos...</Typography>
+          <Typography variant="body2" color="text.secondary">{t('loadingEvents')}</Typography>
         </Stack>
       </Container>
     );
@@ -126,10 +114,10 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={2} alignItems="center">
-          <Typography variant="h4" sx={{ fontWeight: 600 }}>Eventos</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 600 }}>{t('listTitle')}</Typography>
           <Alert severity="error">{error}</Alert>
           <Button onClick={() => window.location.reload()} variant="contained">
-            Intentar de nuevo
+            {t('retry')}
           </Button>
         </Stack>
       </Container>
@@ -151,10 +139,10 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
             fontWeight: 600,
           }}
         >
-          {isOwnProfile ? 'Mis eventos' : 'Eventos'}
+          {isOwnProfile ? t('myEvents') : t('listTitle')}
         </Typography>
         <Button component={Link} to="/events" variant="outlined" color="inherit">
-          Explorar todos los eventos
+          {t('userEvents.exploreAll')}
         </Button>
       </Box>
 
@@ -167,8 +155,8 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
             variant="scrollable"
             scrollButtons="auto"
           >
-            <Tab value="registrations" label={`Eventos en los que estoy registrado (${registrations.length})`} />
-            <Tab value="created" label={`Eventos que he creado (${createdEvents.length})`} />
+            <Tab value="registrations" label={t('userEvents.registeredTab', { count: registrations.length })} />
+            <Tab value="created" label={t('userEvents.createdTab', { count: createdEvents.length })} />
           </Tabs>
         </Box>
       ) : (
@@ -182,7 +170,7 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
               color: 'text.primary',
             }}
           >
-            Eventos creados ({createdEvents.length})
+            {t('userEvents.createdHeading', { count: createdEvents.length })}
           </Typography>
         </Box>
       )}
@@ -192,9 +180,9 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
         <Box>
           {registrations.length === 0 ? (
             <Stack spacing={2} alignItems="center" sx={{ py: 3 }}>
-              <Typography color="text.secondary">Aún no estás registrado en ningún evento.</Typography>
+              <Typography color="text.secondary">{t('userEvents.noneRegistered')}</Typography>
               <Button component={Link} to="/events" variant="contained">
-                Explorar eventos
+                {t('userEvents.explore')}
               </Button>
             </Stack>
           ) : (
@@ -203,18 +191,18 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
                 <Card key={registration.id} variant="outlined">
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 1.5, mb: 1 }}>
-                      <Typography variant="h6">{registration.event_title || 'Evento sin título'}</Typography>
+                      <Typography variant="h6">{registration.event_title || t('untitled')}</Typography>
                       <Stack direction="row" spacing={0.8}>
                         <Chip size="small" label={getRegistrationStatusLabel(registration.registration_status)} color="primary" variant="outlined" />
                         <Chip size="small" label={getPaymentStatusLabel(registration.payment_status)} color="success" variant="outlined" />
                       </Stack>
                     </Box>
-                    <Typography variant="body2"><strong>Fecha del evento:</strong> {formatDate(registration.event_date)}</Typography>
-                    <Typography variant="body2"><strong>Registrado:</strong> {formatDate(registration.registered_at)}</Typography>
+                    <Typography variant="body2"><strong>{t('userEvents.eventDate')}</strong> {formatDate(registration.event_date)}</Typography>
+                    <Typography variant="body2"><strong>{t('userEvents.registeredAt')}</strong> {formatDate(registration.registered_at)}</Typography>
                   </CardContent>
                   <CardActions>
                     <Button component={Link} to={`/events/${registration.event}`} variant="outlined" size="small">
-                      Ver evento
+                      {t('viewEventShort')}
                     </Button>
                   </CardActions>
                 </Card>
@@ -230,11 +218,11 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
           {createdEvents.length === 0 ? (
             <Stack spacing={2} alignItems="center" sx={{ py: 3 }}>
               <Typography color="text.secondary">
-                {isOwnProfile ? 'Aún no has creado ningún evento.' : 'No se encontraron eventos creados.'}
+                {isOwnProfile ? t('userEvents.noneCreatedOwn') : t('userEvents.noneCreatedOther')}
               </Typography>
               {isOwnProfile && (
                 <Button component={Link} to="/events/create" variant="contained">
-                  Crear tu primer evento
+                  {t('userEvents.createFirst')}
                 </Button>
               )}
             </Stack>
@@ -243,7 +231,7 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
               {createdEvents.map((event) => (
                 <Card key={event.id} variant="outlined">
                   {event.image ? (
-                    <CardMedia component="img" height="170" image={event.image} alt={event.title || 'Evento'} />
+                    <CardMedia component="img" height="170" image={event.image} alt={event.title || t('imageAlt')} />
                   ) : (
                     <Box sx={{ height: 170, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'action.hover' }}>
                       <Typography variant="h5">📅</Typography>
@@ -251,13 +239,13 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
                   )}
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 1, mb: 1 }}>
-                      <Typography variant="h6">{event.title || 'Evento sin título'}</Typography>
+                      <Typography variant="h6">{event.title || t('untitled')}</Typography>
                       <Stack direction="row" spacing={0.5} flexWrap="wrap" justifyContent="flex-end">
                         {isOwnProfile && (
                           <Chip
                             size="small"
                             icon={event.is_visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
-                            label={event.is_visible ? 'Público' : 'Privado'}
+                            label={event.is_visible ? t('public') : t('private')}
                             color={event.is_visible ? 'success' : 'default'}
                             variant="outlined"
                           />
@@ -271,36 +259,36 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
                         ? (event.description.length > 150 
                             ? `${event.description.substring(0, 150)}...` 
                             : event.description)
-                        : 'No hay descripción disponible'}
+                        : t('noDescription')}
                     </Typography>
 
                     <Stack spacing={0.6}>
                       <Typography variant="body2">
-                        <strong>Inicio:</strong> {formatDate(event.date_start)}
+                        <strong>{t('card.start')}</strong> {formatDate(event.date_start)}
                       </Typography>
                       {event.date_end && (
                         <Typography variant="body2">
-                          <strong>Fin:</strong> {formatDate(event.date_end)}
+                          <strong>{t('card.end')}</strong> {formatDate(event.date_end)}
                         </Typography>
                       )}
                       {event.reference_price > 0 && (
                         <Typography variant="body2">
-                          <strong>Precio:</strong> ${event.reference_price}
+                          <strong>{t('card.price')}</strong> ${event.reference_price}
                         </Typography>
                       )}
                     </Stack>
                   </CardContent>
                   <CardActions sx={{ flexWrap: 'wrap', gap: 1 }}>
                     <Button component={Link} to={`/events/${event.id}`} variant="outlined" size="small">
-                      Ver detalles
+                      {t('viewDetailsShort')}
                     </Button>
                     {isOwnProfile && (
                       <>
                         <Button component={Link} to={`/events/${event.id}/edit`} variant="contained" size="small">
-                          Editar
+                          {t('edit')}
                         </Button>
                         <Button component={Link} to={`/events/${event.id}/manage`} variant="outlined" color="inherit" size="small">
-                          Gestionar
+                          {t('manageAction')}
                         </Button>
                       </>
                     )}

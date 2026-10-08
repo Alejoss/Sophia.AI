@@ -13,13 +13,16 @@ import {
   Typography,
 } from '@mui/material';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import { useTranslation } from 'react-i18next';
 import ContentSuggestionPicker, { getProfileContentId } from '../../content/ContentSuggestionPicker';
+import { useDateLocales } from '../../hooks/useDateLocales';
+import i18n from '../../i18n';
 import { applyApiErrorsToForm } from '../../utils/apiFormErrors';
 
-const formatDate = (value) => {
+const formatDate = (value, locale) => {
   if (!value) return null;
   try {
-    return new Date(`${value}T00:00:00`).toLocaleDateString('es-ES', {
+    return new Date(`${value}T00:00:00`).toLocaleDateString(locale, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -29,18 +32,10 @@ const formatDate = (value) => {
   }
 };
 
-const getEntryDateLabel = (entry) => {
-  if (entry.start_date && entry.end_date) {
-    return `${formatDate(entry.start_date)} - ${formatDate(entry.end_date)}`;
-  }
-  if (entry.start_date) return formatDate(entry.start_date);
-  return 'Sin fecha';
-};
-
 const schema = yup.object({
   message: yup
     .string()
-    .max(500, 'El mensaje no puede exceder 500 caracteres.')
+    .max(500, () => i18n.t('topics:timeline.messageMax'))
     .default(''),
 });
 
@@ -50,6 +45,8 @@ const TopicTimelineEntryContentSuggestionForm = ({
   onCancel,
   onSubmit,
 }) => {
+  const { t } = useTranslation('topics');
+  const { intl } = useDateLocales();
   const [externalProfiles, setExternalProfiles] = useState([]);
   const [generalError, setGeneralError] = useState('');
 
@@ -67,6 +64,11 @@ const TopicTimelineEntryContentSuggestionForm = ({
 
   const messageValue = watch('message');
   const pending = saving || isSubmitting;
+  const dateLabel = entry.start_date && entry.end_date
+    ? `${formatDate(entry.start_date, intl)} - ${formatDate(entry.end_date, intl)}`
+    : entry.start_date
+      ? formatDate(entry.start_date, intl)
+      : t('common.noDate');
 
   const handleFormSubmit = async (form) => {
     setGeneralError('');
@@ -75,7 +77,7 @@ const TopicTimelineEntryContentSuggestionForm = ({
     if (!contentId) {
       setError('content', {
         type: 'manual',
-        message: 'Selecciona un contenido para vincular a esta entrada.',
+        message: t('timeline.selectContent'),
       });
       return;
     }
@@ -89,7 +91,7 @@ const TopicTimelineEntryContentSuggestionForm = ({
       const { generalError: parsed } = applyApiErrorsToForm(
         err,
         setError,
-        'No se pudo enviar la sugerencia. Inténtalo de nuevo.',
+        t('timeline.suggestionError'),
       );
       if (parsed) setGeneralError(parsed);
     }
@@ -116,11 +118,11 @@ const TopicTimelineEntryContentSuggestionForm = ({
           }}
         >
           <Typography variant="overline" color="text.secondary" display="block">
-            Entrada de la linea de tiempo
+            {t('timeline.entryOverline')}
           </Typography>
           <Chip
             icon={<CalendarTodayIcon />}
-            label={getEntryDateLabel(entry)}
+            label={dateLabel}
             size="small"
             color={entry.start_date ? 'primary' : 'default'}
             variant={entry.start_date ? 'filled' : 'outlined'}
@@ -146,15 +148,15 @@ const TopicTimelineEntryContentSuggestionForm = ({
           }}
           maxSelections={1}
           disabled={pending}
-          title="Contenido a vincular"
-          description="Elige material de tu biblioteca o sube uno nuevo. Si se acepta, se vincula a esta entrada y se anade al tema si aun no forma parte de el."
+          title={t('timeline.contentToLink')}
+          description={t('timeline.contentToLinkHelp')}
         />
 
         <TextField
-          label="Mensaje para moderadores (opcional)"
+          label={t('suggestion.messageLabel')}
           {...register('message')}
           error={Boolean(errors.message)}
-          helperText={errors.message?.message || `${messageValue.length}/500 caracteres`}
+          helperText={errors.message?.message || t('timeline.charCount', { count: messageValue.length })}
           fullWidth
           multiline
           minRows={2}
@@ -174,7 +176,7 @@ const TopicTimelineEntryContentSuggestionForm = ({
         }}
       >
         <Button type="button" onClick={onCancel} disabled={pending}>
-          Cancelar
+          {t('common.cancel')}
         </Button>
         <Button
           type="button"
@@ -182,7 +184,7 @@ const TopicTimelineEntryContentSuggestionForm = ({
           onClick={handleSubmit(handleFormSubmit)}
           disabled={pending}
         >
-          {pending ? 'Enviando...' : 'Enviar sugerencia'}
+          {pending ? t('common.sending') : t('timeline.sendSuggestion')}
         </Button>
       </Box>
     </Paper>

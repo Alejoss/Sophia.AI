@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Grid, Button, Alert, Paper } from '@mui/material';
 import CancelIcon from '@mui/icons-material/Cancel';
 import BadgeDisplay from './BadgeDisplay';
@@ -13,6 +14,7 @@ import { updateProfile } from '../api/profilesApi';
  * @param {Function} onUpdate - Callback when badge is updated
  */
 const FeaturedBadgeSelector = ({ badges, currentFeaturedBadgeId, onUpdate }) => {
+  const { t } = useTranslation('gamification');
   const [selectedBadgeId, setSelectedBadgeId] = useState(currentFeaturedBadgeId);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -40,7 +42,7 @@ const FeaturedBadgeSelector = ({ badges, currentFeaturedBadgeId, onUpdate }) => 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      setError(err.message || 'Error al guardar insignia destacada');
+      setError(err.message || t('errors.saveFeatured'));
       setSuccess(false);
     } finally {
       setSaving(false);
@@ -50,7 +52,7 @@ const FeaturedBadgeSelector = ({ badges, currentFeaturedBadgeId, onUpdate }) => 
   if (!badges || badges.length === 0) {
     return (
       <Alert severity="info">
-        No tienes insignias aún. ¡Sigue participando para obtenerlas!
+        {t('featured.empty')}
       </Alert>
     );
   }
@@ -60,10 +62,10 @@ const FeaturedBadgeSelector = ({ badges, currentFeaturedBadgeId, onUpdate }) => 
   return (
     <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
       <Typography variant="h6" gutterBottom>
-        Insignia Destacada
+        {t('featured.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Selecciona una insignia para mostrarla junto a tu nombre de usuario.
+        {t('featured.hint')}
       </Typography>
 
       {error && (
@@ -74,7 +76,7 @@ const FeaturedBadgeSelector = ({ badges, currentFeaturedBadgeId, onUpdate }) => 
 
       {success && (
         <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(false)}>
-          Insignia destacada actualizada correctamente
+          {t('featured.saved')}
         </Alert>
       )}
 
@@ -160,15 +162,15 @@ const FeaturedBadgeSelector = ({ badges, currentFeaturedBadgeId, onUpdate }) => 
           disabled={saving || !hasChanges}
           sx={{ minWidth: 200 }}
         >
-          {saving 
-            ? 'Guardando...' 
-            : selectedBadgeId === null 
-              ? 'Remover Insignia' 
-              : 'Elegir Insignia Destacada'}
+          {saving
+            ? t('featured.saving')
+            : selectedBadgeId === null
+              ? t('featured.remove')
+              : t('featured.choose')}
         </Button>
         {hasChanges && (
           <Typography variant="caption" color="text.secondary">
-            Tienes cambios sin guardar
+            {t('featured.unsaved')}
           </Typography>
         )}
       </Box>

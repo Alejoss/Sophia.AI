@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Alert,
@@ -28,19 +29,9 @@ import {
   updateTopicBch,
 } from '../api/paymentsApi';
 
-const FILTERS = [
-  { value: 'all', label: 'Todos' },
-  { value: 'for_sale', label: 'En venta' },
-  { value: 'paid', label: 'Con precio' },
-  { value: 'free', label: 'Sin precio' },
-];
+const FILTER_VALUES = ['all', 'for_sale', 'paid', 'free'];
 
-const ORDER_STATUS_LABEL = {
-  pending: 'Pendiente',
-  expired: 'Expirada',
-  cancelled: 'Cancelada',
-  paid: 'Pagada',
-};
+const PRODUCT_TYPE_KEYS = ['path', 'topic', 'anchor', 'token_package', 'course'];
 
 const formatError = (err, fallback) => {
   const msg = err?.error || err?.detail || err?.message || err?.response?.data?.error;
@@ -55,14 +46,9 @@ const matchesFilter = (item, filter, paidKey) => {
   return true;
 };
 
-const productLabel = (order) => {
-  if (order.product_type === 'path') return 'Camino';
-  if (order.product_type === 'topic') return 'Consultas';
-  if (order.product_type === 'anchor') return 'Anclaje';
-  if (order.product_type === 'token_package') return 'Tokens';
-  if (order.product_type === 'course') return 'Curso';
-  return 'Producto';
-};
+const productTypeKey = (order) => (
+  PRODUCT_TYPE_KEYS.includes(order.product_type) ? order.product_type : 'generic'
+);
 
 const productLink = (order) => {
   if (order.product_type === 'path' && order.product_id) {
@@ -78,6 +64,7 @@ const productLink = (order) => {
 };
 
 const BchPaymentsDashboard = () => {
+  const { t } = useTranslation('payments');
   const [catalog, setCatalog] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -117,11 +104,11 @@ const BchPaymentsDashboard = () => {
       setTopicPrices(nextTopicPrices);
       setError(null);
     } catch (err) {
-      setError(formatError(err, 'No se pudo cargar el panel de pagos BCH.'));
+      setError(formatError(err, t('admin.loadError')));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadDashboard();
@@ -156,7 +143,7 @@ const BchPaymentsDashboard = () => {
         setPathPrices((prev) => ({ ...prev, [path.id]: String(updated.reference_price ?? 0) }));
       }
     } catch (err) {
-      setError(formatError(err, 'No se pudo actualizar el camino.'));
+      setError(formatError(err, t('admin.pathUpdateError')));
     } finally {
       setSavingKey(null);
     }
@@ -166,7 +153,7 @@ const BchPaymentsDashboard = () => {
     const raw = pathPrices[path.id];
     const price = Number(raw);
     if (Number.isNaN(price) || price < 0) {
-      setError('El precio del camino debe ser un número mayor o igual a 0.');
+      setError(t('admin.pathPriceInvalid'));
       return;
     }
     setSavingKey(`path-price-${path.id}`);
@@ -181,9 +168,9 @@ const BchPaymentsDashboard = () => {
         )),
       }));
       setPathPrices((prev) => ({ ...prev, [path.id]: String(updated.reference_price ?? 0) }));
-      setSuccess(`Precio del camino «${path.title}» actualizado.`);
+      setSuccess(t('admin.pathPriceUpdated', { title: path.title }));
     } catch (err) {
-      setError(formatError(err, 'No se pudo guardar el precio del camino.'));
+      setError(formatError(err, t('admin.pathPriceError')));
     } finally {
       setSavingKey(null);
     }
@@ -201,7 +188,7 @@ const BchPaymentsDashboard = () => {
         )),
       }));
     } catch (err) {
-      setError(formatError(err, 'No se pudo actualizar el tema.'));
+      setError(formatError(err, t('admin.topicUpdateError')));
     } finally {
       setSavingKey(null);
     }
@@ -211,7 +198,7 @@ const BchPaymentsDashboard = () => {
     const raw = topicPrices[topic.id];
     const price = Number(raw);
     if (Number.isNaN(price) || price < 0) {
-      setError('El precio del tema debe ser un número mayor o igual a 0.');
+      setError(t('admin.topicPriceInvalid'));
       return;
     }
     setSavingKey(`topic-price-${topic.id}`);
@@ -226,7 +213,7 @@ const BchPaymentsDashboard = () => {
       }));
       setTopicPrices((prev) => ({ ...prev, [topic.id]: String(updated.reference_price ?? 0) }));
     } catch (err) {
-      setError(formatError(err, 'No se pudo guardar el precio del tema.'));
+      setError(formatError(err, t('admin.topicPriceError')));
     } finally {
       setSavingKey(null);
     }
@@ -235,7 +222,7 @@ const BchPaymentsDashboard = () => {
   const handleConfirmOrder = async (order) => {
     const txid = (txidDrafts[order.id] || '').trim();
     if (!txid) {
-      setError('Pega el TXID que te envió el comprador antes de confirmar.');
+      setError(t('admin.txidRequired'));
       return;
     }
     setSavingKey(`order-${order.id}`);
@@ -251,10 +238,13 @@ const BchPaymentsDashboard = () => {
       });
       setSuccess(
         result?.detail
-        || `Orden #${order.id} confirmada. Acceso desbloqueado para ${order.buyer_username || 'el comprador'}.`,
+        || t('admin.orderConfirmed', {
+          id: order.id,
+          buyer: order.buyer_username || t('admin.buyerFallback'),
+        }),
       );
     } catch (err) {
-      setError(formatError(err, 'No se pudo confirmar el pago BCH.'));
+      setError(formatError(err, t('admin.confirmError')));
     } finally {
       setSavingKey(null);
     }
@@ -279,30 +269,29 @@ const BchPaymentsDashboard = () => {
       >
         <Box>
           <Typography variant="h5" gutterBottom>
-            Pagos Bitcoin Cash
+            {t('admin.title')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Edita el precio de caminos y temas, y activa o pausa la venta. Si
-            están en venta, el checkout ofrece NOWPayments, Bitcoin Cash y
-            Monero. También confirma pagos BCH reportados por TXID.
+            {t('admin.intro')}
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           <Chip
             size="small"
             color={configured ? 'success' : 'warning'}
-            label={configured ? `BCH servidor · ${network || 'red'}` : 'BCH no configurado'}
+            label={configured
+              ? t('admin.serverChip', { network: network || t('admin.networkFallback') })
+              : t('admin.notConfigured')}
           />
-          <Chip size="small" color="warning" label={`${orders.length} por confirmar`} />
-          <Chip size="small" color="success" label={`${paths.filter((p) => p.is_for_sale).length} en venta`} />
-          <Chip size="small" color="info" label={`${topics.filter((t) => t.is_for_sale).length} temas`} />
+          <Chip size="small" color="warning" label={t('admin.toConfirm', { count: orders.length })} />
+          <Chip size="small" color="success" label={t('admin.forSale', { count: paths.filter((p) => p.is_for_sale).length })} />
+          <Chip size="small" color="info" label={t('admin.topicsChip', { count: topics.filter((item) => item.is_for_sale).length })} />
         </Stack>
       </Stack>
 
       {!configured && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          Configura BCH_RECEIVE_ADDRESS (o la dirección de la red activa) en el
-          servidor para que el checkout BCH aparezca a los alumnos.
+          {t('admin.configureAddress')}
         </Alert>
       )}
 
@@ -318,30 +307,27 @@ const BchPaymentsDashboard = () => {
       )}
 
       <Typography variant="h6" sx={{ mb: 1 }}>
-        Confirmar pagos reportados
+        {t('admin.confirmReported')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        Cuando un comprador reporta el TXID (orden expirada o fallo de
-        verificación), llega aquí precompletado. Revisa la cadena y confirma
-        para desbloquear el acceso. También recibes un aviso en notificaciones
-        y por email.
+        {t('admin.confirmHelp')}
       </Typography>
       {orders.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-          No hay órdenes BCH pendientes, expiradas o canceladas.
+          {t('admin.noOrders')}
         </Typography>
       ) : (
         <Paper variant="outlined" sx={{ mb: 4 }}>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Orden</TableCell>
-                <TableCell>Comprador</TableCell>
-                <TableCell>Producto</TableCell>
-                <TableCell>Monto</TableCell>
-                <TableCell>Estado</TableCell>
+                <TableCell>{t('admin.order')}</TableCell>
+                <TableCell>{t('admin.buyer')}</TableCell>
+                <TableCell>{t('admin.product')}</TableCell>
+                <TableCell>{t('admin.amount')}</TableCell>
+                <TableCell>{t('admin.status')}</TableCell>
                 <TableCell>TXID</TableCell>
-                <TableCell align="right">Acción</TableCell>
+                <TableCell align="right">{t('admin.action')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -364,12 +350,12 @@ const BchPaymentsDashboard = () => {
                     <TableCell>{order.buyer_username || '—'}</TableCell>
                     <TableCell>
                       <Typography variant="body2">
-                        {productLabel(order)}
+                        {t(`admin.productType.${productTypeKey(order)}`)}
                         {order.product_title ? `: ${order.product_title}` : ''}
                       </Typography>
                       {link && (
                         <Button size="small" component={RouterLink} to={link} sx={{ px: 0 }}>
-                          Ver
+                          {t('admin.view')}
                         </Button>
                       )}
                     </TableCell>
@@ -385,13 +371,13 @@ const BchPaymentsDashboard = () => {
                       <Chip
                         size="small"
                         color={order.status === 'pending' ? 'warning' : 'default'}
-                        label={ORDER_STATUS_LABEL[order.status] || order.status}
+                        label={t(`admin.orderStatus.${order.status}`, { defaultValue: order.status })}
                       />
                       {order.reported_txid ? (
                         <Chip
                           size="small"
                           color="info"
-                          label="TXID reportado"
+                          label={t('admin.txidReported')}
                           sx={{ mt: 0.5, display: 'flex' }}
                         />
                       ) : null}
@@ -400,7 +386,7 @@ const BchPaymentsDashboard = () => {
                       <TextField
                         size="small"
                         fullWidth
-                        placeholder="TXID (64 hex)"
+                        placeholder={t('admin.txidPlaceholder')}
                         value={txidDrafts[order.id] || ''}
                         onChange={(event) => {
                           const value = event.target.value;
@@ -416,7 +402,7 @@ const BchPaymentsDashboard = () => {
                         disabled={savingKey === `order-${order.id}`}
                         onClick={() => handleConfirmOrder(order)}
                       >
-                        {savingKey === `order-${order.id}` ? 'Confirmando…' : 'Confirmar pago'}
+                        {savingKey === `order-${order.id}` ? t('admin.confirming') : t('admin.confirmPayment')}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -436,30 +422,30 @@ const BchPaymentsDashboard = () => {
         }}
         sx={{ mb: 2 }}
       >
-        {FILTERS.map((item) => (
-          <ToggleButton key={item.value} value={item.value}>
-            {item.label}
+        {FILTER_VALUES.map((value) => (
+          <ToggleButton key={value} value={value}>
+            {t(`admin.filters.${value}`)}
           </ToggleButton>
         ))}
       </ToggleButtonGroup>
 
       <Typography variant="h6" sx={{ mb: 1 }}>
-        Caminos del conocimiento
+        {t('admin.pathsTitle')}
       </Typography>
       {filteredPaths.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          No hay caminos en este filtro.
+          {t('admin.noPaths')}
         </Typography>
       ) : (
         <Paper variant="outlined" sx={{ mb: 4 }}>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Camino</TableCell>
-                <TableCell>Autor</TableCell>
-                <TableCell>Precio</TableCell>
-                <TableCell>En venta</TableCell>
-                <TableCell align="right">Acciones</TableCell>
+                <TableCell>{t('admin.path')}</TableCell>
+                <TableCell>{t('admin.author')}</TableCell>
+                <TableCell>{t('admin.price')}</TableCell>
+                <TableCell>{t('admin.forSale')}</TableCell>
+                <TableCell align="right">{t('admin.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -470,7 +456,7 @@ const BchPaymentsDashboard = () => {
                       {path.title}
                     </Typography>
                     {!path.is_visible && (
-                      <Chip size="small" label="Oculto" sx={{ mt: 0.5 }} />
+                      <Chip size="small" label={t('admin.hidden')} sx={{ mt: 0.5 }} />
                     )}
                   </TableCell>
                   <TableCell>{path.author || '—'}</TableCell>
@@ -492,7 +478,7 @@ const BchPaymentsDashboard = () => {
                         disabled={savingKey === `path-price-${path.id}`}
                         onClick={() => handlePathPriceSave(path)}
                       >
-                        Guardar
+                        {t('admin.save')}
                       </Button>
                     </Stack>
                   </TableCell>
@@ -506,17 +492,17 @@ const BchPaymentsDashboard = () => {
                           onChange={(event) => handlePathToggle(path, event.target.checked)}
                         />
                       }
-                      label={path.is_for_sale ? 'On' : 'Off'}
+                      label={path.is_for_sale ? t('admin.saleOn') : t('admin.saleOff')}
                     />
                     {!path.is_paid_path && (
                       <Typography variant="caption" color="text.secondary" display="block">
-                        Guarda un precio mayor a 0 para poner en venta.
+                        {t('admin.savePriceHint')}
                       </Typography>
                     )}
                   </TableCell>
                   <TableCell align="right">
                     <Button size="small" component={RouterLink} to={`/knowledge_path/${path.id}`}>
-                      Ver
+                      {t('admin.view')}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -527,22 +513,22 @@ const BchPaymentsDashboard = () => {
       )}
 
       <Typography variant="h6" sx={{ mb: 1 }}>
-        Temas (Consultas)
+        {t('admin.topicsTitle')}
       </Typography>
       {filteredTopics.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          No hay temas en este filtro.
+          {t('admin.noTopics')}
         </Typography>
       ) : (
         <Paper variant="outlined">
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Tema</TableCell>
-                <TableCell>Creador</TableCell>
-                <TableCell>Precio Consultas</TableCell>
-                <TableCell>En venta</TableCell>
-                <TableCell align="right">Acciones</TableCell>
+                <TableCell>{t('admin.topic')}</TableCell>
+                <TableCell>{t('admin.creator')}</TableCell>
+                <TableCell>{t('admin.consultPrice')}</TableCell>
+                <TableCell>{t('admin.forSale')}</TableCell>
+                <TableCell align="right">{t('admin.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -553,7 +539,7 @@ const BchPaymentsDashboard = () => {
                       {topic.title}
                     </Typography>
                     {!topic.is_public && (
-                      <Chip size="small" label="Privado" sx={{ mt: 0.5 }} />
+                      <Chip size="small" label={t('admin.private')} sx={{ mt: 0.5 }} />
                     )}
                   </TableCell>
                   <TableCell>{topic.creator || '—'}</TableCell>
@@ -575,7 +561,7 @@ const BchPaymentsDashboard = () => {
                         disabled={savingKey === `topic-price-${topic.id}`}
                         onClick={() => handleTopicPriceSave(topic)}
                       >
-                        Guardar
+                        {t('admin.save')}
                       </Button>
                     </Stack>
                   </TableCell>
@@ -589,17 +575,17 @@ const BchPaymentsDashboard = () => {
                           onChange={(event) => handleTopicToggle(topic, event.target.checked)}
                         />
                       }
-                      label={topic.is_for_sale ? 'On' : 'Off'}
+                      label={topic.is_for_sale ? t('admin.saleOn') : t('admin.saleOff')}
                     />
                     {!topic.is_paid_topic && (
                       <Typography variant="caption" color="text.secondary" display="block">
-                        Guarda un precio mayor a 0 para poner en venta.
+                        {t('admin.savePriceHint')}
                       </Typography>
                     )}
                   </TableCell>
                   <TableCell align="right">
                     <Button size="small" component={RouterLink} to={`/content/topics/${topic.id}`}>
-                      Ver
+                      {t('admin.view')}
                     </Button>
                   </TableCell>
                 </TableRow>

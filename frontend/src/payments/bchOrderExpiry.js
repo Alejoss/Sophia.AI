@@ -19,12 +19,12 @@ export function formatRemainingCountdown(totalSeconds) {
 }
 
 /** Local time string for "válida hasta …" fallback copy. */
-export function formatExpiryLocalTime(expiresAtIso) {
+export function formatExpiryLocalTime(expiresAtIso, locale) {
   if (!expiresAtIso) return null;
   const end = Date.parse(expiresAtIso);
   if (Number.isNaN(end)) return null;
   try {
-    return new Date(end).toLocaleString(undefined, {
+    return new Date(end).toLocaleString(locale || undefined, {
       dateStyle: 'short',
       timeStyle: 'short',
     });

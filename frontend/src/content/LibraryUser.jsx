@@ -13,6 +13,7 @@ import {
 import NoteIcon from "@mui/icons-material/Note";
 import SearchIcon from "@mui/icons-material/Search";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
+import { useTranslation } from "react-i18next";
 import contentApi from "../api/contentApi";
 import { useNavigate } from "react-router-dom";
 import { resolveMediaUrl } from "../utils/fileUtils";
@@ -22,6 +23,7 @@ import ContentDisplay from "./ContentDisplay";
 const DEFAULT_PAGE_SIZE = 12;
 
 const LibraryUser = () => {
+  const { t } = useTranslation("content");
   const [userContent, setUserContent] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -67,12 +69,12 @@ const LibraryUser = () => {
       setError(
         err?.response?.data?.error
         || err?.error
-        || "Error al obtener el contenido",
+        || t("library.loadError"),
       );
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, page, rowsPerPage, mediaFilter, searchDebounced]);
+  }, [isAuthenticated, page, rowsPerPage, mediaFilter, searchDebounced, t]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -96,7 +98,7 @@ const LibraryUser = () => {
   };
 
   if (loading && userContent.length === 0 && !error)
-    return <Typography color="text.primary">Cargando contenido...</Typography>;
+    return <Typography color="text.primary">{t("library.loading")}</Typography>;
   if (error)
     return (
       <Box sx={{ pt: 12, px: 3, textAlign: "center" }}>
@@ -104,20 +106,20 @@ const LibraryUser = () => {
           {error}
         </Typography>
         <Button variant="contained" onClick={() => loadLibraryPage()}>
-          Reintentar
+          {t("actions.retry")}
         </Button>
       </Box>
     );
   if (!isAuthenticated)
     return (
       <Typography color="text.primary">
-        Por favor inicia sesión para ver el contenido
+        {t("library.signIn")}
       </Typography>
     );
 
   const emptyMessage = searchDebounced
-    ? "No se encontró contenido con la búsqueda realizada."
-    : "No se encontró contenido para el filtro seleccionado.";
+    ? t("library.emptySearch")
+    : t("library.emptyFilter");
 
   return (
     <Box
@@ -145,7 +147,7 @@ const LibraryUser = () => {
           fontWeight: 600,
         }}
       >
-        Biblioteca de Contenido
+        {t("library.title")}
       </Typography>
 
       <Box sx={{ mb: 3 }}>
@@ -174,7 +176,7 @@ const LibraryUser = () => {
             color="primary"
             onClick={() => navigate("/content/collections")}
           >
-            Colecciones
+            {t("library.collections")}
           </Button>
 
           <Button
@@ -194,7 +196,7 @@ const LibraryUser = () => {
               navigate("/profiles/my_profile?section=knowledge-paths")
             }
           >
-            Mis caminos de conocimiento
+            {t("library.knowledgePaths")}
           </Button>
 
           <Button
@@ -213,7 +215,7 @@ const LibraryUser = () => {
             startIcon={<UploadFileIcon />}
             onClick={() => navigate("/content/library_upload_content")}
           >
-            Subir contenido
+            {t("library.upload")}
           </Button>
         </Box>
 
@@ -227,7 +229,7 @@ const LibraryUser = () => {
           }}
         >
           <TextField
-            placeholder="Buscar en tu biblioteca..."
+            placeholder={t("library.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             size="small"
@@ -250,7 +252,7 @@ const LibraryUser = () => {
             value={mediaFilter}
             exclusive
             onChange={handleFilterChange}
-            aria-label="media type filter"
+            aria-label={t("library.filterAria")}
             sx={{
               "& .MuiToggleButton-root": {
                 color: "text.primary",
@@ -270,18 +272,18 @@ const LibraryUser = () => {
               },
             }}
           >
-            <ToggleButton value="ALL">Todos</ToggleButton>
-            <ToggleButton value="IMAGE">Imágenes</ToggleButton>
-            <ToggleButton value="TEXT">Texto</ToggleButton>
-            <ToggleButton value="VIDEO">Video</ToggleButton>
-            <ToggleButton value="AUDIO">Audio</ToggleButton>
+            <ToggleButton value="ALL">{t("library.all")}</ToggleButton>
+            <ToggleButton value="IMAGE">{t("library.images")}</ToggleButton>
+            <ToggleButton value="TEXT">{t("library.text")}</ToggleButton>
+            <ToggleButton value="VIDEO">{t("library.video")}</ToggleButton>
+            <ToggleButton value="AUDIO">{t("library.audio")}</ToggleButton>
           </ToggleButtonGroup>
         </Box>
       </Box>
 
       {loading && userContent.length === 0 ? (
         <Typography color="text.secondary" sx={{ py: 2 }}>
-          Cargando…
+          {t("common.loadingEllipsis")}
         </Typography>
       ) : mediaFilter === "TEXT" ? (
         <Box sx={{ overflowX: "auto" }}>
@@ -299,16 +301,16 @@ const LibraryUser = () => {
               <thead>
                 <tr>
                   <th style={{ textAlign: "left", padding: "12px", color: "inherit" }}>
-                    Título
+                    {t("common.title")}
                   </th>
                   <th style={{ textAlign: "left", padding: "12px", color: "inherit" }}>
-                    Autor
+                    {t("common.author")}
                   </th>
                   <th style={{ textAlign: "left", padding: "12px", color: "inherit" }}>
-                    Notas
+                    {t("common.notes")}
                   </th>
                   <th style={{ textAlign: "left", padding: "12px", color: "inherit" }}>
-                    Archivo
+                    {t("common.file")}
                   </th>
                 </tr>
               </thead>
@@ -352,7 +354,7 @@ const LibraryUser = () => {
                             rel="noopener noreferrer"
                             style={{ color: "inherit", textDecoration: "underline" }}
                           >
-                            Descargar
+                            {t("actions.download")}
                           </a>
                         ) : null;
                       })()}
@@ -401,9 +403,11 @@ const LibraryUser = () => {
         rowsPerPage={rowsPerPage}
         onRowsPerPageChange={handleChangeRowsPerPage}
         rowsPerPageOptions={[12, 24, 48]}
-        labelRowsPerPage="Por página"
+        labelRowsPerPage={t("pagination.perPage")}
         labelDisplayedRows={({ from, to, count }) =>
-          `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`
+          count !== -1
+            ? t("pagination.range", { from, to, total: count })
+            : t("pagination.rangeMore", { from, to })
         }
         sx={{ mt: 2, borderTop: 1, borderColor: "divider" }}
       />

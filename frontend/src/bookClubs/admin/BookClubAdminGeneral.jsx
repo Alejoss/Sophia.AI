@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -15,17 +16,17 @@ import {
 import bookClubsApi from '../../api/bookClubsApi';
 import { resolveMediaUrl } from '../../utils/fileUtils';
 import {
+  CLUB_STATUSES,
   extractApiError,
   normalizeTelegramUrl,
-  STATUS_LABELS,
   toDatetimeLocal,
   toIsoOrNull,
 } from '../clubTheme';
 
-const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }));
 const MAX_COVER_BYTES = 3 * 1024 * 1024;
 
 const BookClubAdminGeneral = ({ mode = 'edit' }) => {
+  const { t } = useTranslation('bookClubs');
   const isCreate = mode === 'create';
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -95,11 +96,11 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setError('El archivo debe ser una imagen (JPEG, PNG, GIF o WebP).');
+      setError(t('general.imageType'));
       return;
     }
     if (file.size > MAX_COVER_BYTES) {
-      setError('La portada no debe superar 3 MB.');
+      setError(t('general.coverTooLarge'));
       return;
     }
 
@@ -120,7 +121,7 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
         setForm((prev) => ({ ...prev, cover_image: null }));
         revokeLocalPreview();
         setCoverPreviewUrl(null);
-        setSuccess('Portada actualizada.');
+        setSuccess(t('general.coverUpdated'));
         await reload?.({ silent: true });
         if (updated?.cover_image) {
           setCoverPreviewUrl(resolveMediaUrl(updated.cover_image));
@@ -128,7 +129,7 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
       } catch (err) {
         const coverErr = err?.response?.data?.cover_image;
         const coverMsg = Array.isArray(coverErr) ? coverErr.join(' ') : coverErr;
-        setError(coverMsg || extractApiError(err, 'No se pudo subir la portada.'));
+        setError(coverMsg || extractApiError(err, t('errors.uploadCover')));
       } finally {
         setUploadingCover(false);
       }
@@ -137,7 +138,7 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
 
   const handleSave = async () => {
     if (!form.title.trim()) {
-      setError('El título es obligatorio.');
+      setError(t('general.titleRequired'));
       return;
     }
     setSaving(true);
@@ -149,7 +150,7 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
       if (form.starts_at) {
         startsAt = toIsoOrNull(form.starts_at);
         if (!startsAt) {
-          setError('La fecha de inicio no es válida.');
+          setError(t('general.startInvalid'));
           setSaving(false);
           return;
         }
@@ -157,7 +158,7 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
       if (form.ends_at) {
         endsAt = toIsoOrNull(form.ends_at);
         if (!endsAt) {
-          setError('La fecha de fin no es válida.');
+          setError(t('general.endInvalid'));
           setSaving(false);
           return;
         }
@@ -199,13 +200,13 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
         setClearCover(false);
         revokeLocalPreview();
         setCoverPreviewUrl(null);
-        setSuccess('Cambios guardados.');
+        setSuccess(t('general.saved'));
         await reload?.({ silent: true });
       }
     } catch (err) {
       const coverErr = err?.response?.data?.cover_image;
       const coverMsg = Array.isArray(coverErr) ? coverErr.join(' ') : coverErr;
-      setError(coverMsg || extractApiError(err, 'No se pudo guardar.'));
+      setError(coverMsg || extractApiError(err, t('errors.save')));
     } finally {
       setSaving(false);
     }
@@ -219,21 +220,20 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
       {isCreate && (
         <>
           <Button component={RouterLink} to="/dashboard" sx={{ mb: 2 }}>
-            ← Dashboard
+            {t('dashboardBack')}
           </Button>
           <Typography variant="h4" gutterBottom>
-            Nuevo club de lectura
+            {t('general.newTitle')}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Empieza con lo esencial. Luego, en Conexiones, vinculas el knowledge path (misiones) y
-            el tema de Investigación; después reuniones y preguntas.
+            {t('general.newIntro')}
           </Typography>
         </>
       )}
 
       {!isCreate && (
         <Typography variant="h6" gutterBottom>
-          Datos generales
+          {t('general.heading')}
         </Typography>
       )}
 
@@ -249,9 +249,9 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
       )}
 
       <Stack spacing={2} maxWidth={640}>
-        <TextField label="Título" required fullWidth value={form.title} onChange={handleField('title')} />
+        <TextField label={t('general.title')} required fullWidth value={form.title} onChange={handleField('title')} />
         <TextField
-          label="Descripción"
+          label={t('general.description')}
           fullWidth
           multiline
           minRows={4}
@@ -259,39 +259,39 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
           onChange={handleField('description')}
         />
         <TextField
-          label="Link del grupo de Telegram"
+          label={t('general.telegram')}
           fullWidth
-          placeholder="https://t.me/tu-grupo"
+          placeholder={t('general.telegramPlaceholder')}
           value={form.telegram_group_url}
           onChange={handleField('telegram_group_url')}
-          helperText="Acepta https://t.me/..., t.me/... o @usuario. Déjalo vacío para quitarlo."
+          helperText={t('general.telegramHelper')}
         />
         <FormControl fullWidth>
-          <InputLabel id="status-label">Estado</InputLabel>
+          <InputLabel id="status-label">{t('general.status')}</InputLabel>
           <Select
             labelId="status-label"
-            label="Estado"
+            label={t('general.status')}
             value={form.status}
             onChange={handleField('status')}
           >
-            {STATUS_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
+            {CLUB_STATUSES.map((value) => (
+              <MenuItem key={value} value={value}>
+                {t(`status.${value}`)}
               </MenuItem>
             ))}
           </Select>
         </FormControl>
         <TextField
-          label="Inicio del ciclo"
+          label={t('general.starts')}
           type="datetime-local"
           fullWidth
           InputLabelProps={{ shrink: true }}
           value={form.starts_at}
           onChange={handleField('starts_at')}
-          helperText="Se muestra en el hub. Vacía el campo y guarda para quitar la fecha."
+          helperText={t('general.startsHelper')}
         />
         <TextField
-          label="Fin del ciclo"
+          label={t('general.ends')}
           type="datetime-local"
           fullWidth
           InputLabelProps={{ shrink: true }}
@@ -303,15 +303,15 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
           <Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               {form.cover_image instanceof File
-                ? `Nueva: ${form.cover_image.name}`
+                ? t('general.newFile', { name: form.cover_image.name })
                 : coverPreviewUrl && !serverCover
-                  ? 'Vista previa'
-                  : 'Portada actual'}
+                  ? t('general.preview')
+                  : t('general.currentCover')}
             </Typography>
             <Box
               component="img"
               src={displayCover}
-              alt="Portada del club"
+              alt={t('general.coverAlt')}
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
               }}
@@ -323,12 +323,12 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
           <Button variant="outlined" component="label" disabled={uploadingCover || saving}>
             {uploadingCover
-              ? 'Subiendo portada…'
+              ? t('general.uploading')
               : form.cover_image
-                ? 'Cambiar archivo'
+                ? t('general.changeFile')
                 : displayCover
-                  ? 'Reemplazar portada'
-                  : 'Portada (opcional)'}
+                  ? t('general.replaceCover')
+                  : t('general.coverOptional')}
             <input hidden type="file" accept="image/*" onChange={handleCoverSelect} />
           </Button>
           {!isCreate && (displayCover || club?.cover_image || clearCover) && (
@@ -343,14 +343,14 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
                 setCoverPreviewUrl(null);
               }}
             >
-              Quitar portada
+              {t('general.removeCover')}
             </Button>
           )}
         </Stack>
         <Typography variant="caption" color="text.secondary">
           {isCreate
-            ? 'La portada se envía al crear el club (máx. 3 MB).'
-            : 'Al elegir un archivo se sube de inmediato (máx. 3 MB), como en caminos de conocimiento.'}
+            ? t('general.coverCreateHint')
+            : t('general.coverEditHint')}
         </Typography>
 
         <Button
@@ -359,7 +359,7 @@ const BookClubAdminGeneral = ({ mode = 'edit' }) => {
           disabled={saving || uploadingCover}
           sx={{ alignSelf: 'flex-start' }}
         >
-          {saving ? 'Guardando…' : isCreate ? 'Crear y continuar' : 'Guardar cambios'}
+          {saving ? t('general.saving') : isCreate ? t('general.createContinue') : t('general.saveChanges')}
         </Button>
       </Stack>
     </Box>

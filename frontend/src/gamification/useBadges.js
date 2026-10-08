@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getMyBadges, getUserBadges, getAllBadges } from '../api/gamificationApi';
 
 /**
@@ -6,6 +7,7 @@ import { getMyBadges, getUserBadges, getAllBadges } from '../api/gamificationApi
  * Provides loading states, error handling, and data fetching
  */
 export const useBadges = (userId = null) => {
+  const { t } = useTranslation('gamification');
   const [badges, setBadges] = useState([]);
   const [totalPoints, setTotalPoints] = useState(0);
   const [badgeCount, setBadgeCount] = useState(0);
@@ -37,7 +39,7 @@ export const useBadges = (userId = null) => {
         setBadgeCount(data.badge_count || data.badges?.length || 0);
       } catch (err) {
         console.error('Error fetching insignias:', err);
-        setError(err.message || 'Error al cargar insignias');
+        setError(err.message || t('errors.load'));
         setBadges([]);
       } finally {
         setLoading(false);
@@ -45,7 +47,7 @@ export const useBadges = (userId = null) => {
     };
 
     fetchBadges();
-  }, [userId]);
+  }, [userId, t]);
 
   return {
     badges,
@@ -75,7 +77,7 @@ export const useBadges = (userId = null) => {
           setBadgeCount(data.badge_count || data.badges?.length || 0);
         } catch (err) {
           console.error('Error fetching insignias:', err);
-          setError(err.message || 'Error al cargar insignias');
+          setError(err.message || t('errors.load'));
         } finally {
           setLoading(false);
         }
@@ -89,6 +91,7 @@ export const useBadges = (userId = null) => {
  * Custom hook for fetching all available badges
  */
 export const useAllBadges = () => {
+  const { t } = useTranslation('gamification');
   const [badges, setBadges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -102,7 +105,7 @@ export const useAllBadges = () => {
         setBadges(data.results || data || []);
       } catch (err) {
         console.error('Error fetching all insignias:', err);
-        setError(err.message || 'Error al cargar insignias disponibles');
+        setError(err.message || t('errors.loadAvailable'));
         setBadges([]);
       } finally {
         setLoading(false);
@@ -110,7 +113,7 @@ export const useAllBadges = () => {
     };
 
     fetchAllBadges();
-  }, []);
+  }, [t]);
 
   return { badges, loading, error };
 };

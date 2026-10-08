@@ -1,10 +1,12 @@
 import React from 'react';
 import { Avatar, Box, Typography, List, ListItem, ListItemText } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { formatDate } from '../utils/dateUtils';
 import UserAvatar from '../components/UserAvatar';
 
 const ContentReferences = ({ references }) => {
+    const { t } = useTranslation('content');
     const navigate = useNavigate();
 
     if (!references) return null;
@@ -15,7 +17,7 @@ const ContentReferences = ({ references }) => {
             {references.knowledge_paths?.length > 0 && (
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="subtitle1" gutterBottom>
-                        Rutas de conocimiento
+                        {t('references.knowledgePaths')}
                     </Typography>
                     <List>
                         {references.knowledge_paths.map((path) => (
@@ -60,7 +62,7 @@ const ContentReferences = ({ references }) => {
             {references.topics?.length > 0 && (
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="subtitle1" gutterBottom>
-                        Temas
+                        {t('references.topics')}
                     </Typography>
                     <List>
                         {references.topics.map((topic) => (
@@ -100,7 +102,7 @@ const ContentReferences = ({ references }) => {
             {references.publications?.length > 0 && (
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="subtitle1" gutterBottom>
-                        Publicaciones
+                        {t('references.publications')}
                     </Typography>
                     <List>
                         {references.publications.map((pub) => (
@@ -124,7 +126,7 @@ const ContentReferences = ({ references }) => {
                                     sx={{ mr: 2 }}
                                 />
                                 <ListItemText 
-                                    primary={`Publicación por ${pub.username}`}
+                                    primary={t('references.publicationBy', { name: pub.username })}
                                     secondary={formatDate(pub.published_at)}
                                 />
                             </ListItem>
@@ -138,7 +140,7 @@ const ContentReferences = ({ references }) => {
              !references.topics?.length && 
              !references.publications?.length && (
                 <Typography color="text.secondary">
-                    Este contenido no está referenciado en ninguna ruta de conocimiento, tema o publicación.
+                    {t('references.empty')}
                 </Typography>
             )}
         </Box>

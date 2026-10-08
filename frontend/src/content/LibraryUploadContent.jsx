@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Grid, Paper, Container, Typography, Box, Button, Stack } from '@mui/material';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import { useTranslation } from 'react-i18next';
 import UploadContentForm from './UploadContentForm';
 import RecentUserContent from './RecentUserContent';
 
 const LibraryUploadContent = () => {
+  const { t } = useTranslation('content');
   const navigate = useNavigate();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -19,7 +21,7 @@ const LibraryUploadContent = () => {
       <Box sx={{ mb: 4 }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent="space-between" sx={{ mb: 1 }}>
           <Typography variant="h4" sx={{ mb: 0 }}>
-            Subir contenido
+            {t('uploadPage.title')}
           </Typography>
           <Button
             variant="outlined"
@@ -27,11 +29,11 @@ const LibraryUploadContent = () => {
             onClick={() => navigate('/content/library_upload_folder')}
             sx={{ textTransform: 'none', alignSelf: { xs: 'stretch', sm: 'center' } }}
           >
-            Subir carpeta
+            {t('uploadPage.uploadFolder')}
           </Button>
         </Stack>
         <Typography variant="body1" color="text.secondary">
-          Sube nuevo contenido y visualiza tus subidas recientes
+          {t('uploadPage.subtitle')}
         </Typography>
       </Box>
       <Grid container spacing={3}>

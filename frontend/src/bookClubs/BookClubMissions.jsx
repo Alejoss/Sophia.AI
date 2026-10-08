@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { useDateLocales } from '../hooks/useDateLocales';
 import { Link as RouterLink } from 'react-router-dom';
 import { Alert, Box, Button, LinearProgress, Stack, Typography } from '@mui/material';
 import { useBookClub } from './BookClubLayout';
@@ -6,6 +8,8 @@ import { CLUB_ACCENT, CLUB_ACCENT_HOVER } from './clubTheme';
 import { getGuestSession, guestCompleteAccountUrl } from './guestStorage';
 
 const BookClubMissions = () => {
+  const { t } = useTranslation('bookClubs');
+  const { intl } = useDateLocales();
   const { slug, hub, isGuest, canParticipate } = useBookClub();
   const progressPct = Math.round(hub.progress?.percentage || 0);
   const pathId = hub.quick_links?.knowledge_path_id;
@@ -20,10 +24,10 @@ const BookClubMissions = () => {
     <Stack spacing={3}>
       <Box>
         <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-          Misiones
+          {t('missions.title')}
         </Typography>
         <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>
-          El knowledge path del club es la secuencia de lecturas y ejercicios del ciclo.
+          {t('missions.intro')}
         </Typography>
       </Box>
 
@@ -32,12 +36,12 @@ const BookClubMissions = () => {
           severity="info"
           action={
             <Button color="inherit" size="small" component={RouterLink} to={accountUrl} sx={{ fontWeight: 700 }}>
-              Crear cuenta
+              {t('createAccount')}
             </Button>
           }
           sx={{ bgcolor: 'rgba(255,107,53,0.1)', color: '#fff', border: '1px solid rgba(255,107,53,0.35)' }}
         >
-          Puedes ver el resumen de misiones. Para abrirlas y marcar progreso, crea tu cuenta.
+          {t('missions.readOnly')}
         </Alert>
       )}
 
@@ -49,7 +53,11 @@ const BookClubMissions = () => {
         }}
       >
         <Typography sx={{ color: 'rgba(255,255,255,0.85)', mb: 1 }}>
-          {hub.progress.completed_nodes} de {hub.progress.total_nodes} misiones · {progressPct}%
+          {t('missions.progress', {
+            completed: hub.progress.completed_nodes,
+            total: hub.progress.total_nodes,
+            percent: progressPct,
+          })}
         </Typography>
         <LinearProgress
           variant="determinate"
@@ -73,10 +81,10 @@ const BookClubMissions = () => {
           }}
         >
           <Typography variant="overline" sx={{ color: CLUB_ACCENT, fontWeight: 700 }}>
-            Siguiente
+            {t('missions.next')}
           </Typography>
           <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
-            Misión {next.order}: {next.title}
+            {t('missions.missionLine', { order: next.order, title: next.title })}
           </Typography>
           {readOnly ? (
             <Button
@@ -85,15 +93,15 @@ const BookClubMissions = () => {
               to={accountUrl}
               sx={{ mt: 2, bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
             >
-              Crear cuenta para abrir
+              {t('missions.createToOpen')}
             </Button>
           ) : next.locked ? (
             <Typography sx={{ color: 'rgba(255,255,255,0.6)', mt: 1 }}>
               {next.club_schedule_locked
                 ? next.opens_at
-                  ? `Esta misión se abrirá para todo el club el ${new Date(next.opens_at).toLocaleString('es-ES')}.`
-                  : 'Esta misión todavía no está disponible según el calendario del club.'
-                : 'Esta misión está bloqueada hasta completar la anterior.'}
+                  ? t('missions.opensAt', { date: new Date(next.opens_at).toLocaleString(intl) })
+                  : t('missions.notYet')
+                : t('missions.lockedPrevious')}
             </Typography>
           ) : (
             <Button
@@ -102,19 +110,19 @@ const BookClubMissions = () => {
               to={`/knowledge_path/${next.path_id}/nodes/${next.node_id}?club=${encodeURIComponent(slug)}`}
               sx={{ mt: 2, bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
             >
-              Abrir misión
+              {t('missions.open')}
             </Button>
           )}
         </Box>
       ) : hub.progress.is_completed ? (
-        <Alert severity="success">Completaste todas las misiones de este ciclo. Usa el Foro o Comunidad mientras llega el siguiente.</Alert>
+        <Alert severity="success">{t('missions.allDone')}</Alert>
       ) : (
         <Box>
           <Typography sx={{ color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>
-            Las misiones se están preparando
+            {t('missions.preparing')}
           </Typography>
           <Typography sx={{ color: 'rgba(255,255,255,0.6)', mt: 0.75 }}>
-            Cuando el staff publique la primera lectura, aparecerá aquí como tu acción principal.
+            {t('missions.preparingBody')}
           </Typography>
         </Box>
       )}
@@ -126,7 +134,7 @@ const BookClubMissions = () => {
           to={`/knowledge_path/${pathId}?club=${encodeURIComponent(slug)}`}
           sx={{ alignSelf: 'flex-start', borderColor: CLUB_ACCENT, color: CLUB_ACCENT }}
         >
-          Ver path completo
+          {t('missions.viewPath')}
         </Button>
       )}
     </Stack>

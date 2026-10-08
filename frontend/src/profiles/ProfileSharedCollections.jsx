@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Typography,
@@ -17,6 +18,7 @@ const PAGE_SIZE = 24;
  * Lists another user's public collections (same rules as /content/collections/public/?owner=).
  */
 const ProfileSharedCollections = ({ userId, ownerUsername }) => {
+  const { t } = useTranslation('profiles');
   const navigate = useNavigate();
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +48,7 @@ const ProfileSharedCollections = ({ userId, ownerUsername }) => {
           setError(
             err.response?.data?.error ||
               err.message ||
-              'No se pudieron cargar las colecciones'
+              t('collections.loadError')
           );
           setCollections([]);
         }
@@ -58,7 +60,7 @@ const ProfileSharedCollections = ({ userId, ownerUsername }) => {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, t]);
 
   if (!userId) {
     return null;
@@ -67,10 +69,10 @@ const ProfileSharedCollections = ({ userId, ownerUsername }) => {
   return (
     <Box>
       <Typography variant="h5" component="h2" fontWeight={600} gutterBottom>
-        Colecciones Compartidas
+        {t('collections.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Colecciones que {ownerUsername || 'este usuario'} comparte públicamente con la comunidad.
+        {t('collections.lead', { name: ownerUsername || t('collections.fallbackUser') })}
       </Typography>
 
       {loading && (
@@ -87,7 +89,7 @@ const ProfileSharedCollections = ({ userId, ownerUsername }) => {
 
       {!loading && !error && collections.length === 0 && (
         <Typography variant="body1" color="text.secondary">
-          Este usuario no tiene colecciones compartidas visibles todavía.
+          {t('collections.empty')}
         </Typography>
       )}
 
@@ -125,11 +127,10 @@ const ProfileSharedCollections = ({ userId, ownerUsername }) => {
                     </Typography>
                   )}
                   <Typography variant="body2" color="text.secondary">
-                    Por {c.owner_username}
+                    {t('collections.by', { name: c.owner_username })}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                    {c.visible_item_count}{' '}
-                    {c.visible_item_count === 1 ? 'elemento visible' : 'elementos visibles'}
+                    {t('collections.visible', { count: c.visible_item_count })}
                   </Typography>
                 </CardContent>
               </CardActionArea>

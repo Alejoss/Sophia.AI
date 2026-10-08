@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { Box, Stack, Typography } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -12,6 +13,7 @@ import { CLUB_ACCENT, CLUB_BG } from './clubTheme';
  * knowledge-path visitors never see club UI.
  */
 const BookClubReturnLink = ({ sx }) => {
+  const { t } = useTranslation('bookClubs');
   const [searchParams] = useSearchParams();
   const slug = searchParams.get('club');
   const [club, setClub] = useState(null);
@@ -66,10 +68,10 @@ const BookClubReturnLink = ({ sx }) => {
             variant="overline"
             sx={{ color: CLUB_ACCENT, fontWeight: 700, lineHeight: 1.4, display: 'block' }}
           >
-            Club de Lectura
+            {t('brand')}
           </Typography>
           <Typography sx={{ color: '#fff', fontWeight: 700 }}>
-            Volver a «{club.title}»
+            {t('backToClub', { title: club.title })}
           </Typography>
         </Box>
       </Stack>

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Snackbar, Alert, Box, Typography } from '@mui/material';
 import BadgeDisplay from './BadgeDisplay';
 
 const BadgeNotification = ({ badge, open, onClose }) => {
+  const { t } = useTranslation('gamification');
   const [isVisible, setIsVisible] = useState(open);
 
   useEffect(() => {
@@ -47,14 +49,14 @@ const BadgeNotification = ({ badge, open, onClose }) => {
           <BadgeDisplay badge={badge} showName={false} context="notification" />
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-              ¡Nueva Insignia Desbloqueada!
+              {t('notification.unlocked')}
             </Typography>
             <Typography variant="body2">
               {badge.badge_name || badge.name}
             </Typography>
             {badge.points_earned !== undefined && (
               <Typography variant="caption" color="text.secondary">
-                +{badge.points_earned} puntos
+                {t('notification.points', { count: badge.points_earned })}
               </Typography>
             )}
           </Box>

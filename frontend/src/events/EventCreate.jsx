@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import i18n from '../i18n';
 import { useForm, Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -37,34 +39,34 @@ const PLATFORM_CHOICES = [
   { value: 'tox', label: 'Tox' },
   { value: 'twitch', label: 'Twitch' },
   { value: 'zoom', label: 'Zoom' },
-  { value: 'other', label: 'Otra' },
+  { value: 'other' },
 ];
 
 const EVENT_TYPES = [
-  { value: 'LIVE_COURSE', label: 'Curso en Vivo' },
-  { value: 'LIVE_CERTIFICATION', label: 'Certificación en Vivo' },
-  { value: 'LIVE_MASTER_CLASS', label: 'Clase Magistral en Vivo' },
+  { value: 'LIVE_COURSE' },
+  { value: 'LIVE_CERTIFICATION' },
+  { value: 'LIVE_MASTER_CLASS' },
 ];
 
 const schema = yup.object({
   title: yup
     .string()
     .trim()
-    .required('El título es obligatorio'),
+    .required(() => i18n.t('events:validation.titleRequired')),
   description: yup
     .string()
     .trim()
-    .required('La descripción es obligatoria'),
+    .required(() => i18n.t('events:validation.descriptionRequired')),
   event_type: yup
     .string()
-    .required('El tipo de evento es obligatorio'),
+    .required(() => i18n.t('events:validation.typeRequired')),
   platform: yup.string().default(''),
   other_platform: yup
     .string()
     .default('')
     .when('platform', {
       is: 'other',
-      then: (field) => field.trim().required('El nombre de la otra plataforma es obligatorio'),
+      then: (field) => field.trim().required(() => i18n.t('events:validation.otherPlatformRequired')),
       otherwise: (field) => field,
     }),
   reference_price: yup.string().default(''),
@@ -73,7 +75,7 @@ const schema = yup.object({
     .default('')
     .test(
       'min-hour',
-      'La fecha de inicio debe ser al menos 1 hora a partir de ahora',
+      () => i18n.t('events:validation.startMinHour'),
       (value) => {
         if (!value) return true;
         const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
@@ -85,7 +87,7 @@ const schema = yup.object({
     .default('')
     .test(
       'after-start',
-      'La fecha de fin debe ser posterior a la fecha de inicio',
+      () => i18n.t('events:validation.endAfterStart'),
       function afterStart(value) {
         const { date_start: dateStart } = this.parent;
         if (!value || !dateStart) return true;
@@ -108,6 +110,7 @@ const defaultValues = {
 };
 
 const EventCreate = () => {
+  const { t } = useTranslation('events');
   const navigate = useNavigate();
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -149,12 +152,12 @@ const EventCreate = () => {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setImageError('Por favor, seleccione un archivo de imagen válido');
+      setImageError(t('image.invalid'));
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setImageError('El tamaño de la imagen debe ser menor a 5MB');
+      setImageError(t('image.tooLarge'));
       return;
     }
 
@@ -196,7 +199,7 @@ const EventCreate = () => {
       }
 
       const createdEvent = await createEvent(formData);
-      setSuccess('¡Evento creado exitosamente!');
+      setSuccess(t('success.created'));
 
       setTimeout(() => {
         navigate(`/events/${createdEvent.id}`);
@@ -213,7 +216,7 @@ const EventCreate = () => {
       const { generalError: parsed } = applyApiErrorsToForm(
         err,
         setError,
-        'Error al crear el evento. Por favor, inténtelo de nuevo.',
+        t('errors.create'),
       );
 
       if (!imageErrors && parsed) {
@@ -225,7 +228,7 @@ const EventCreate = () => {
   return (
     <Container maxWidth="md" sx={{ py: 3 }}>
       <Typography variant="h4" sx={{ fontWeight: 600, mb: 2.5 }}>
-        Crear Nuevo Evento
+        {t('createNew')}
       </Typography>
 
       <Card variant="outlined">
@@ -233,20 +236,20 @@ const EventCreate = () => {
           <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
             <Stack spacing={2.5}>
               <TextField
-                label="Título *"
+                label={t('fields.title')}
                 {...register('title')}
                 error={Boolean(errors.title)}
                 helperText={errors.title?.message || ''}
-                placeholder="Ingrese el título del evento"
+                placeholder={t('fields.titlePlaceholder')}
                 fullWidth
               />
 
               <TextField
-                label="Descripción *"
+                label={t('fields.description')}
                 {...register('description')}
                 error={Boolean(errors.description)}
                 helperText={errors.description?.message || ''}
-                placeholder="Describa su evento..."
+                placeholder={t('fields.descriptionPlaceholder')}
                 multiline
                 minRows={3}
                 fullWidth
@@ -254,10 +257,10 @@ const EventCreate = () => {
 
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Imagen del Evento
+                  {t('fields.image')}
                 </Typography>
                 <Button component="label" variant="outlined" disabled={isSubmitting}>
-                  {imagePreview ? 'Cambiar Imagen' : 'Elegir Imagen'}
+                  {imagePreview ? t('fields.changeImage') : t('fields.chooseImage')}
                   <input type="file" accept="image/*" hidden onChange={handleImageChange} />
                 </Button>
                 {imagePreview && (
@@ -270,7 +273,7 @@ const EventCreate = () => {
                     />
                     <Box sx={{ mt: 1 }}>
                       <Button type="button" onClick={removeImage} color="error" size="small">
-                        Eliminar
+                        {t('delete')}
                       </Button>
                     </Box>
                   </Box>
@@ -289,11 +292,11 @@ const EventCreate = () => {
                     control={control}
                     render={({ field }) => (
                       <FormControl fullWidth error={Boolean(errors.event_type)}>
-                        <InputLabel>Tipo de Evento *</InputLabel>
-                        <Select {...field} label="Tipo de Evento *">
-                          <MenuItem value="">Seleccionar tipo</MenuItem>
+                        <InputLabel>{t('fields.eventType')}</InputLabel>
+                        <Select {...field} label={t('fields.eventType')}>
+                          <MenuItem value="">{t('platforms.selectType')}</MenuItem>
                           {EVENT_TYPES.map((et) => (
-                            <MenuItem key={et.value} value={et.value}>{et.label}</MenuItem>
+                            <MenuItem key={et.value} value={et.value}>{t(`eventTypes.${et.value}`)}</MenuItem>
                           ))}
                         </Select>
                         {errors.event_type && (
@@ -310,11 +313,13 @@ const EventCreate = () => {
                     control={control}
                     render={({ field }) => (
                       <FormControl fullWidth error={Boolean(errors.platform)}>
-                        <InputLabel>Plataforma</InputLabel>
-                        <Select {...field} label="Plataforma">
-                          <MenuItem value="">Ninguna</MenuItem>
+                        <InputLabel>{t('fields.platform')}</InputLabel>
+                        <Select {...field} label={t('fields.platform')}>
+                          <MenuItem value="">{t('platforms.none')}</MenuItem>
                           {PLATFORM_CHOICES.map((p) => (
-                            <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
+                            <MenuItem key={p.value} value={p.value}>
+                              {p.value === 'other' ? t('platforms.other') : p.label}
+                            </MenuItem>
                           ))}
                         </Select>
                         {errors.platform && (
@@ -328,17 +333,17 @@ const EventCreate = () => {
 
               {platform === 'other' && (
                 <TextField
-                  label="Otra Plataforma *"
+                  label={t('fields.otherPlatform')}
                   {...register('other_platform')}
                   error={Boolean(errors.other_platform)}
                   helperText={errors.other_platform?.message || ''}
-                  placeholder="Ingrese el nombre de la plataforma"
+                  placeholder={t('fields.otherPlatformPlaceholder')}
                   fullWidth
                 />
               )}
 
               <TextField
-                label="Precio de Referencia en USD"
+                label={t('fields.referencePrice')}
                 type="number"
                 {...register('reference_price')}
                 error={Boolean(errors.reference_price)}
@@ -354,11 +359,11 @@ const EventCreate = () => {
                     control={control}
                     render={({ field }) => (
                       <EventDateTimeField
-                        label="Fecha/Hora de Inicio"
+                        label={t('fields.start')}
                         value={field.value}
                         onChange={field.onChange}
                         error={errors.date_start?.message}
-                        dateHelperText="Seleccione la fecha de inicio"
+                        dateHelperText={t('fields.startHelper')}
                         minDate={startMinDate}
                       />
                     )}
@@ -370,11 +375,11 @@ const EventCreate = () => {
                     control={control}
                     render={({ field }) => (
                       <EventDateTimeField
-                        label="Fecha/Hora de Fin"
+                        label={t('fields.end')}
                         value={field.value}
                         onChange={field.onChange}
                         error={errors.date_end?.message}
-                        dateHelperText="Seleccione la fecha de fin"
+                        dateHelperText={t('fields.endHelper')}
                         minDate={endMinDate}
                       />
                     )}
@@ -383,11 +388,11 @@ const EventCreate = () => {
               </Grid>
 
               <TextField
-                label="Descripción del Horario"
+                label={t('fields.schedule')}
                 {...register('schedule_description')}
                 error={Boolean(errors.schedule_description)}
                 helperText={errors.schedule_description?.message || ''}
-                placeholder="ej., Todos los martes durante 5 semanas"
+                placeholder={t('fields.schedulePlaceholder')}
                 multiline
                 minRows={3}
                 fullWidth
@@ -405,17 +410,17 @@ const EventCreate = () => {
                   <Stack direction="row" spacing={1} alignItems="center">
                     {isVisible ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      Público
+                      {t('public')}
                     </Typography>
                   </Stack>
                 }
               />
               <Typography variant="caption" color="text.secondary">
-                Los eventos privados no aparecen en el listado público ni en búsquedas, pero pueden compartirse con un enlace directo.
+                {t('visibilityHint')}
               </Typography>
 
               <Button type="submit" variant="contained" disabled={isSubmitting}>
-                {isSubmitting ? 'Creando...' : 'Crear Evento'}
+                {isSubmitting ? t('creating') : t('createEvent')}
               </Button>
             </Stack>
           </Box>

@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useContext } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useDateLocales } from '../hooks/useDateLocales';
 import { AuthContext } from '../context/AuthContext';
 import { fetchThreads } from '../api/messagesApi';
 import { 
@@ -19,6 +21,8 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 
 const ThreadList = ({ onThreadSelect }) => {
+    const { t } = useTranslation('messages');
+    const { intl } = useDateLocales();
     const [threads, setThreads] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -37,13 +41,13 @@ const ThreadList = ({ onThreadSelect }) => {
                 setError(null);
             } catch (err) {
                 console.error('Error loading threads:', err);
-                setError('Error al cargar las conversaciones.');
+                setError(t('list.loadFailed'));
             } finally {
                 setLoading(false);
             }
         };
         loadThreads();
-    }, []);
+    }, [t]);
 
     const getOtherParticipant = (thread) => {
         if (!thread || !currentUser) return null;
@@ -73,7 +77,7 @@ const ThreadList = ({ onThreadSelect }) => {
         <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             {/* Header */}
             <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>Mensajes</Typography>
+                <Typography variant="h6" sx={{ mb: 2 }}>{t('list.title')}</Typography>
                 <Paper
                     component="form"
                     noValidate
@@ -82,12 +86,12 @@ const ThreadList = ({ onThreadSelect }) => {
                 >
                     <InputBase
                         sx={{ ml: 1, flex: 1 }}
-                        placeholder="Buscar conversaciones"
+                        placeholder={t('list.searchPlaceholder')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        inputProps={{ 'aria-label': 'Buscar conversaciones' }}
+                        inputProps={{ 'aria-label': t('list.searchPlaceholder') }}
                     />
-                    <IconButton type="submit" sx={{ p: '10px' }} aria-label="Buscar">
+                    <IconButton type="submit" sx={{ p: '10px' }} aria-label={t('list.searchAria')}>
                         <SearchIcon />
                     </IconButton>
                 </Paper>
@@ -98,8 +102,8 @@ const ThreadList = ({ onThreadSelect }) => {
                 {!filteredThreads || filteredThreads.length === 0 ? (
                     <ListItem>
                         <ListItemText 
-                            primary="No se encontraron conversaciones" 
-                            secondary={searchQuery ? "Intente con un término de búsqueda diferente" : "Aún no hay conversaciones"}
+                            primary={t('list.noneFound')}
+                            secondary={searchQuery ? t('list.tryDifferent') : t('list.noneYet')}
                         />
                     </ListItem>
                 ) : (
@@ -146,10 +150,10 @@ const ThreadList = ({ onThreadSelect }) => {
                                                         variant="caption"
                                                         color="text.secondary"
                                                     >
-                                                        {new Date(thread.last_message.timestamp).toLocaleString('es-ES')}
+                                                        {new Date(thread.last_message.timestamp).toLocaleString(intl)}
                                                     </Typography>
                                                 </>
-                                            ) : 'Aún no hay mensajes'
+                                            ) : t('list.noMessages')
                                         }
                                     />
                                 </ListItem>

@@ -34,7 +34,9 @@ import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccount";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import { useTranslation } from "react-i18next";
 import contentApi from "../api/contentApi";
+import i18n from "../i18n";
 import { useAuth } from "../context/AuthContext";
 import { applyApiErrorsToForm } from "../utils/apiFormErrors";
 import ImageUploadModal from "../components/ImageUploadModal";
@@ -49,7 +51,7 @@ const topicSchema = yup.object({
   title: yup
     .string()
     .trim()
-    .required("El título es requerido."),
+    .required(() => i18n.t("topics:edit.titleRequired")),
   description: yup.string().trim().default(""),
   is_public: yup.boolean().default(true),
   chat_enabled: yup.boolean().default(false),
@@ -77,6 +79,7 @@ const normalizeTab = (raw, { isCreator, canManage }) => {
 };
 
 const TopicEdit = () => {
+  const { t } = useTranslation("topics");
   const { topicId } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -145,7 +148,7 @@ const TopicEdit = () => {
         });
         setPageError(null);
       } catch {
-        setPageError("Error al cargar los detalles del tema");
+        setPageError(t("edit.loadError"));
       } finally {
         setLoading(false);
       }
@@ -179,9 +182,9 @@ const TopicEdit = () => {
       const updatedTopic = await contentApi.updateTopicImage(topicId, payload);
       setTopic((prev) => (prev ? { ...prev, ...updatedTopic } : updatedTopic));
       setImageCacheBuster(Date.now());
-      setSaveMessage("Imagen actualizada.");
+      setSaveMessage(t("edit.imageSaved"));
     } catch {
-      setPageError("Error al actualizar la imagen del tema");
+      setPageError(t("edit.imageError"));
     }
   };
 
@@ -194,7 +197,7 @@ const TopicEdit = () => {
       setTopic((prev) => (prev ? { ...prev, ...updatedTopic } : updatedTopic));
       setImageCacheBuster(Date.now());
     } catch {
-      setPageError("Error al actualizar el foco de la imagen");
+      setPageError(t("edit.focalError"));
     }
   };
 
@@ -208,13 +211,13 @@ const TopicEdit = () => {
         is_public: updatedTopic.is_public !== false,
         chat_enabled: Boolean(updatedTopic.chat_enabled),
       });
-      setSaveMessage("Cambios guardados.");
+      setSaveMessage(t("edit.saved"));
       setPageError(null);
     } catch (err) {
       const { generalError } = applyApiErrorsToForm(
         err,
         setError,
-        "Error al actualizar los detalles del tema",
+        t("edit.updateError"),
       );
       if (generalError) {
         setPageError(generalError);
@@ -229,7 +232,7 @@ const TopicEdit = () => {
       setDeleteDialogOpen(false);
       navigate("/content/topics", { replace: true });
     } catch (err) {
-      setPageError(err?.error || err?.detail || "Error al eliminar el tema.");
+      setPageError(err?.error || err?.detail || t("edit.deleteError"));
     } finally {
       setIsDeletingTopic(false);
     }
@@ -241,33 +244,35 @@ const TopicEdit = () => {
 
   const tabs = useMemo(() => {
     const items = [
-      { id: TAB_IDS.general, label: "General", icon: <SettingsIcon fontSize="small" /> },
-      { id: TAB_IDS.content, label: "Contenido", icon: <VideoLibraryIcon fontSize="small" /> },
-      { id: TAB_IDS.timeline, label: "Linea de tiempo", icon: <TimelineIcon fontSize="small" /> },
+      { id: TAB_IDS.general, label: t("edit.tabGeneral"), icon: <SettingsIcon fontSize="small" /> },
+      { id: TAB_IDS.content, label: t("edit.tabContent"), icon: <VideoLibraryIcon fontSize="small" /> },
+      { id: TAB_IDS.timeline, label: t("edit.tabTimeline"), icon: <TimelineIcon fontSize="small" /> },
       {
         id: TAB_IDS.suggestions,
-        label: pendingSuggestionsTotal > 0 ? `Sugerencias (${pendingSuggestionsTotal})` : "Sugerencias",
+        label: pendingSuggestionsTotal > 0
+          ? t("edit.suggestionsCount", { count: pendingSuggestionsTotal })
+          : t("edit.tabSuggestions"),
         icon: <LightbulbIcon fontSize="small" />,
       },
     ];
     if (isCreator) {
-      items.push({ id: TAB_IDS.moderators, label: "Moderadores", icon: <SupervisorAccountIcon fontSize="small" /> });
-      items.push({ id: TAB_IDS.danger, label: "Peligro", icon: <WarningAmberIcon fontSize="small" /> });
+      items.push({ id: TAB_IDS.moderators, label: t("edit.tabModerators"), icon: <SupervisorAccountIcon fontSize="small" /> });
+      items.push({ id: TAB_IDS.danger, label: t("edit.tabDanger"), icon: <WarningAmberIcon fontSize="small" /> });
     }
     return items;
-  }, [isCreator, pendingSuggestionsTotal]);
+  }, [isCreator, pendingSuggestionsTotal, t]);
 
-  if (loading) return <Typography sx={{ p: 3 }}>Cargando edicion del tema...</Typography>;
-  if (!topic) return <Alert severity="info" sx={{ m: 3 }}>Tema no encontrado</Alert>;
+  if (loading) return <Typography sx={{ p: 3 }}>{t("edit.loading")}</Typography>;
+  if (!topic) return <Alert severity="info" sx={{ m: 3 }}>{t("edit.notFound")}</Alert>;
 
   if (!canManage) {
     return (
       <Box sx={{ p: 3, maxWidth: 640, mx: "auto" }}>
         <Alert severity="warning" sx={{ mb: 2 }}>
-          No tienes permiso para editar este tema.
+          {t("edit.noPermission")}
         </Alert>
         <Button component={RouterLink} to={`/content/topics/${topicId}`} startIcon={<ArrowBackIcon />}>
-          Volver al tema
+          {t("edit.backToTopic")}
         </Button>
       </Box>
     );
@@ -295,11 +300,11 @@ const TopicEdit = () => {
             size="small"
             sx={{ textTransform: "none" }}
           >
-            Ver tema
+            {t("edit.viewTopic")}
           </Button>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
             {activeTab === TAB_IDS.general && isDirty && (
-              <Chip size="small" label="Cambios sin guardar" color="warning" variant="outlined" />
+              <Chip size="small" label={t("edit.unsaved")} color="warning" variant="outlined" />
             )}
             {activeTab === TAB_IDS.general && (
               <Button
@@ -311,7 +316,7 @@ const TopicEdit = () => {
                 size="small"
                 sx={{ textTransform: "none" }}
               >
-                {isSubmitting ? "Guardando..." : "Guardar cambios"}
+                {isSubmitting ? t("common.saving") : t("edit.save")}
               </Button>
             )}
           </Box>
@@ -357,13 +362,13 @@ const TopicEdit = () => {
                 textTransform: "none",
               }}
             >
-              Editar imagen
+              {t("edit.editImage")}
             </Button>
           )}
         </Box>
 
         <Typography variant="h5" sx={{ px: { xs: 2, md: 3 }, fontWeight: 700, mb: 0.5 }}>
-          Editar tema
+          {t("edit.pageTitle")}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ px: { xs: 2, md: 3 }, mb: 1 }}>
           {topic.title}
@@ -395,7 +400,7 @@ const TopicEdit = () => {
           <Box component="form" id="topic-edit-form" onSubmit={handleSubmit(onSubmit)} noValidate>
             <TextField
               fullWidth
-              label="Titulo"
+              label={t("edit.titleLabel")}
               {...register("title")}
               error={Boolean(errors.title)}
               helperText={errors.title?.message}
@@ -403,7 +408,7 @@ const TopicEdit = () => {
             />
             <TextField
               fullWidth
-              label="Descripcion"
+              label={t("edit.descriptionLabel")}
               {...register("description")}
               error={Boolean(errors.description)}
               helperText={errors.description?.message}
@@ -411,7 +416,7 @@ const TopicEdit = () => {
               multiline
               minRows={8}
               maxRows={24}
-              placeholder="Describe el tema"
+              placeholder={t("edit.descriptionPlaceholder")}
             />
             <Box sx={{ mt: 2, mb: 1 }}>
               <Controller
@@ -434,7 +439,7 @@ const TopicEdit = () => {
                           <VisibilityOffIcon fontSize="small" />
                         )}
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          Público
+                          {t("edit.public")}
                         </Typography>
                       </Box>
                     }
@@ -447,8 +452,7 @@ const TopicEdit = () => {
                 </Typography>
               )}
               <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5, mb: 2 }}>
-                Si está desactivado, el tema no aparece en el listado público ni en búsquedas.
-                Solo tú, los moderadores y el staff pueden verlo.
+                {t("edit.visibilityHelp")} {t("edit.visibilityStaff")}
               </Typography>
 
               <Controller
@@ -471,7 +475,7 @@ const TopicEdit = () => {
                           color="primary"
                         />
                       }
-                      label="Mostrar pestaña Consultas"
+                      label={t("edit.showConsultations")}
                     />
                   );
                 }}
@@ -483,8 +487,8 @@ const TopicEdit = () => {
               )}
               <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
                 {topic?.chat_can_enable
-                  ? `Listo: ${topic.indexed_transcript_count} contenido(s) indexado(s). Al activarlo, los usuarios verán la pestaña Consultas.`
-                  : 'No disponible aún: hace falta al menos un video/audio del tema con transcript embebido (estado indexed).'}
+                  ? t("edit.ready", { count: topic.indexed_transcript_count })
+                  : t("edit.unavailable")}
               </Typography>
             </Box>
           </Box>
@@ -531,10 +535,10 @@ const TopicEdit = () => {
         {activeTab === TAB_IDS.danger && isCreator && (
           <Box>
             <Typography variant="h6" color="error" sx={{ fontWeight: 700, mb: 1 }}>
-              Zona de peligro
+              {t("edit.dangerZone")}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Si eliminas este tema se borraran tambien su contenido asociado, moderadores e invitaciones.
+              {t("edit.dangerBody")}
             </Typography>
             <Button
               variant="contained"
@@ -543,25 +547,25 @@ const TopicEdit = () => {
               onClick={() => setDeleteDialogOpen(true)}
               sx={{ textTransform: "none" }}
             >
-              Eliminar tema
+              {t("edit.deleteTopic")}
             </Button>
           </Box>
         )}
       </Paper>
 
       <Dialog open={deleteDialogOpen} onClose={() => !isDeletingTopic && setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Eliminar tema</DialogTitle>
+        <DialogTitle>{t("edit.deleteTopic")}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
-            Seguro que deseas eliminar <strong>{topic.title}</strong>? Esta accion no se puede deshacer.
+            {t("edit.deleteBefore")}<strong>{topic.title}</strong>{t("edit.deleteAfter")}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeletingTopic}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleDeleteTopic} disabled={isDeletingTopic} color="error" variant="contained">
-            {isDeletingTopic ? "Eliminando..." : "Eliminar"}
+            {isDeletingTopic ? t("edit.deleting") : t("common.delete")}
           </Button>
         </DialogActions>
       </Dialog>
@@ -574,7 +578,7 @@ const TopicEdit = () => {
         existingFocalX={topic?.topic_image_focal_x ?? 0.5}
         existingFocalY={topic?.topic_image_focal_y ?? 0.5}
         onFocalOnlyUpdate={handleFocalOnlyUpdate}
-        entityLabel="tema"
+        entityLabel={t("edit.entityLabel")}
       />
 
       <Snackbar

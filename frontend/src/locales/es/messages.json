@@ -1,0 +1,31 @@
+{
+  "validation": {
+    "writeBeforeSend": "Escribe un mensaje antes de enviar."
+  },
+  "list": {
+    "loadFailed": "Error al cargar las conversaciones.",
+    "title": "Mensajes",
+    "searchPlaceholder": "Buscar conversaciones",
+    "searchAria": "Buscar",
+    "noneFound": "No se encontraron conversaciones",
+    "tryDifferent": "Intente con un término de búsqueda diferente",
+    "noneYet": "Aún no hay conversaciones",
+    "noMessages": "Aún no hay mensajes"
+  },
+  "thread": {
+    "createFailed": "Error al crear o obtener el hilo",
+    "loadFailed": "Error al cargar los mensajes.",
+    "sendFailed": "Error al enviar el mensaje.",
+    "notFound": "No se encontró el hilo.",
+    "withUser": "Conversación con",
+    "unknownUser": "Usuario",
+    "empty": "Aún no hay mensajes.",
+    "placeholder": "Escriba su mensaje...",
+    "sending": "Enviando...",
+    "send": "Enviar"
+  },
+  "layout": {
+    "selectTitle": "Seleccione una conversación",
+    "selectHint": "Elija una conversación de la lista o inicie una nueva"
+  }
+}

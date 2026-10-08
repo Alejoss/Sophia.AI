@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import * as yup from "yup";
@@ -26,14 +27,15 @@ import {
 "@mui/material";
 import { applyApiErrorsToForm } from "../utils/apiFormErrors.js";
 
-const rejectSchema = yup.object({
-  reason: yup
-    .string()
-    .trim()
-    .required("El motivo del rechazo es requerido."),
-});
-
 const Certificates = ({ isOwnProfile = false, userId = null }) => {
+  const { t } = useTranslation("profiles");
+  const rejectSchema = useMemo(
+    () =>
+      yup.object({
+        reason: yup.string().trim().required(() => t("certificates.reasonRequired")),
+      }),
+    [t],
+  );
   const [activeTab, setActiveTab] = useState("certificates");
   const [certificates, setCertificates] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -89,7 +91,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
 
       setCertificates(data);
     } catch (err) {
-      setError("Error al cargar los certificados");
+      setError(t("certificates.loadError"));
       console.error(err);
     } finally {
       setCertificatesLoading(false);
@@ -108,7 +110,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
         setRequests([]);
       }
     } catch (err) {
-      setError("Error al cargar las solicitudes de certificados");
+      setError(t("certificates.loadRequestsError"));
       console.error(err);
     } finally {
       setRequestsLoading(false);
@@ -128,7 +130,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       setSelectedRequest(null);
       fetchRequests();
     } catch (err) {
-      setError("Error al aprobar la solicitud");
+      setError(t("certificates.approveError"));
       console.error(err);
     }
   };
@@ -151,7 +153,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       const { generalError } = applyApiErrorsToForm(
         err,
         setRejectFormError,
-        "Error al rechazar la solicitud",
+        t("certificates.rejectError"),
         { rejection_reason: "reason" },
       );
       if (generalError) {
@@ -165,7 +167,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       await certificatesApi.cancelCertificateRequest(requestId);
       fetchRequests();
     } catch (err) {
-      setError("Error al cancelar la solicitud");
+      setError(t("certificates.cancelError"));
       console.error(err);
     }
   };
@@ -212,17 +214,17 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
     } else if (certificate.event_title) {
       return certificate.event_title;
     } else {
-      return "Certificado";
+      return t("certificates.certificate");
     }
   };
 
   const getCertificateType = (certificate) => {
     if (certificate.knowledge_path_title) {
-      return "Camino de conocimiento";
+      return t("certificates.knowledgePath");
     } else if (certificate.event_title) {
-      return "Evento";
+      return t("certificates.event");
     } else {
-      return "Certificado";
+      return t("certificates.certificate");
     }
   };
 
@@ -232,17 +234,17 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
     } else if (request.event_title) {
       return request.event_title;
     } else {
-      return "Solicitud de certificado";
+      return t("certificates.request");
     }
   };
 
   const getRequestType = (request) => {
     if (request.knowledge_path_title) {
-      return "Camino de conocimiento";
+      return t("certificates.knowledgePath");
     } else if (request.event_title) {
-      return "Evento";
+      return t("certificates.event");
     } else {
-      return "Certificado";
+      return t("certificates.certificate");
     }
   };
 
@@ -262,8 +264,8 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
       {isOwnProfile ?
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
           <Tabs value={activeTab} onChange={handleTabChange}>
-            <Tab label="Certificados" value="certificates" />
-            <Tab label="Solicitudes de certificados" value="requests" />
+            <Tab label={t("certificates.tabCertificates")} value="certificates" />
+            <Tab label={t("certificates.tabRequests")} value="requests" />
           </Tabs>
         </Box> :
 
@@ -281,7 +283,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
             fontWeight: 600
           }}>
           
-            Certificados ({certificates.length})
+            {t("certificates.count", { count: certificates.length })}
           </Typography>
         </Box>
       }
@@ -304,8 +306,8 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
           certificates.length === 0 ?
           <Typography variant="body1" color="text.secondary">
                 {isOwnProfile ?
-            "Aún no has obtenido ningún certificado. ¡Completa caminos de conocimiento o asiste a eventos para obtener certificados!" :
-            "No se encontraron certificados."}
+            t("certificates.emptyOwn") :
+            t("certificates.emptyOther")}
               </Typography> :
 
           <Stack spacing={2}>
@@ -326,17 +328,16 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                             {getCertificateTitle(certificate)}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            Tipo: {getCertificateType(certificate)}
+                            {t("certificates.type", { type: getCertificateType(certificate) })}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            Emitido el:{" "}
-                            {new Date(
-                        certificate.issued_on
-                      ).toLocaleDateString()}
+                            {t("certificates.issuedOn", {
+                              date: new Date(certificate.issued_on).toLocaleDateString(),
+                            })}
                           </Typography>
                           {certificate.blockchain_hash &&
                     <Chip
-                      label="En Blockchain"
+                      label={t("certificates.onBlockchain")}
                       color="success"
                       size="small"
                       sx={{ mt: 1 }} />
@@ -351,7 +352,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                     target="_blank"
                     rel="noopener noreferrer">
                     
-                            Descargar
+                            {t("certificates.download")}
                           </Button>
                   }
                       </Box>
@@ -378,8 +379,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
           requests.length === 0 ?
           <Box textAlign="center" py={4}>
                 <Typography variant="h6" color="text.secondary" gutterBottom>
-                  ¿Tienes algo que enseñar? Crea un Camino de Conocimiento o un Evento
-                  y emite certificados
+                  {t("certificates.emptyRequestsTitle")}
                 </Typography>
                 <Box
               mt={3}
@@ -403,14 +403,14 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                 color="primary"
                 onClick={() => navigate("/knowledge_path/create")}>
                 
-                    Crear camino de conocimiento
+                    {t("certificates.createPath")}
                   </Button>
                   <Button
                 variant="contained"
                 color="secondary"
                 onClick={() => navigate("/events/create")}>
                 
-                    Crear un evento
+                    {t("certificates.createEvent")}
                   </Button>
                 </Box>
               </Box> :
@@ -429,7 +429,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                 color="text.primary"
                 sx={{ fontWeight: 600 }}>
                 
-                      Solicitudes para revisar
+                      {t("certificates.toReview")}
                     </Typography>
                     {sortRequests(
                 requests.filter(
@@ -454,7 +454,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 {getRequestTitle(request)}
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
-                                Solicitado por:{" "}
+                                {t("certificates.requestedBy")}{" "}
                                 <MuiLink
                           component={Link}
                           to={`/profiles/user_profile/${request.requester_id}`}
@@ -464,7 +464,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 </MuiLink>
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
-                                Tipo: {getRequestType(request)}
+                                {t("certificates.type", { type: getRequestType(request) })}
                               </Typography>
                               <Chip
                         label={request.status}
@@ -478,7 +478,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                       typeof request.notes === "string" &&
                       request.notes.trim() !== "") &&
                       <Typography variant="body2" sx={{ mt: 1 }}>
-                                    Notas:{" "}
+                                    {t("certificates.notes")}{" "}
                                     {typeof request.notes === "object" ?
                         JSON.stringify(request.notes) :
                         request.notes}
@@ -494,14 +494,14 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                           color="success"
                           onClick={() => openApproveDialog(request)}>
                           
-                                    Aprobar
+                                    {t("certificates.approve")}
                                   </Button>
                                   <Button
                           variant="contained"
                           color="error"
                           onClick={() => openRejectDialog(request)}>
                           
-                                    Rechazar
+                                    {t("certificates.reject")}
                                   </Button>
                                 </>
                       }
@@ -511,7 +511,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                         color="success"
                         onClick={() => openApproveDialog(request)}>
                         
-                                  Aceptar solicitud
+                                  {t("certificates.acceptRequest")}
                                 </Button>
                       }
                             </Stack>
@@ -523,7 +523,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                     color="error"
                     sx={{ mt: 1 }}>
                     
-                              Rejection reason: {request.rejection_reason}
+                              {t("certificates.rejectionReason", { reason: request.rejection_reason })}
                             </Typography>
                   }
                         </CardContent>
@@ -543,7 +543,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                 color="text.primary"
                 sx={{ fontWeight: 600 }}>
                 
-                      Mis solicitudes
+                      {t("certificates.myRequests")}
                     </Typography>
                     {sortRequests(
                 requests.filter(
@@ -566,13 +566,12 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 {getRequestTitle(request)}
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
-                                Solicitado el:{" "}
-                                {new Date(
-                          request.request_date
-                        ).toLocaleDateString()}
+                                {t("certificates.requestedOn", {
+                                  date: new Date(request.request_date).toLocaleDateString(),
+                                })}
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
-                                Autor:{" "}
+                                {t("certificates.author")}{" "}
                                 <MuiLink
                           component={Link}
                           to={`/profiles/user_profile/${
@@ -586,7 +585,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                                 </MuiLink>
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
-                                Tipo: {getRequestType(request)}
+                                {t("certificates.type", { type: getRequestType(request) })}
                               </Typography>
                               <Chip
                         label={request.status}
@@ -600,7 +599,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                       typeof request.notes === "string" &&
                       request.notes.trim() !== "") &&
                       <Typography variant="body2" sx={{ mt: 1 }}>
-                                    Notas:{" "}
+                                    {t("certificates.notes")}{" "}
                                     {typeof request.notes === "object" ?
                         JSON.stringify(request.notes) :
                         request.notes}
@@ -613,7 +612,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                       color="error"
                       onClick={() => handleCancel(request.id)}>
                       
-                                Cancelar
+                                {t("certificates.cancel")}
                               </Button>
                     }
                           </Box>
@@ -623,7 +622,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
                     color="error"
                     sx={{ mt: 1 }}>
                     
-                              Motivo del rechazo: {request.rejection_reason}
+                              {t("certificates.rejectionReason", { reason: request.rejection_reason })}
                             </Typography>
                   }
                         </CardContent>
@@ -642,12 +641,12 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
         open={approveDialogOpen}
         onClose={() => setApproveDialogOpen(false)}>
         
-        <DialogTitle>Aprobar solicitud de certificado</DialogTitle>
+        <DialogTitle>{t("certificates.approveTitle")}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
-            label="Nota (opcional)"
+            label={t("certificates.noteOptional")}
             type="text"
             fullWidth
             multiline
@@ -657,9 +656,9 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
           
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setApproveDialogOpen(false)}>Cancelar</Button>
+          <Button onClick={() => setApproveDialogOpen(false)}>{t("cancel")}</Button>
           <Button onClick={handleApprove} color="primary">
-            Aprobar
+            {t("certificates.approve")}
           </Button>
         </DialogActions>
       </Dialog>
@@ -670,7 +669,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
         onClose={() => !isRejectSubmitting && setRejectDialogOpen(false)}>
 
         <Box component="form" onSubmit={handleRejectSubmit(onRejectSubmit)} noValidate>
-          <DialogTitle>Rechazar solicitud de certificado</DialogTitle>
+          <DialogTitle>{t("certificates.rejectTitle")}</DialogTitle>
           <DialogContent>
             {rejectGeneralError && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -680,7 +679,7 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
             <TextField
               autoFocus
               margin="dense"
-              label="Motivo del rechazo"
+              label={t("certificates.reasonLabel")}
               type="text"
               fullWidth
               multiline
@@ -693,10 +692,10 @@ const Certificates = ({ isOwnProfile = false, userId = null }) => {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setRejectDialogOpen(false)} disabled={isRejectSubmitting}>
-              Cancelar
+              {t("cancel")}
             </Button>
             <Button type="submit" color="error" disabled={isRejectSubmitting}>
-              {isRejectSubmitting ? "Rechazando..." : "Rechazar"}
+              {isRejectSubmitting ? t("certificates.rejecting") : t("certificates.reject")}
             </Button>
           </DialogActions>
         </Box>

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Grid, Typography, Box, CircularProgress } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import ContentDisplay from './ContentDisplay';
 
 // ContentDisplay Mode: "simple" - Uses SimpleContentProfileSerializer for optimized performance
 const RecentUserContent = () => {
+  const { t } = useTranslation('content');
   const [recentContent, setRecentContent] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,13 +21,13 @@ const RecentUserContent = () => {
         setLoading(false);
       } catch (err) {
         console.error('\nError fetching recent content:', err);
-        setError('Error al cargar el contenido reciente');
+        setError(t('recent.loadError'));
         setLoading(false);
       }
     };
 
     fetchRecentContent();
-  }, []);
+  }, [t]);
 
   const handleContentClick = (contentId) => {
     window.open(`/content/${contentId}/library?context=library`, '_blank', 'noopener,noreferrer');
@@ -50,7 +52,7 @@ const RecentUserContent = () => {
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        Contenido subido recientemente
+        {t('recent.title')}
       </Typography>
       <Grid container spacing={2}>
         {recentContent.map((profile) => {
@@ -69,7 +71,7 @@ const RecentUserContent = () => {
         {recentContent.length === 0 &&
         <Grid item xs={12}>
             <Typography color="text.secondary" align="center">
-              No se encontró contenido reciente
+              {t('recent.empty')}
             </Typography>
           </Grid>
         }

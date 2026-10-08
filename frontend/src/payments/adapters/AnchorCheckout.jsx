@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import ProductPaymentCheckout from '../ProductPaymentCheckout';
 import {
   createAnchorRequestBchPayment,
@@ -20,6 +21,7 @@ const AnchorCheckout = ({
   tokenBalance = 0,
   onPaid,
 }) => {
+  const { t } = useTranslation('payments');
   const lastRequestId = useRef(anchorRequestId);
   if (anchorRequestId != null) lastRequestId.current = anchorRequestId;
   const activeRequestId = anchorRequestId ?? lastRequestId.current;
@@ -28,7 +30,7 @@ const AnchorCheckout = ({
     <ProductPaymentCheckout
       open={open}
       onClose={onClose}
-      title={title || ANCHOR_PAYMENT_TITLE}
+      title={!title || title === ANCHOR_PAYMENT_TITLE ? t('catalog.anchor.defaultTitle') : title}
       priceUsd={priceUsd}
       productKind={PRODUCT_KINDS.ANCHOR}
       productFlags={{}}

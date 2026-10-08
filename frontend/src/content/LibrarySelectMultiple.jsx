@@ -25,6 +25,7 @@ import {
 } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SearchIcon from '@mui/icons-material/Search';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { formatDate } from '../utils/dateUtils';
 
@@ -36,16 +37,20 @@ const LibrarySelectMultiple = ({
   onCancel,
   onSave,
   onSelectionChange,
-  title = 'Seleccionar contenido de la biblioteca',
+  title,
   description,
   filterFunction,
   maxSelections,
   selectedIds = [],
   contextName = '',
   compact = false,
-  confirmLabel = 'Elegir',
-  confirmingLabel = 'Guardando...',
+  confirmLabel,
+  confirmingLabel,
 }) => {
+  const { t } = useTranslation('content');
+  const heading = title ?? t('librarySelect.multipleTitle');
+  const chooseLabel = confirmLabel ?? t('librarySelect.choose');
+  const savingLabel = confirmingLabel ?? t('librarySelect.saving');
   const filterRef = useRef(filterFunction);
   filterRef.current = filterFunction;
 
@@ -135,12 +140,12 @@ const LibrarySelectMultiple = ({
       setError(
         err?.response?.data?.error
         || err?.error
-        || 'Error al obtener tu contenido',
+        || t('librarySelect.loadError'),
       );
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, searchDebounced, selectedCollectionId]);
+  }, [page, rowsPerPage, searchDebounced, selectedCollectionId, t]);
 
   useEffect(() => {
     loadLibraryPage();
@@ -204,7 +209,7 @@ const LibrarySelectMultiple = ({
     const profiles = selectedProfilesRef.current;
     const ids = profiles.map((profile) => profile.id).filter((id) => id != null);
     if (ids.length === 0) {
-      setError('Selecciona al menos un contenido.');
+      setError(t('librarySelect.selectAtLeastOne'));
       return;
     }
     // Ensure parent has the full profile objects before closing.
@@ -217,7 +222,7 @@ const LibrarySelectMultiple = ({
       setError(
         err?.response?.data?.error
         || err?.error
-        || 'Error al guardar las selecciones',
+        || t('librarySelect.saveError'),
       );
     } finally {
       setSaving(false);
@@ -232,7 +237,7 @@ const LibrarySelectMultiple = ({
       <Paper sx={{ p: compact ? 2 : 3 }}>
         <Box sx={{ mb: compact ? 1 : 3 }}>
           <Typography variant={compact ? 'h6' : 'h4'} sx={{ mb: 1 }}>
-            {title} {contextName && `: ${contextName}`}
+            {heading} {contextName && `: ${contextName}`}
           </Typography>
           {description && (
             <Typography variant="body1" color="text.secondary">
@@ -241,7 +246,7 @@ const LibrarySelectMultiple = ({
           )}
           {maxSelections && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Se pueden seleccionar máximo {maxSelections} elementos
+              {t('librarySelect.maxSelections', { value: maxSelections })}
             </Typography>
           )}
         </Box>
@@ -250,7 +255,7 @@ const LibrarySelectMultiple = ({
 
         <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
           <TextField
-            placeholder="Buscar contenido..."
+            placeholder={t('common.searchContent')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             size="small"
@@ -261,14 +266,14 @@ const LibrarySelectMultiple = ({
           />
 
           <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Colección</InputLabel>
+            <InputLabel>{t('common.collection')}</InputLabel>
             <Select
               value={selectedCollectionId}
-              label="Colección"
+              label={t('common.collection')}
               onChange={(e) => setSelectedCollectionId(e.target.value)}
             >
               <MenuItem value="">
-                <em>Todas las colecciones</em>
+                <em>{t('common.allCollections')}</em>
               </MenuItem>
               {collections.map((collection) => (
                 <MenuItem key={collection.id} value={String(collection.id)}>
@@ -281,13 +286,13 @@ const LibrarySelectMultiple = ({
 
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Typography variant="h6">
-            Contenido disponible
+            {t('librarySelect.available')}
             {typeof totalCount === 'number' ? ` (${totalCount})` : ''}
-            {selectedCount > 0 ? ` · ${selectedCount} seleccionado(s)` : ''}
+            {selectedCount > 0 ? ` · ${t('selectedCount', { count: selectedCount })}` : ''}
           </Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Button variant="outlined" onClick={onCancel} disabled={saving}>
-              Cancelar
+              {t('actions.cancel')}
             </Button>
             <Button
               variant="contained"
@@ -295,7 +300,7 @@ const LibrarySelectMultiple = ({
               onClick={handleSubmit}
               disabled={selectedCount === 0 || saving}
             >
-              {saving ? confirmingLabel : `${confirmLabel} (${selectedCount})`}
+              {saving ? savingLabel : `${chooseLabel} (${selectedCount})`}
             </Button>
           </Box>
         </Box>
@@ -326,11 +331,11 @@ const LibrarySelectMultiple = ({
                         disabled={Boolean(maxSelections && selectedCount >= maxSelections && pageSelectedCount === 0)}
                       />
                     </TableCell>
-                    <TableCell>Título</TableCell>
-                    <TableCell>Tipo</TableCell>
-                    <TableCell>Autor</TableCell>
-                    <TableCell>Fecha de subida</TableCell>
-                    <TableCell>Ver</TableCell>
+                    <TableCell>{t('common.title')}</TableCell>
+                    <TableCell>{t('common.type')}</TableCell>
+                    <TableCell>{t('common.author')}</TableCell>
+                    <TableCell>{t('librarySelect.uploadedAt')}</TableCell>
+                    <TableCell>{t('actions.view')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -353,7 +358,7 @@ const LibrarySelectMultiple = ({
                             )}
                           />
                         </TableCell>
-                        <TableCell>{content.title || 'Sin título'}</TableCell>
+                        <TableCell>{content.title || t('common.untitled')}</TableCell>
                         <TableCell>
                           <Chip
                             label={content.content?.media_type || '-'}
@@ -362,7 +367,7 @@ const LibrarySelectMultiple = ({
                             variant="outlined"
                           />
                         </TableCell>
-                        <TableCell>{content.author || 'Desconocido'}</TableCell>
+                        <TableCell>{content.author || t('common.unknownAuthor')}</TableCell>
                         <TableCell>
                           {content.created_at ? formatDate(content.created_at) : '—'}
                         </TableCell>
@@ -380,7 +385,7 @@ const LibrarySelectMultiple = ({
                               '&:hover': { textDecoration: 'underline' },
                             }}
                           >
-                            Ver
+                            {t('actions.view')}
                             <OpenInNewIcon fontSize="small" />
                           </MuiLink>
                         </TableCell>
@@ -391,8 +396,8 @@ const LibrarySelectMultiple = ({
                     <TableRow>
                       <TableCell colSpan={6} align="center">
                         {searchDebounced || selectedCollectionId
-                          ? 'No se encontró contenido con los filtros aplicados'
-                          : 'No hay contenido disponible'}
+                          ? t('librarySelect.emptyFiltered')
+                          : t('librarySelect.empty')}
                       </TableCell>
                     </TableRow>
                   )}
@@ -411,9 +416,11 @@ const LibrarySelectMultiple = ({
                 setPage(0);
               }}
               rowsPerPageOptions={[10, 25, 50]}
-              labelRowsPerPage="Filas"
+              labelRowsPerPage={t('pagination.rows')}
               labelDisplayedRows={({ from, to, count }) => (
-                `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`
+                count !== -1
+                  ? t('pagination.range', { from, to, total: count })
+                  : t('pagination.rangeMore', { from, to })
               )}
             />
           </>

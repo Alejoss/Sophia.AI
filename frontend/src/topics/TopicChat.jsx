@@ -15,14 +15,16 @@ import {
 import { Link as RouterLink } from 'react-router-dom';
 import SendIcon from '@mui/icons-material/Send';
 import AddIcon from '@mui/icons-material/Add';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { useAuth } from '../context/AuthContext';
 import { getTopicContentPath } from '../utils/urlUtils';
+import { useDateLocales } from '../hooks/useDateLocales';
 
-function formatQueryDate(iso) {
+function formatQueryDate(iso, intl) {
   if (!iso) return '';
   try {
-    return new Date(iso).toLocaleString('es', {
+    return new Date(iso).toLocaleString(intl, {
       dateStyle: 'medium',
       timeStyle: 'short',
     });
@@ -31,14 +33,15 @@ function formatQueryDate(iso) {
   }
 }
 
-function mediaTypeLabel(mediaType) {
-  if (mediaType === 'AUDIO') return 'Audio';
-  if (mediaType === 'VIDEO') return 'Video';
-  if (mediaType === 'TEXT') return 'Texto';
-  return mediaType || 'Archivo';
+function mediaTypeLabel(mediaType, t) {
+  if (mediaType === 'AUDIO') return t('chat.audio');
+  if (mediaType === 'VIDEO') return t('chat.video');
+  if (mediaType === 'TEXT') return t('chat.text');
+  return mediaType || t('chat.file');
 }
 
 function SourcesList({ sources, topicId }) {
+  const { t } = useTranslation('topics');
   if (!sources?.length) return null;
   return (
     <Box sx={{ mt: 1.5, px: 0.5, pb: 1 }}>
@@ -47,7 +50,7 @@ function SourcesList({ sources, topicId }) {
         color="text.secondary"
         sx={{ display: 'block', mb: 1 }}
       >
-        Fuentes
+        {t('chat.sources')}
       </Typography>
       <Box
         component="ul"
@@ -83,10 +86,10 @@ function SourcesList({ sources, topicId }) {
                 [{src.index}]{' '}
                 {sourceTo ? (
                   <Link component={RouterLink} to={sourceTo} underline="hover">
-                    {src.title || `Contenido ${src.content_id}`}
+                    {src.title || t('chat.contentId', { id: src.content_id })}
                   </Link>
                 ) : (
-                  src.title || `Fuente ${src.index}`
+                  src.title || t('chat.source', { index: src.index })
                 )}
                 {typeof src.score === 'number' && (
                   <Typography
@@ -107,10 +110,11 @@ function SourcesList({ sources, topicId }) {
 }
 
 function SelectedTranscriptsSummary({ selectedContentIds, sourceById, topicId }) {
+  const { t } = useTranslation('topics');
   if (!selectedContentIds?.length) {
     return (
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5, px: 0.5 }}>
-        Archivos consultados: todos los indexados del tema
+        {t('chat.allConsulted')}
       </Typography>
     );
   }
@@ -118,7 +122,7 @@ function SelectedTranscriptsSummary({ selectedContentIds, sourceById, topicId })
   return (
     <Box sx={{ mt: 1.5, px: 0.5 }}>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
-        Archivos seleccionados ({selectedContentIds.length})
+        {t('chat.selectedFiles', { count: selectedContentIds.length })}
       </Typography>
       <Box
         component="ul"
@@ -132,7 +136,7 @@ function SelectedTranscriptsSummary({ selectedContentIds, sourceById, topicId })
       >
         {selectedContentIds.map((id) => {
           const src = sourceById?.[id];
-          const title = src?.title || `Contenido ${id}`;
+          const title = src?.title || t('chat.contentId', { id });
           const href = `/content/${id}/transcript?context=topic${
             topicId ? `&topicId=${topicId}` : ''
           }`;
@@ -144,7 +148,7 @@ function SelectedTranscriptsSummary({ selectedContentIds, sourceById, topicId })
                 </Link>
                 {src?.media_type ? (
                   <Typography component="span" variant="caption" color="text.secondary">
-                    {` · ${mediaTypeLabel(src.media_type)}`}
+                    {` · ${mediaTypeLabel(src.media_type, t)}`}
                   </Typography>
                 ) : null}
               </Typography>
@@ -157,6 +161,8 @@ function SelectedTranscriptsSummary({ selectedContentIds, sourceById, topicId })
 }
 
 function ConsultationView({ query, topicId, sourceById }) {
+  const { t } = useTranslation('topics');
+  const { intl } = useDateLocales();
   if (!query) return null;
   return (
     <Box
@@ -170,7 +176,7 @@ function ConsultationView({ query, topicId, sourceById }) {
       }}
     >
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
-        Tu pregunta · {formatQueryDate(query.created_at)}
+        {t('chat.yourQuestion')} · {formatQueryDate(query.created_at, intl)}
       </Typography>
       <Box
         sx={{
@@ -190,7 +196,7 @@ function ConsultationView({ query, topicId, sourceById }) {
       </Box>
 
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
-        Respuesta
+        {t('chat.answer')}
       </Typography>
       <Box
         sx={{
@@ -220,9 +226,9 @@ function ConsultationView({ query, topicId, sourceById }) {
           color="text.secondary"
           sx={{ display: 'block', mt: 1.5, px: 0.5 }}
         >
-          Fragmentos usados: {query.used_chunk_count ?? 0}
+          {t('chat.usedFragments', { count: query.used_chunk_count ?? 0 })}
           {typeof query.retrieved_chunk_count === 'number'
-            ? ` / recuperados: ${query.retrieved_chunk_count}`
+            ? t('chat.retrieved', { count: query.retrieved_chunk_count })
             : ''}
         </Typography>
       )}
@@ -239,12 +245,13 @@ function TranscriptChecklist({
   disabled,
   loading,
 }) {
+  const { t } = useTranslation('topics');
   if (loading) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <CircularProgress size={16} />
         <Typography variant="body2" color="text.secondary">
-          Cargando contenidos indexados…
+          {t('chat.loadingSources')}
         </Typography>
       </Box>
     );
@@ -253,7 +260,7 @@ function TranscriptChecklist({
   if (!sources.length) {
     return (
       <Alert severity="warning" sx={{ borderRadius: 0 }}>
-        No hay contenidos indexados en este tema todavía.
+        {t('chat.noIndexed')}
       </Alert>
     );
   }
@@ -274,25 +281,23 @@ function TranscriptChecklist({
         }}
       >
         <Typography variant="subtitle2">
-          Contenidos a consultar ({selectedIds.length}/{sources.length})
+          {t('chat.contentsCount', { selected: selectedIds.length, total: sources.length })}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button size="small" onClick={onSelectAll} disabled={disabled || allSelected}>
-            Todas
+            {t('chat.all')}
           </Button>
           <Button size="small" onClick={onClear} disabled={disabled || selectedIds.length === 0}>
-            Ninguna
+            {t('chat.none')}
           </Button>
         </Box>
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-        Marca los archivos cuyos contenidos quieres usar en esta consulta.
+        {t('chat.markFiles')}
       </Typography>
       {showAllSelectedWarning && (
         <Alert severity="warning" sx={{ borderRadius: 0, mb: 1 }}>
-          Al seleccionar todos los archivos, el modelo procesa demasiado contenido
-          y las respuestas suelen ser menos precisas. Elige solo los archivos
-          relevantes para obtener mejores resultados.
+          {t('chat.tooMuchContent')}
         </Alert>
       )}
       <FormGroup
@@ -328,9 +333,9 @@ function TranscriptChecklist({
                 color="text.secondary"
                 sx={{ display: 'block', overflowWrap: 'anywhere', wordBreak: 'break-word' }}
               >
-                {mediaTypeLabel(src.media_type)}
+                {mediaTypeLabel(src.media_type, t)}
                 {src.original_author ? ` · ${src.original_author}` : ''}
-                {typeof src.chunk_count === 'number' ? ` · ${src.chunk_count} fragmentos` : ''}
+                {typeof src.chunk_count === 'number' ? t('chat.fragments', { count: src.chunk_count }) : ''}
               </Typography>
             </Box>
           );
@@ -369,6 +374,8 @@ function TranscriptChecklist({
  * Independent topic consultations (one question → one answer), with history.
  */
 function TopicChat({ topicId }) {
+  const { t } = useTranslation('topics');
+  const { intl } = useDateLocales();
   const { isAuthenticated } = useAuth();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -410,8 +417,8 @@ function TopicChat({ topicId }) {
 
   const dailyLimitMessage = (limit) =>
     limit != null
-      ? `Has alcanzado el límite de ${limit} consultas gratuitas por día. Compra tokens ACBC para seguir creando consultas.`
-      : 'Has alcanzado el límite de consultas gratuitas por día. Compra tokens ACBC para seguir creando consultas.';
+      ? t('chat.limitReached', { limit })
+      : t('chat.limitReachedGeneric');
 
   const loadHistory = useCallback(async () => {
     if (!isAuthenticated || !topicId) return;
@@ -459,7 +466,7 @@ function TopicChat({ topicId }) {
   if (!isAuthenticated) {
     return (
       <Alert severity="info" sx={{ borderRadius: 0, mb: 4 }}>
-        Inicia sesión para consultar los contenidos de este tema.
+        {t('chat.loginRequired')}
       </Alert>
     );
   }
@@ -496,8 +503,8 @@ function TopicChat({ topicId }) {
       const detail =
         err?.response?.data?.error ||
         err?.message ||
-        'No se pudo cargar la consulta.';
-      setError(typeof detail === 'string' ? detail : 'No se pudo cargar la consulta.');
+        t('chat.loadQueryError');
+      setError(typeof detail === 'string' ? detail : t('chat.loadQueryError'));
     } finally {
       setLoading(false);
     }
@@ -511,7 +518,7 @@ function TopicChat({ topicId }) {
       return;
     }
     if (selectedIds.length === 0) {
-      setError('Selecciona al menos un contenido para consultar.');
+      setError(t('chat.selectAtLeast'));
       return;
     }
 
@@ -559,9 +566,9 @@ function TopicChat({ topicId }) {
       let detail = apiError;
       if (typeof detail !== 'string' || !detail.trim()) {
         if (status >= 500) {
-          detail = 'No se pudo completar la consulta. Inténtalo de nuevo en unos segundos.';
+          detail = t('chat.completeError');
         } else {
-          detail = err?.message || 'No se pudo obtener una respuesta.';
+          detail = err?.message || t('chat.noAnswer');
         }
       }
       setError(detail);
@@ -588,13 +595,12 @@ function TopicChat({ topicId }) {
       }}
     >
       <Typography variant="body2" color="text.secondary">
-        Cada consulta es independiente: eliges qué contenidos indexados
-        usar, se responde solo con esos archivos y se guarda en tu historial.
+        {t('chat.intro')}
         {dailyLimit != null && (
           <>
             {' '}
-            Límite gratuito: {dailyLimit} consultas por día
-            {dailyRemaining != null ? ` (${dailyRemaining} restantes hoy)` : ''}.
+            {t('chat.dailyLimit', { limit: dailyLimit })}
+            {dailyRemaining != null ? ` ${t('chat.remainingToday', { count: dailyRemaining })}` : ''}.
           </>
         )}
       </Typography>
@@ -607,7 +613,7 @@ function TopicChat({ topicId }) {
           onClick={startNewConsultation}
           disabled={composing || atDailyLimit}
         >
-          Nueva consulta
+          {t('chat.newQuery')}
         </Button>
       </Box>
 
@@ -620,7 +626,7 @@ function TopicChat({ topicId }) {
             underline="hover"
             sx={{ fontWeight: 600 }}
           >
-            Ir a Mis tokens
+            {t('chat.goToTokens')}
           </Link>
         </Alert>
       )}
@@ -644,7 +650,7 @@ function TopicChat({ topicId }) {
             py: 2.5,
           }}
         >
-          <Typography variant="subtitle2">Nueva consulta</Typography>
+          <Typography variant="subtitle2">{t('chat.newQuery')}</Typography>
           <TranscriptChecklist
             sources={sources}
             selectedIds={selectedIds}
@@ -659,7 +665,7 @@ function TopicChat({ topicId }) {
             multiline
             minRows={3}
             maxRows={8}
-            placeholder="Escribe tu pregunta…"
+            placeholder={t('chat.writeQuestion')}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
@@ -672,7 +678,7 @@ function TopicChat({ topicId }) {
               disabled={loading || atDailyLimit || !input.trim() || selectedIds.length === 0}
               endIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
             >
-              Consultar
+              {t('chat.consult')}
             </Button>
           </Box>
         </Box>
@@ -688,18 +694,18 @@ function TopicChat({ topicId }) {
 
       <Box>
         <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
-          Tus consultas en este tema
+          {t('chat.historyTitle')}
         </Typography>
         {historyLoading && history.length === 0 ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CircularProgress size={18} />
             <Typography variant="body2" color="text.secondary">
-              Cargando historial…
+              {t('chat.loadingHistory')}
             </Typography>
           </Box>
         ) : history.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            Aún no has hecho consultas en este tema.
+            {t('chat.emptyHistory')}
           </Typography>
         ) : (
           <Box
@@ -740,10 +746,10 @@ function TopicChat({ topicId }) {
                     {item.question_preview}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {formatQueryDate(item.created_at)}
+                    {formatQueryDate(item.created_at, intl)}
                     {selectedCount > 0
-                      ? ` · ${selectedCount} archivo${selectedCount === 1 ? '' : 's'}`
-                      : ' · todos los archivos'}
+                      ? t('chat.files', { count: selectedCount })
+                      : t('chat.allFiles')}
                   </Typography>
                 </Box>
               );

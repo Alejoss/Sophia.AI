@@ -1,60 +1,70 @@
 import * as yup from 'yup';
-
-/** Shared Yup email rule (Spanish messages). */
-export const emailField = (label = 'correo electrónico') =>
-  yup
-    .string()
-    .trim()
-    .required(`El ${label} es requerido.`)
-    .email(`Introduce un ${label} válido.`);
+import i18n from '../i18n';
 
 const PASSWORD_SPECIAL = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]+/;
 
-/** Client-side password rules aligned with Register (Spanish). */
-export function getPasswordRuleErrors(password = '') {
+function translator(t) {
+  return t || ((key, options) => i18n.t(key, options));
+}
+
+/** Shared Yup email rule. Messages resolve when the field is validated. */
+export const emailField = (label, t) => {
+  const tr = translator(t);
+  const fieldLabel = () => label || tr('forms:email.defaultLabel');
+  return yup
+    .string()
+    .trim()
+    .required(() => tr('forms:email.required', { label: fieldLabel() }))
+    .email(() => tr('forms:email.invalid', { label: fieldLabel() }));
+};
+
+/** Client-side password rules aligned with Register. */
+export function getPasswordRuleErrors(password = '', t) {
+  const tr = translator(t);
   const errors = [];
   if (password.length < 8) {
-    errors.push('Debe tener al menos 8 caracteres');
+    errors.push(tr('forms:password.min'));
   }
   if (!/[A-Z]/.test(password)) {
-    errors.push('Debe contener al menos una letra mayúscula');
+    errors.push(tr('forms:password.upper'));
   }
   if (!/[a-z]/.test(password)) {
-    errors.push('Debe contener al menos una letra minúscula');
+    errors.push(tr('forms:password.lower'));
   }
   if (!/[0-9]/.test(password)) {
-    errors.push('Debe contener al menos un número');
+    errors.push(tr('forms:password.number'));
   }
   if (!PASSWORD_SPECIAL.test(password)) {
-    errors.push('Debe contener al menos un carácter especial (!@#$%^&*...)');
+    errors.push(tr('forms:password.special'));
   }
   return errors;
 }
 
-export const passwordField = () =>
-  yup
+export const passwordField = (t) => {
+  const tr = translator(t);
+  return yup
     .string()
-    .required('La contraseña es requerida.')
+    .required(() => tr('forms:password.required'))
     .test('password-rules', function passwordRules(value) {
-      const ruleErrors = getPasswordRuleErrors(value || '');
+      const ruleErrors = getPasswordRuleErrors(value || '', tr);
       if (ruleErrors.length === 0) {
         return true;
       }
       return this.createError({ message: ruleErrors.join('\n') });
     });
+};
 
-export const usernameField = () =>
-  yup
+export const usernameField = (t) => {
+  const tr = translator(t);
+  return yup
     .string()
     .trim()
-    .required('El nombre de usuario es requerido.')
-    .min(3, 'El nombre de usuario debe tener al menos 3 caracteres.')
+    .required(() => tr('forms:username.required'))
+    .min(3, () => tr('forms:username.min'))
     .test(
       'no-at',
-      'El nombre de usuario no puede contener el símbolo @. Usa solo letras, números y guiones bajos (_).',
+      () => tr('forms:username.noAt'),
       (value) => !String(value || '').includes('@'),
     )
-    .matches(
-      /^[a-zA-Z0-9_]+$/,
-      'El nombre de usuario solo puede contener letras, números y guiones bajos (_).',
-    );
+    .matches(/^[a-zA-Z0-9_]+$/, () => tr('forms:username.charset'));
+};

@@ -1,0 +1,12 @@
+{
+  "language": {
+    "switch": "Idioma",
+    "es": "Español",
+    "en": "English"
+  },
+  "errors": {
+    "crash": "Algo salió mal. Recarga la página o contacta soporte.",
+    "telegramTitle": "Esta app no está disponible en el navegador de Telegram",
+    "telegramBody": "Por favor, ábrela en tu navegador externo (Safari, Chrome u otro)."
+  }
+}

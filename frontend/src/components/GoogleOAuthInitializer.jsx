@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 const GoogleOAuthInitializer = ({ children }) => {
+  const { t } = useTranslation('misc');
   const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
 
   useEffect(() => {
@@ -36,7 +38,7 @@ const GoogleOAuthInitializer = ({ children }) => {
           fontSize: '0.95rem',
         }}
       >
-        El inicio de sesión con Google no está disponible temporalmente.
+        {t('social.unavailable')}
       </div>
     );
   }

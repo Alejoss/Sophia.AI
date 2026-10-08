@@ -21,17 +21,22 @@ import {
     CircularProgress,
 } from '@mui/material';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import i18n from '../i18n';
 
 const MAX_PENDING_TOPIC_REQUESTS = 3;
 
-const STATUS_LABELS = {
-    PENDING: 'Pendiente',
-    APPROVED: 'Aprobada',
-    REJECTED: 'Rechazada',
-    COMPLETED: 'Tema creado',
-    CANCELLED: 'Cancelada',
+const statusLabel = (status, t) => {
+    const labels = {
+        PENDING: t('creation.statusPending'),
+        APPROVED: t('creation.statusApproved'),
+        REJECTED: t('creation.statusRejected'),
+        COMPLETED: t('creation.statusCompleted'),
+        CANCELLED: t('creation.statusCancelled'),
+    };
+    return labels[status] || status;
 };
 
 const STATUS_COLORS = {
@@ -46,11 +51,12 @@ const requestSchema = yup.object({
     proposed_title: yup
         .string()
         .trim()
-        .required('El título propuesto es requerido.'),
+        .required(() => i18n.t('topics:creation.titleRequired')),
     proposed_description: yup.string().trim().default(''),
 });
 
 const TopicCreationForm = () => {
+    const { t } = useTranslation('topics');
     const navigate = useNavigate();
     const [requests, setRequests] = useState([]);
     const [loadingRequests, setLoadingRequests] = useState(true);
@@ -97,7 +103,7 @@ const TopicCreationForm = () => {
 
         try {
             await contentApi.createTopicCreationRequest(formData);
-            setSuccess('Solicitud enviada. Un administrador revisará el título y la descripción.');
+            setSuccess(t('creation.sent'));
             reset({ proposed_title: '', proposed_description: '' });
             await fetchRequests();
         } catch (err) {
@@ -105,7 +111,7 @@ const TopicCreationForm = () => {
             const { generalError: parsed } = applyApiErrorsToForm(
                 err,
                 setError,
-                'Error al enviar la solicitud.',
+                t('creation.submitError'),
                 { proposed_title: 'proposed_title', proposed_description: 'proposed_description' },
             );
             if (parsed) {
@@ -128,9 +134,9 @@ const TopicCreationForm = () => {
                 return;
             }
             await fetchRequests();
-            setSuccess('¡Tema creado exitosamente!');
+            setSuccess(t('creation.created'));
         } catch (err) {
-            setActionError(err.response?.data?.error || 'Error al crear el tema');
+            setActionError(err.response?.data?.error || t('creation.createError'));
         } finally {
             setCreatingTopicId(null);
         }
@@ -142,10 +148,10 @@ const TopicCreationForm = () => {
         setSuccess(null);
         try {
             await contentApi.cancelTopicCreationRequest(request.id);
-            setSuccess('Solicitud cancelada.');
+            setSuccess(t('creation.cancelled'));
             await fetchRequests();
         } catch (err) {
-            setActionError(err.response?.data?.error || 'Error al cancelar la solicitud');
+            setActionError(err.response?.data?.error || t('creation.cancelError'));
         } finally {
             setCancellingId(null);
         }
@@ -174,12 +180,11 @@ const TopicCreationForm = () => {
                                 fontSize: { xs: '20px', sm: '24px', md: '24px' },
                             }}
                         >
-                            Solicitar creación de tema
+                            {t('creation.pageTitle')}
                         </Typography>
 
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Antes de crear un tema, envía una solicitud con el título y la descripción propuestos.
-                            Un administrador la revisará para asegurar que el tema sea lo bastante específico.
+                            {t('creation.intro')}
                         </Typography>
 
                         {actionError && (
@@ -196,8 +201,7 @@ const TopicCreationForm = () => {
 
                         {atPendingLimit ? (
                             <Alert severity="info" sx={{ mb: 2 }}>
-                                Ya tienes {MAX_PENDING_TOPIC_REQUESTS} solicitudes pendientes de revisión.
-                                Podrás enviar otra cuando alguna sea resuelta.
+                                {t('creation.pendingLimit', { count: MAX_PENDING_TOPIC_REQUESTS })}
                             </Alert>
                         ) : (
                             <form onSubmit={handleSubmit(onSubmitRequest)} noValidate>
@@ -209,13 +213,13 @@ const TopicCreationForm = () => {
 
                                 <TextField
                                     fullWidth
-                                    label="Título propuesto"
-                                    placeholder="Elige un tema no muy amplio"
+                                    label={t('creation.proposedTitle')}
+                                    placeholder={t('creation.titlePlaceholder')}
                                     {...register('proposed_title')}
                                     error={!!errors.proposed_title}
                                     helperText={
                                         errors.proposed_title?.message ||
-                                        'Un buen tema trata sobre algo de algo.'
+                                        t('creation.titleHelp')
                                     }
                                     required
                                     sx={{ mb: 2 }}
@@ -223,7 +227,7 @@ const TopicCreationForm = () => {
 
                                 <TextField
                                     fullWidth
-                                    label="Descripción propuesta"
+                                    label={t('creation.proposedDescription')}
                                     {...register('proposed_description')}
                                     error={!!errors.proposed_description}
                                     helperText={errors.proposed_description?.message}
@@ -239,14 +243,14 @@ const TopicCreationForm = () => {
                                     fullWidth
                                     disabled={isSubmitting}
                                 >
-                                    {isSubmitting ? 'Enviando...' : 'Enviar solicitud'}
+                                    {isSubmitting ? t('creation.sending') : t('creation.submit')}
                                 </Button>
                             </form>
                         )}
 
                         <Box sx={{ mt: 4 }}>
                             <Typography variant="h6" gutterBottom>
-                                Mis solicitudes
+                                {t('creation.myRequests')}
                             </Typography>
                             {loadingRequests ? (
                                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
@@ -254,16 +258,16 @@ const TopicCreationForm = () => {
                                 </Box>
                             ) : requests.length === 0 ? (
                                 <Typography variant="body2" color="text.secondary">
-                                    Aún no has enviado solicitudes.
+                                    {t('creation.empty')}
                                 </Typography>
                             ) : (
                                 <TableContainer>
                                     <Table size="small">
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell>Título</TableCell>
-                                                <TableCell>Estado</TableCell>
-                                                <TableCell align="right">Acción</TableCell>
+                                                <TableCell>{t('common.title')}</TableCell>
+                                                <TableCell>{t('common.status')}</TableCell>
+                                                <TableCell align="right">{t('creation.action')}</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
@@ -283,7 +287,7 @@ const TopicCreationForm = () => {
                                                     </TableCell>
                                                     <TableCell>
                                                         <Chip
-                                                            label={STATUS_LABELS[request.status] || request.status}
+                                                            label={statusLabel(request.status, t)}
                                                             color={STATUS_COLORS[request.status] || 'default'}
                                                             size="small"
                                                         />
@@ -297,7 +301,7 @@ const TopicCreationForm = () => {
                                                                 onClick={() => handleCancelRequest(request)}
                                                                 disabled={cancellingId === request.id}
                                                             >
-                                                                {cancellingId === request.id ? 'Cancelando...' : 'Cancelar'}
+                                                                {cancellingId === request.id ? t('creation.cancelling') : t('common.cancel')}
                                                             </Button>
                                                         )}
                                                         {request.status === 'APPROVED' && (
@@ -307,7 +311,7 @@ const TopicCreationForm = () => {
                                                                 onClick={() => handleCreateTopic(request)}
                                                                 disabled={creatingTopicId === request.id}
                                                             >
-                                                                {creatingTopicId === request.id ? 'Creando...' : 'Crear tema'}
+                                                                {creatingTopicId === request.id ? t('creation.creating') : t('creation.createTopic')}
                                                             </Button>
                                                         )}
                                                         {request.status === 'COMPLETED' && request.topic_id && (
@@ -316,7 +320,7 @@ const TopicCreationForm = () => {
                                                                 variant="outlined"
                                                                 onClick={() => navigate(`/content/topics/${request.topic_id}`)}
                                                             >
-                                                                Ver tema
+                                                                {t('creation.viewTopic')}
                                                             </Button>
                                                         )}
                                                     </TableCell>
@@ -357,50 +361,50 @@ const TopicCreationForm = () => {
                                 <LightbulbIcon fontSize="small" />
                             </Box>
                             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                ¿Cómo crear un buen tema?
+                                {t('creation.guideTitle')}
                             </Typography>
                         </Box>
 
                         <Typography variant="body2" color="text.secondary">
-                            Crear un Tema es un ejercicio de curaduría: eliges y organizas el mejor contenido que has encontrado sobre algo que te importa.
+                            {t('creation.guideBody')}
                         </Typography>
 
                         <Box sx={{ mt: 1 }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Piensa en esto cuando definas el título:
+                                {t('creation.thinkTitle')}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                • Se restringe a un aspecto concreto, no a “todo sobre X”.
+                                {t('creation.tipNarrow')}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                • Incluye contexto (lugar, tiempo o enfoque).
+                                {t('creation.tipContext')}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                • Permite conectar contenido específico que realmente quieras guardar y compartir.
+                                {t('creation.tipConnect')}
                             </Typography>
                         </Box>
 
                         <Box sx={{ mt: 2 }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Evita títulos demasiado amplios como:
+                                {t('creation.avoidTitle')}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">• Terrorismo</Typography>
-                            <Typography variant="body2" color="text.secondary">• Medicina</Typography>
-                            <Typography variant="body2" color="text.secondary">• Política</Typography>
+                            <Typography variant="body2" color="text.secondary">{t('creation.avoidTerrorism')}</Typography>
+                            <Typography variant="body2" color="text.secondary">{t('creation.avoidMedicine')}</Typography>
+                            <Typography variant="body2" color="text.secondary">{t('creation.avoidPolitics')}</Typography>
                         </Box>
 
                         <Box sx={{ mt: 2 }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Mejores ejemplos de temas:
+                                {t('creation.betterTitle')}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                • Beneficios del consumo de miel para la salud
+                                {t('creation.exampleHoney')}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                • La verdad sobre el ataque terrorista de Oklahoma
+                                {t('creation.exampleOklahoma')}
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                • Radicalización online en los jóvenes
+                                {t('creation.exampleYouth')}
                             </Typography>
                         </Box>
                     </Paper>

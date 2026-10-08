@@ -13,10 +13,12 @@ import {
     CircularProgress 
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { isAuthenticated } from '../context/localStorageUtils';
 
 const TopicList = () => {
+    const { t } = useTranslation('topics');
     const [topics, setTopics] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -29,13 +31,13 @@ const TopicList = () => {
                 setTopics(data);
                 setLoading(false);
             } catch (err) {
-                setError('Error al cargar los temas');
+                setError(t('list.loadFailed'));
                 setLoading(false);
             }
         };
 
         fetchTopics();
-    }, []);
+    }, [t]);
 
     if (loading) return (
         <Box sx={{ display: 'flex', justifyContent: 'center', pt: { xs: 2, md: 4 } }}>
@@ -62,7 +64,7 @@ const TopicList = () => {
                         fontSize: "24px"
                     }}
                 >
-                    Temas
+                    {t('list.title')}
                 </Typography>
                 {isAuthenticated() && (
                     <Button
@@ -71,7 +73,7 @@ const TopicList = () => {
                         startIcon={<AddIcon />}
                         onClick={() => navigate('/content/create_topic')}
                     >
-                        Solicitar tema
+                        {t('list.requestTopic')}
                     </Button>
                 )}
             </Box>

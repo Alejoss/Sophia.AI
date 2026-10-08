@@ -12,18 +12,21 @@ import {
     Divider,
     Alert,
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import ContentSelector from '../content/ContentSelector';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import i18n from '../i18n';
 
 const schema = yup.object({
     text_content: yup
         .string()
         .trim()
-        .required('El contenido de texto es requerido.'),
+        .required(() => i18n.t('publications:create.textRequired')),
 });
 
 const PublicationCreationForm = () => {
+    const { t } = useTranslation('publications');
     const navigate = useNavigate();
     const [selectedContent, setSelectedContent] = useState(null);
     const [generalError, setGeneralError] = useState('');
@@ -65,7 +68,7 @@ const PublicationCreationForm = () => {
             const { generalError: parsed } = applyApiErrorsToForm(
                 err,
                 setError,
-                'Error al crear la publicación.',
+                t('create.error'),
                 { text_content: 'text_content' },
             );
             if (parsed) {
@@ -93,7 +96,7 @@ const PublicationCreationForm = () => {
                     fontWeight: 600,
                 }}
             >
-                Crear Nueva Publicación
+                {t('create.title')}
             </Typography>
 
             <ContentSelector
@@ -107,7 +110,7 @@ const PublicationCreationForm = () => {
 
             <Paper elevation={2} sx={{ p: 4 }}>
                 <Typography variant="h6" gutterBottom>
-                    Detalles de la Publicación
+                    {t('create.details')}
                 </Typography>
 
                 {generalError && (
@@ -122,7 +125,7 @@ const PublicationCreationForm = () => {
                         multiline
                         minRows={5}
                         maxRows={24}
-                        label="Contenido de Texto"
+                        label={t('create.textLabel')}
                         {...register('text_content')}
                         error={!!errors.text_content}
                         helperText={errors.text_content?.message}
@@ -154,14 +157,14 @@ const PublicationCreationForm = () => {
                             onClick={handleCancel}
                             disabled={isSubmitting || isUploadingContent}
                         >
-                            Cancelar
+                            {t('create.cancel')}
                         </Button>
                         <Button
                             type="submit"
                             variant="contained"
                             disabled={isSubmitting || isUploadingContent || hasPendingContent}
                         >
-                            {isSubmitting ? 'Creando...' : 'Crear Publicación'}
+                            {isSubmitting ? t('create.creating') : t('create.submit')}
                         </Button>
                     </Box>
                 </Box>

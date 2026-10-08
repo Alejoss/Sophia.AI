@@ -1,0 +1,31 @@
+{
+  "validation": {
+    "writeBeforeSend": "Write a message before sending."
+  },
+  "list": {
+    "loadFailed": "Could not load conversations.",
+    "title": "Messages",
+    "searchPlaceholder": "Search conversations",
+    "searchAria": "Search",
+    "noneFound": "No conversations found",
+    "tryDifferent": "Try a different search term",
+    "noneYet": "No conversations yet",
+    "noMessages": "No messages yet"
+  },
+  "thread": {
+    "createFailed": "Could not create or load the thread",
+    "loadFailed": "Could not load messages.",
+    "sendFailed": "Could not send the message.",
+    "notFound": "Thread not found.",
+    "withUser": "Conversation with",
+    "unknownUser": "User",
+    "empty": "No messages yet.",
+    "placeholder": "Write your message...",
+    "sending": "Sending...",
+    "send": "Send"
+  },
+  "layout": {
+    "selectTitle": "Select a conversation",
+    "selectHint": "Choose a conversation from the list or start a new one"
+  }
+}

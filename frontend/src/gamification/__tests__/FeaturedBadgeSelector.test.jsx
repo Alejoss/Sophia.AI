@@ -73,12 +73,10 @@ describe('FeaturedBadgeSelector', () => {
         onUpdate={mockOnUpdate}
       />
     );
-    
-    // Find and click a badge (implementation depends on how badges are rendered)
-    const badgeElements = screen.getAllByText(/First Voice|Knowledge Seeker/);
-    if (badgeElements.length > 0) {
-      fireEvent.click(badgeElements[0].closest('div'));
-    }
+
+    fireEvent.click(screen.getByRole('img', { name: 'First Voice' }));
+
+    expect(screen.getByRole('button', { name: /elegir insignia destacada/i })).toBeEnabled();
   });
 
   it('allows removing featured badge', () => {
@@ -89,12 +87,10 @@ describe('FeaturedBadgeSelector', () => {
         onUpdate={mockOnUpdate}
       />
     );
-    
-    // Find the remove/clear button (CancelIcon)
-    const removeButton = screen.getByRole('button', { name: /remover/i });
-    if (removeButton) {
-      fireEvent.click(removeButton);
-    }
+
+    fireEvent.click(screen.getByTestId('CancelIcon'));
+
+    expect(screen.getByRole('button', { name: /remover insignia/i })).toBeEnabled();
   });
 
   it('calls onUpdate after saving', async () => {
@@ -108,15 +104,13 @@ describe('FeaturedBadgeSelector', () => {
       />
     );
 
-    // Select a badge and save
-    const saveButton = screen.getByRole('button', { name: /elegir|guardar/i });
-    if (saveButton && !saveButton.disabled) {
-      fireEvent.click(saveButton);
-      
-      await waitFor(() => {
-        expect(profilesApi.updateProfile).toHaveBeenCalled();
-      });
-    }
+    fireEvent.click(screen.getByRole('img', { name: 'First Voice' }));
+    fireEvent.click(screen.getByRole('button', { name: /elegir insignia destacada/i }));
+
+    await waitFor(() => {
+      expect(profilesApi.updateProfile).toHaveBeenCalled();
+    });
+    expect(mockOnUpdate).toHaveBeenCalled();
   });
 
   it('disables save button when no changes', () => {
@@ -127,9 +121,8 @@ describe('FeaturedBadgeSelector', () => {
         onUpdate={mockOnUpdate}
       />
     );
-    
-    const saveButton = screen.getByRole('button', { name: /elegir|guardar/i });
-    expect(saveButton).toBeDisabled();
+
+    expect(screen.getByRole('button', { name: /remover insignia/i })).toBeDisabled();
   });
 
   it('shows success message after saving', async () => {

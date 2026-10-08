@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -18,14 +19,13 @@ import '../styles/course-real-historia-bitcoin.css';
 const COURSE_PATH = '/cursos/real-historia-bitcoin';
 const CHECKOUT_PATH = `${COURSE_PATH}/checkout`;
 const COURSE_CODE = 'real-historia-bitcoin';
-const COURSE_TITLE = 'La Real Historia de Bitcoin y la Guerra por las Criptomonedas';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const checkoutErrorMessage = (err) => {
+const checkoutErrorMessage = (err, fallback) => {
   const raw = err?.error || err?.detail || err?.message;
   if (typeof raw === 'string' && raw.trim()) return raw;
-  return 'No se pudo abrir el pago.';
+  return fallback;
 };
 
 const formatPrice = (amount) => {
@@ -35,6 +35,7 @@ const formatPrice = (amount) => {
 };
 
 const RealHistoriaBitcoinCheckout = () => {
+  const { t } = useTranslation('courses');
   const navigate = useNavigate();
   const { authState, authInitialized } = useAuth();
   const accountEmail = authState.user?.email || '';
@@ -52,11 +53,11 @@ const RealHistoriaBitcoinCheckout = () => {
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = `Pago — ${COURSE_TITLE}`;
+    document.title = t('checkout.documentTitle', { title: t('title') });
     return () => {
       document.title = previousTitle;
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!authInitialized) return undefined;
@@ -82,11 +83,11 @@ const RealHistoriaBitcoinCheckout = () => {
         if (cancelled) return;
         setCourse(data);
         if (!data?.is_for_sale || !data?.price_usd) {
-          setError('Este curso no tiene un precio de pago.');
+          setError(t('checkout.noPrice'));
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(checkoutErrorMessage(err));
+        if (!cancelled) setError(checkoutErrorMessage(err, t('checkout.openFailed')));
       })
       .finally(() => {
         if (!cancelled) setLoadingCourse(false);
@@ -94,17 +95,17 @@ const RealHistoriaBitcoinCheckout = () => {
     return () => {
       cancelled = true;
     };
-  }, [authInitialized, authState.isAuthenticated]);
+  }, [authInitialized, authState.isAuthenticated, t]);
 
   const emailError = useMemo(() => {
     const trimmed = email.trim();
-    if (!trimmed) return 'El correo electrónico es requerido.';
-    if (!EMAIL_RE.test(trimmed)) return 'Introduce un correo electrónico válido.';
+    if (!trimmed) return t('checkout.emailRequired');
+    if (!EMAIL_RE.test(trimmed)) return t('checkout.emailInvalid');
     return '';
-  }, [email]);
+  }, [email, t]);
 
   const priceLabel = formatPrice(purchase?.price_amount ?? course?.price_usd);
-  const title = purchase?.title || course?.title || COURSE_TITLE;
+  const title = purchase?.title || course?.title || t('title');
 
   const continueToPayment = (event) => {
     event.preventDefault();
@@ -121,7 +122,7 @@ const RealHistoriaBitcoinCheckout = () => {
           return;
         }
         if (!data.id || !data.price_amount) {
-          setError('Este curso no tiene un precio de pago.');
+          setError(t('checkout.noPrice'));
           return;
         }
         setCheckoutOpen(true);
@@ -131,7 +132,7 @@ const RealHistoriaBitcoinCheckout = () => {
           navigate(`/profiles/login?next=${encodeURIComponent(CHECKOUT_PATH)}`, { replace: true });
           return;
         }
-        setError(checkoutErrorMessage(err));
+        setError(checkoutErrorMessage(err, t('checkout.openFailed')));
       })
       .finally(() => {
         setSubmitting(false);
@@ -152,7 +153,7 @@ const RealHistoriaBitcoinCheckout = () => {
     return (
       <Box className="brand-home rhb-page">
         <Box className="rhb-checkout-status">
-          <Typography component="p">Tu lugar en el curso está confirmado.</Typography>
+          <Typography component="p">{t('checkout.confirmed')}</Typography>
           <Box className="rhb-checkout-actions">
             <Button
               component={Link}
@@ -160,7 +161,7 @@ const RealHistoriaBitcoinCheckout = () => {
               variant="contained"
               className="brand-button brand-button-primary"
             >
-              Volver al curso
+              {t('checkout.backToCourse')}
             </Button>
           </Box>
         </Box>
@@ -172,24 +173,24 @@ const RealHistoriaBitcoinCheckout = () => {
     <Box className="brand-home rhb-page">
       <Box className="rhb-checkout-shell">
         <Container maxWidth="sm" className="rhb-checkout-container">
-          <nav className="rhb-checkout-steps" aria-label="Pasos del pago">
+          <nav className="rhb-checkout-steps" aria-label={t('checkout.stepsAria')}>
             <span className={`rhb-checkout-step ${checkoutOpen ? 'is-done' : 'is-current'}`}>
-              1. Correo
+              {t('checkout.stepEmail')}
             </span>
             <span className="rhb-checkout-step-sep" aria-hidden="true" />
             <span className={`rhb-checkout-step ${checkoutOpen ? 'is-current' : ''}`}>
-              2. Pago
+              {t('checkout.stepPayment')}
             </span>
           </nav>
 
           <Typography component="h1" className="rhb-checkout-heading">
-            Finalizar compra
+            {t('checkout.heading')}
           </Typography>
           <Typography component="p" className="rhb-checkout-lead">
-            Confirma tu correo para el recibo y el acceso al curso. Luego elige cómo pagar.
+            {t('checkout.lead')}
           </Typography>
 
-          <Box className="rhb-checkout-summary" component="section" aria-label="Resumen del pedido">
+          <Box className="rhb-checkout-summary" component="section" aria-label={t('checkout.summaryAria')}>
             <Typography component="h2" className="rhb-checkout-summary-title">
               {title}
             </Typography>
@@ -216,7 +217,7 @@ const RealHistoriaBitcoinCheckout = () => {
           >
             <TextField
               id="course-receipt-email"
-              label="Correo para el recibo"
+              label={t('checkout.emailLabel')}
               type="email"
               name="email"
               autoComplete="email"
@@ -227,7 +228,7 @@ const RealHistoriaBitcoinCheckout = () => {
               helperText={
                 emailTouched && emailError
                   ? emailError
-                  : 'Te enviaremos la confirmación de pago a este correo.'
+                  : t('checkout.emailHelper')
               }
               fullWidth
               required
@@ -241,17 +242,16 @@ const RealHistoriaBitcoinCheckout = () => {
                 className="brand-button brand-button-primary"
                 disabled={submitting || loadingCourse || !course?.is_for_sale}
               >
-                {submitting ? 'Preparando…' : 'Continuar al pago'}
+                {submitting ? t('checkout.preparing') : t('checkout.continue')}
               </Button>
               <Button component={Link} to={COURSE_PATH} className="brand-button">
-                Volver al curso
+                {t('checkout.backToCourse')}
               </Button>
             </Box>
           </Box>
 
           <Typography component="p" className="rhb-checkout-note">
-            Puedes pagar con Bitcoin Cash directo, otras criptos vía NOWPayments,
-            o acordar Monero por mensaje.
+            {t('checkout.note')}
           </Typography>
         </Container>
       </Box>

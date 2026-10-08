@@ -10,6 +10,7 @@ import {
   Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../../api/contentApi';
 import { useAuth } from '../../context/AuthContext';
 import { parseApiValidationErrors } from '../../utils/apiFormErrors';
@@ -19,6 +20,7 @@ import TopicTimelineEntryContentSuggestionForm from './TopicTimelineEntryContent
 const TopicTimelineEntryContentSuggestionPage = () => {
   const { topicId, entryId } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation('topics');
   const { user, isAuthenticated } = useAuth();
 
   const [topicTitle, setTopicTitle] = useState('');
@@ -48,7 +50,7 @@ const TopicTimelineEntryContentSuggestionPage = () => {
         (item) => String(item.id) === String(entryId),
       );
       if (!matchedEntry) {
-        setLoadError('No se encontro la entrada de la linea de tiempo.');
+        setLoadError(t('timeline.entryNotFound'));
         return;
       }
       setEntry(matchedEntry);
@@ -68,15 +70,15 @@ const TopicTimelineEntryContentSuggestionPage = () => {
       setCanSuggest(allowed);
 
       if (!allowed) {
-        setLoadError('Solo usuarios que no son moderadores pueden sugerir contenido para entradas.');
+        setLoadError(t('timeline.suggestContentOnly'));
       }
     } catch (err) {
-      const { generalError } = parseApiValidationErrors(err, 'No se pudo cargar la informacion.');
+      const { generalError } = parseApiValidationErrors(err, t('timeline.loadInfoError'));
       setLoadError(generalError);
     } finally {
       setLoading(false);
     }
-  }, [entryId, isAuthenticated, topicId, user?.id]);
+  }, [entryId, isAuthenticated, topicId, user?.id, t]);
 
   useEffect(() => {
     loadPageData();
@@ -100,7 +102,7 @@ const TopicTimelineEntryContentSuggestionPage = () => {
     return (
       <Stack alignItems="center" spacing={1.5} sx={{ py: 8 }}>
         <CircularProgress size={28} />
-        <Typography color="text.secondary">Cargando formulario...</Typography>
+        <Typography color="text.secondary">{t('timeline.loadingForm')}</Typography>
       </Stack>
     );
   }
@@ -109,15 +111,15 @@ const TopicTimelineEntryContentSuggestionPage = () => {
     <Box sx={{ maxWidth: 960, mx: 'auto', py: { xs: 2, sm: 3 }, px: { xs: 2, sm: 3 } }}>
       <Breadcrumbs sx={{ mb: 2 }}>
         <MuiLink component={RouterLink} to="/content/topics" underline="hover" color="inherit">
-          Temas
+          {t('list.title')}
         </MuiLink>
         <MuiLink component={RouterLink} to={`/content/topics/${topicId}`} underline="hover" color="inherit">
-          {topicTitle || 'Tema'}
+          {topicTitle || t('user.topicFallback')}
         </MuiLink>
         <MuiLink component={RouterLink} to={timelineUrl} underline="hover" color="inherit">
-          Linea de tiempo
+          {t('timeline.title')}
         </MuiLink>
-        <Typography color="text.primary">Sugerir contenido</Typography>
+        <Typography color="text.primary">{t('timeline.suggestContent')}</Typography>
       </Breadcrumbs>
 
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
@@ -129,15 +131,15 @@ const TopicTimelineEntryContentSuggestionPage = () => {
           color="text.secondary"
           variant="body2"
         >
-          Volver a la linea de tiempo
+          {t('timeline.backToTimeline')}
         </MuiLink>
       </Stack>
 
       <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-        Sugerir contenido para esta entrada
+        {t('timeline.suggestContentAria')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        {topicTitle ? `Tema: ${topicTitle}` : ''}
+        {topicTitle ? t('timeline.topicLine', { title: topicTitle }) : ''}
       </Typography>
 
       {loadError && (

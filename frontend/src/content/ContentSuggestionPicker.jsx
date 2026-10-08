@@ -9,6 +9,7 @@ import {
   Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useTranslation } from 'react-i18next';
 import LibrarySelectMultiple from './LibrarySelectMultiple';
 import UploadContentForm from './UploadContentForm';
 
@@ -25,9 +26,12 @@ const ContentSuggestionPicker = ({
   onFileSelected,
   disabled = false,
   maxSelections = null,
-  title = 'Contenidos de tu biblioteca o nuevos',
-  description = 'Elige contenidos de tu biblioteca, desde una URL o subiendo un archivo.',
+  title,
+  description,
 }) => {
+  const { t } = useTranslation('content');
+  const heading = title ?? t('suggestionPicker.defaultTitle');
+  const intro = description ?? t('suggestionPicker.defaultDescription');
   const singleSelection = maxSelections === 1;
 
   const applyProfiles = (profiles) => {
@@ -79,7 +83,7 @@ const ContentSuggestionPicker = ({
           sx={{ mb: 2, textTransform: 'none' }}
           disabled={disabled}
         >
-          Volver
+          {t('suggestionPicker.back')}
         </Button>
         <LibrarySelectMultiple
           onCancel={() => setStep('choice')}
@@ -91,7 +95,7 @@ const ContentSuggestionPicker = ({
             setStep('choice');
           }}
           onSelectionChange={handleAddProfiles}
-          title="Seleccionar contenido"
+          title={t('suggestionPicker.selectTitle')}
           maxSelections={singleSelection ? 1 : maxSelections}
           selectedIds={selectedIds}
           compact
@@ -110,12 +114,12 @@ const ContentSuggestionPicker = ({
           sx={{ mb: 2, textTransform: 'none' }}
           disabled={disabled || uploadInProgress}
         >
-          Volver
+          {t('suggestionPicker.back')}
         </Button>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {uploadMode === 'url'
-            ? 'Indica la URL del contenido que quieres proponer.'
-            : 'Sube el archivo del contenido que quieres proponer.'}
+            ? t('suggestionPicker.urlHint')
+            : t('suggestionPicker.fileHint')}
         </Typography>
         <UploadContentForm
           onContentUploaded={handleContentUploaded}
@@ -131,10 +135,10 @@ const ContentSuggestionPicker = ({
   return (
     <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
       <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
-        {title}
+        {heading}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {description}
+        {intro}
       </Typography>
 
       {selectedProfiles.length > 0 && (
@@ -142,7 +146,7 @@ const ContentSuggestionPicker = ({
           {selectedProfiles.map((profile) => (
             <Chip
               key={profile.id}
-              label={profile.title || profile.content?.original_title || 'Contenido'}
+              label={profile.title || profile.content?.original_title || t('common.contentFallback')}
               onDelete={disabled ? undefined : () => handleRemoveProfile(profile.id)}
               variant="outlined"
               size="small"
@@ -158,7 +162,7 @@ const ContentSuggestionPicker = ({
           disabled={disabled}
           sx={{ textTransform: 'none' }}
         >
-          Elegir de la biblioteca
+          {t('suggestionPicker.fromLibrary')}
         </Button>
         <Button
           variant="outlined"
@@ -166,7 +170,7 @@ const ContentSuggestionPicker = ({
           disabled={disabled}
           sx={{ textTransform: 'none' }}
         >
-          Desde URL
+          {t('suggestionPicker.fromUrl')}
         </Button>
         <Button
           variant="outlined"
@@ -174,21 +178,21 @@ const ContentSuggestionPicker = ({
           disabled={disabled}
           sx={{ textTransform: 'none' }}
         >
-          Subir archivo
+          {t('suggestionPicker.uploadFile')}
         </Button>
       </Stack>
 
       {selectedProfiles.length === 0 && (
         <Alert severity="info" sx={{ mt: 2 }}>
           {singleSelection
-            ? 'Opcional: puedes proponer un contenido relacionado con esta entrada.'
-            : 'Opcional: puedes proponer contenidos relacionados ademas de los que ya estan en el tema.'}
+            ? t('suggestionPicker.optionalOne')
+            : t('suggestionPicker.optionalMany')}
         </Alert>
       )}
 
       {singleSelection && selectedProfiles.length > 0 && (
         <Alert severity="info" sx={{ mt: 2 }}>
-          Solo un contenido por sugerencia. Elige otro para reemplazar el actual.
+          {t('suggestionPicker.replaceHint')}
         </Alert>
       )}
     </Paper>

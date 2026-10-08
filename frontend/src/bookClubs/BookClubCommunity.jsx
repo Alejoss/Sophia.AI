@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Alert,
@@ -13,6 +14,7 @@ import { useBookClub } from './BookClubLayout';
 import { CLUB_ACCENT, CLUB_ACCENT_HOVER } from './clubTheme';
 
 const BookClubCommunity = () => {
+  const { t } = useTranslation('bookClubs');
   const { hub, club, slug, canParticipate } = useBookClub();
   const topicId = hub.quick_links?.topic_id;
   const telegramUrl = club?.telegram_group_url;
@@ -40,7 +42,7 @@ const BookClubCommunity = () => {
         if (!cancelled) {
           setMembersError(
             err?.response?.data?.detail ||
-              'No se pudieron cargar los miembros.'
+              t('errors.loadMembers')
           );
         }
       })
@@ -50,17 +52,16 @@ const BookClubCommunity = () => {
     return () => {
       cancelled = true;
     };
-  }, [slug, canParticipate]);
+  }, [slug, canParticipate, t]);
 
   return (
     <Stack spacing={3}>
       <Box>
         <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-          Comunidad
+          {t('community.title')}
         </Typography>
         <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>
-          Conversación del ciclo: Telegram para el día a día. La investigación y la línea de tiempo
-          del tema están en la pestaña Investigación.
+          {t('community.intro')}
         </Typography>
       </Box>
 
@@ -77,10 +78,10 @@ const BookClubCommunity = () => {
             Telegram
           </Typography>
           <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5, mb: 1 }}>
-            Grupo del club
+            {t('community.groupTitle')}
           </Typography>
           <Typography sx={{ color: 'rgba(255,255,255,0.7)', mb: 2 }}>
-            Avisos, dudas rápidas y compañía mientras lees. Es el canal vivo del ciclo.
+            {t('community.groupBody')}
           </Typography>
           <Button
             variant="contained"
@@ -90,12 +91,12 @@ const BookClubCommunity = () => {
             rel="noopener noreferrer"
             sx={{ bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
           >
-            Abrir grupo de Telegram
+            {t('community.openTelegram')}
           </Button>
         </Box>
       ) : (
         <Alert severity="info" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: '#fff' }}>
-          Aún no hay un grupo de Telegram vinculado a este club.
+          {t('community.noTelegram')}
         </Alert>
       )}
 
@@ -109,10 +110,10 @@ const BookClubCommunity = () => {
         >
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Miembros del club
+              {t('community.members')}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.55)' }}>
-              Conoce a las personas con quienes estás leyendo.
+              {t('community.membersHint')}
             </Typography>
           </Box>
           {canParticipate && (
@@ -121,14 +122,14 @@ const BookClubCommunity = () => {
               to={`/club-de-lectura/${slug}/presentate`}
               sx={{ color: CLUB_ACCENT, fontWeight: 700 }}
             >
-              Editar mi presentación
+              {t('community.editIntro')}
             </Button>
           )}
         </Stack>
 
         {!canParticipate ? (
           <Alert severity="info" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: '#fff' }}>
-            Crea tu cuenta y únete al club para conocer a los demás miembros.
+            {t('community.joinToMeet')}
           </Alert>
         ) : membersLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
@@ -138,7 +139,7 @@ const BookClubCommunity = () => {
           <Alert severity="error">{membersError}</Alert>
         ) : members.length === 0 ? (
           <Alert severity="info" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: '#fff' }}>
-            Todavía nadie se ha presentado. Sé el primero con «Editar mi presentación».
+            {t('community.nobodyYet')}
           </Alert>
         ) : (
           <Box
@@ -164,7 +165,7 @@ const BookClubCommunity = () => {
               >
                 <Typography sx={{ fontWeight: 700 }}>
                   @{member.username}
-                  {member.is_me ? ' · Tú' : ''}
+                  {member.is_me ? t('you') : ''}
                 </Typography>
                 {member.country && (
                   <Typography
@@ -196,7 +197,7 @@ const BookClubCommunity = () => {
                         size="small"
                         sx={{ color: CLUB_ACCENT, px: 0 }}
                       >
-                        Red social ↗
+                        {t('community.social')}
                       </Button>
                     )}
                     {member.additional_url && (
@@ -208,7 +209,7 @@ const BookClubCommunity = () => {
                         size="small"
                         sx={{ color: CLUB_ACCENT, px: 0 }}
                       >
-                        Otro link ↗
+                        {t('community.otherLink')}
                       </Button>
                     )}
                   </Stack>
@@ -229,10 +230,10 @@ const BookClubCommunity = () => {
           }}
         >
           <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-            Investigación del ciclo
+            {t('community.investigationTitle')}
           </Typography>
           <Typography sx={{ color: 'rgba(255,255,255,0.7)', mb: 2 }}>
-            La línea de tiempo y el material del tema están en la pestaña Investigación, sin salir del hub.
+            {t('community.investigationBody')}
           </Typography>
           <Button
             variant="contained"
@@ -240,7 +241,7 @@ const BookClubCommunity = () => {
             to={`/club-de-lectura/${slug}/investigacion`}
             sx={{ bgcolor: CLUB_ACCENT, '&:hover': { bgcolor: CLUB_ACCENT_HOVER } }}
           >
-            Ir a Investigación
+            {t('community.goInvestigation')}
           </Button>
         </Box>
       )}

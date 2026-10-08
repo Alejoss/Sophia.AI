@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import bookClubsApi from '../api/bookClubsApi';
 
 const CLUB_ACCENT = '#FF6B35';
@@ -19,6 +20,7 @@ const pickLatestActiveClub = (clubs = []) => {
 };
 
 const ClubDeLectura = () => {
+  const { t } = useTranslation('public');
   const { authState, authInitialized } = useContext(AuthContext);
   const navigate = useNavigate();
   const [activeClub, setActiveClub] = useState(null);
@@ -62,10 +64,10 @@ const ClubDeLectura = () => {
   };
 
   const ctaLabel = (() => {
-    if (joining) return 'Entrando…';
-    if (!authState.isAuthenticated) return 'Entrar al club';
-    if (activeClub?.is_member) return 'Ir al hub del club';
-    return 'Unirme al club';
+    if (joining) return t('club.entering');
+    if (!authState.isAuthenticated) return t('club.enter');
+    if (activeClub?.is_member) return t('club.goToHub');
+    return t('club.join');
   })();
 
   return (
@@ -83,7 +85,7 @@ const ClubDeLectura = () => {
       <Box
         component="img"
         src="/images/club-de-lectura.png"
-        alt="Club de Lectura — Seminario Cypherpunk. El secuestro de Bitcoin de Roger Ver y Steve Patterson."
+        alt={t('club.imageAlt')}
         sx={{
           width: '100%',
           maxWidth: 1200,
@@ -103,14 +105,13 @@ const ClubDeLectura = () => {
               component="h1"
               sx={{ color: '#fff', fontWeight: 700, mb: 1.5 }}
             >
-              El Club de Lectura ya comenzó
+              {t('club.started')}
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.8)', mb: 1 }}>
-              El ciclo «{activeClub.title}» inició el 20 de Julio.
+              {t('club.cycleStarted', { title: activeClub.title })}
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.65)', mb: 3 }}>
-              Todavía puedes unirte: entra al hub para sumarte a las misiones, el foro y la
-              comunidad.
+              {t('club.stillJoin')}
             </Typography>
 
             <Button
@@ -138,13 +139,13 @@ const ClubDeLectura = () => {
                 )}`}
                 sx={{ color: CLUB_ACCENT, textTransform: 'none' }}
               >
-                ¿Ya tienes cuenta? Inicia sesión
+                {t('club.login')}
               </Button>
             )}
           </>
         ) : (
           <Typography sx={{ color: 'rgba(255,255,255,0.65)' }}>
-            Por ahora no hay un ciclo activo publicado. Vuelve pronto.
+            {t('club.none')}
           </Typography>
         )}
       </Box>

@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import { MONERO_CONTACT_USER_ID } from './moneroPayment';
 
 /** Same inbox as Monero checkout — platform operator (user id 2). */
@@ -17,31 +18,38 @@ export const isLikelyBchTxid = (value = '') =>
 export const buildBchVerifyHelpMessage = ({
   title,
   priceUsd,
-  productLabel = 'producto',
+  productLabel,
   bchOrder,
   error,
   txid,
   note,
 } = {}) => {
   const price = Number(priceUsd ?? bchOrder?.usd_amount ?? 0).toFixed(2);
-  const product = title ? `«${title}»` : productLabel;
+  const product = title ? `«${title}»` : (productLabel || i18n.t('payments:genericProduct'));
   const amount = bchOrder?.expected_amount_bch
     ? `${bchOrder.expected_amount_bch} BCH (${bchOrder.expected_amount_sats} sats)`
-    : 'monto de la orden';
-  const address = bchOrder?.address || '(sin dirección)';
-  const orderId = bchOrder?.id != null ? `Orden #${bchOrder.id}. ` : '';
+    : i18n.t('payments:bchSupport.orderAmount');
+  const address = bchOrder?.address || i18n.t('payments:bchSupport.noAddress');
+  const orderId = bchOrder?.id != null
+    ? i18n.t('payments:bchSupport.orderRef', { id: bchOrder.id })
+    : '';
   const cleanTxid = normalizeBchTxid(txid);
   const errLine = error
-    ? `Error al verificar: ${error}`
-    : 'No pude verificar el pago automáticamente.';
-  const noteLine = note?.trim() ? ` Nota: ${note.trim()}` : '';
-  return (
-    `Hola, ya pagué con Bitcoin Cash por ${product} ($${price} USD) pero la verificación falló. `
-    + `${orderId}`
-    + `Envié ${amount} a ${address}. `
-    + `TXID: ${cleanTxid || '(pendiente)'}. `
-    + `${errLine}${noteLine} ¿Puedes confirmar el pago y desbloquear el acceso?`
-  );
+    ? i18n.t('payments:bchSupport.verifyErrorLine', { error })
+    : i18n.t('payments:bchSupport.autoVerifyFailed');
+  const noteLine = note?.trim()
+    ? i18n.t('payments:bchSupport.noteLine', { note: note.trim() })
+    : '';
+  return i18n.t('payments:bchSupport.verifyMessage', {
+    product,
+    price,
+    orderId,
+    amount,
+    address,
+    txid: cleanTxid || i18n.t('payments:bchSupport.pendingTxid'),
+    errLine,
+    noteLine,
+  });
 };
 
 export const ANCHOR_FULFILL_DEFERRED_DESCRIPTION =
@@ -51,7 +59,7 @@ export const ANCHOR_FULFILL_DEFERRED_DESCRIPTION =
 export const buildAnchorFulfillDeferredHelpMessage = ({
   title,
   priceUsd,
-  productLabel = 'anclaje a Bitcoin',
+  productLabel,
   bchOrder,
   reviewNote,
   requestId,
@@ -59,22 +67,35 @@ export const buildAnchorFulfillDeferredHelpMessage = ({
   paymentMethod,
 } = {}) => {
   const price = Number(priceUsd ?? bchOrder?.usd_amount ?? 0).toFixed(2);
-  const product = title ? `«${title}»` : productLabel;
-  const orderId = bchOrder?.id != null ? `Orden BCH #${bchOrder.id}. ` : '';
-  const reqId = requestId != null ? `Solicitud de anclaje #${requestId}. ` : '';
-  const method = paymentMethod ? `Método: ${paymentMethod}. ` : '';
-  const review = reviewNote?.trim()
-    ? `Detalle técnico: ${reviewNote.trim()}. `
+  const product = title ? `«${title}»` : (productLabel || i18n.t('payments:catalog.anchor.productLabel'));
+  const orderId = bchOrder?.id != null
+    ? i18n.t('payments:bchSupport.anchorOrderRef', { id: bchOrder.id })
     : '';
-  const noteLine = note?.trim() ? ` Nota: ${note.trim()}` : '';
+  const reqId = requestId != null
+    ? i18n.t('payments:bchSupport.anchorRequestRef', { id: requestId })
+    : '';
+  const method = paymentMethod
+    ? i18n.t('payments:bchSupport.methodLine', { method: paymentMethod })
+    : '';
+  const review = reviewNote?.trim()
+    ? i18n.t('payments:bchSupport.reviewLine', { note: reviewNote.trim() })
+    : '';
+  const noteLine = note?.trim()
+    ? i18n.t('payments:bchSupport.noteLine', { note: note.trim() })
+    : '';
   const txid = bchOrder?.payment_txid || bchOrder?.txid || '';
-  const txLine = txid ? `TXID BCH: ${normalizeBchTxid(txid)}. ` : '';
-  return (
-    `Hola, ya pagué por ${product} ($${price} USD). El pago está confirmado, `
-    + 'pero el anclaje a Bitcoin no se emitió automáticamente. '
-    + `${reqId}${orderId}${method}${txLine}${review}`
-    + 'No quiero volver a pagar. '
-    + `¿Pueden completar el anclaje manualmente?${noteLine}`
-  );
+  const txLine = txid
+    ? i18n.t('payments:bchSupport.txLine', { txid: normalizeBchTxid(txid) })
+    : '';
+  return i18n.t('payments:bchSupport.anchorMessage', {
+    product,
+    price,
+    reqId,
+    orderId,
+    method,
+    txLine,
+    review,
+    noteLine,
+  });
 };
 

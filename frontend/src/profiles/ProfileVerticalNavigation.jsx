@@ -29,6 +29,7 @@ import {
   Toll as TollIcon
 } from '@mui/icons-material';
 import { createMenuConfig } from '../utils/menuUtils';
+import { useTranslation } from 'react-i18next';
 
 /** Temporarily hidden until crypto payments are ready for general use. */
 export const SHOW_FAVORITE_CRYPTOS_SECTION = false;
@@ -37,45 +38,45 @@ export const SHOW_FAVORITE_CRYPTOS_SECTION = false;
 export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCount = 0) => {
   const baseItems = [
     {
-      label: 'Publicaciones',
+      labelKey: 'profile.publications',
       section: 'publications',
       icon: ArticleIcon,
       path: null // Will be handled by section change
     },
     {
-      label: 'Caminos de conocimiento',
+      labelKey: 'profile.knowledgePaths',
       section: 'knowledge-paths',
       icon: KnowledgePathIcon,
       path: null
     },
     {
-      label: 'Temas',
+      labelKey: 'profile.topics',
       section: 'topics',
       icon: TopicIcon,
       path: null
     },
     {
-      label: 'Certificados',
+      labelKey: 'profile.certificates',
       section: 'certificates',
       icon: SchoolIcon,
       path: null
     },
     {
-      label: 'Eventos',
+      labelKey: 'profile.events',
       section: 'events',
       icon: EventIcon,
       path: null
     },
     ...(SHOW_FAVORITE_CRYPTOS_SECTION
       ? [{
-          label: 'Criptomonedas favoritas',
+          labelKey: 'profile.cryptos',
           section: 'cryptos',
           icon: CryptoIcon,
           path: null
         }]
       : []),
     {
-      label: 'Insignias',
+      labelKey: 'profile.badges',
       section: 'badges',
       icon: BadgeIcon,
       path: null
@@ -86,7 +87,7 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
     const insertAfterSection = SHOW_FAVORITE_CRYPTOS_SECTION ? 'cryptos' : 'events';
     const insertIndex = baseItems.findIndex((item) => item.section === insertAfterSection);
     baseItems.splice(insertIndex + 1, 0, {
-      label: 'Mis tokens',
+      labelKey: 'profile.tokens',
       section: 'tokens',
       icon: TollIcon,
       path: null
@@ -97,26 +98,26 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
   if (isOwnProfile) {
     baseItems.push(
       {
-        label: 'Marcadores',
+        labelKey: 'profile.bookmarks',
         section: 'saved-items',
         icon: BookmarkIcon,
         path: null
       },
       {
-        label: 'Notificaciones',
+        labelKey: 'profile.notifications',
         section: 'notifications',
         icon: NotificationsIcon,
         path: null,
         badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : null
       },
       {
-        label: 'Seguridad',
+        labelKey: 'profile.security',
         section: 'security',
         icon: SecurityIcon,
         path: null
       },
       {
-        label: 'Sugerencias',
+        labelKey: 'profile.suggestions',
         section: 'suggestions',
         icon: LightbulbIcon,
         path: null,
@@ -131,13 +132,7 @@ export const getProfileMenuItems = (isOwnProfile = false, unreadNotificationsCou
 // Export menu configuration for use in header navigation
 export const getProfileMenuConfig = (isOwnProfile = false, unreadNotificationsCount = 0) => {
   const items = getProfileMenuItems(isOwnProfile, unreadNotificationsCount);
-  return createMenuConfig(items, 'Secciones del perfil', true);
-};
-
-const sharedCollectionsLabel = (count) => {
-  if (count == null) return 'Colecciones compartidas';
-  if (count === 1) return '1 Colección compartida';
-  return `${count} Colecciones compartidas`;
+  return createMenuConfig(items, 'profile.sections', true);
 };
 
 const ProfileVerticalNavigation = ({ 
@@ -151,7 +146,12 @@ const ProfileVerticalNavigation = ({
   sharedCollectionsCount = null,
   sx = {} 
 }) => {
+  const { t } = useTranslation('nav');
   const navigate = useNavigate();
+  const labelOf = (item) => t(item.labelKey);
+  const sharedCollectionsLabel = sharedCollectionsCount == null
+    ? t('profile.sharedCollections')
+    : t('profile.sharedCollectionsCount', { count: sharedCollectionsCount });
 
   const handleSectionClick = (section) => {
     onSectionChange(null, section);
@@ -189,7 +189,7 @@ const ProfileVerticalNavigation = ({
               fontSize: '1rem',
             }}
           >
-            Mi Biblioteca
+            {t('profile.myLibrary')}
           </Button>
         ) : (
           <Button
@@ -214,7 +214,7 @@ const ProfileVerticalNavigation = ({
               }),
             }}
           >
-            {sharedCollectionsLabel(sharedCollectionsCount)}
+            {sharedCollectionsLabel}
           </Button>
         )}
 
@@ -248,7 +248,7 @@ const ProfileVerticalNavigation = ({
                       <IconComponent />
                     </ListItemIcon>
                     <ListItemText 
-                      primary={item.label}
+                      primary={labelOf(item)}
                       sx={{
                         '& .MuiListItemText-primary': {
                           fontWeight: 400,
@@ -289,7 +289,7 @@ const ProfileVerticalNavigation = ({
                     <IconComponent />
                   </ListItemIcon>
                   <ListItemText 
-                    primary={item.label}
+                    primary={labelOf(item)}
                     sx={{
                       '& .MuiListItemText-primary': {
                         fontWeight: isItemActive ? 600 : 400,

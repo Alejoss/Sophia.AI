@@ -1,0 +1,58 @@
+{
+  "errors": {
+    "load": "Error al cargar insignias",
+    "loadAvailable": "Error al cargar insignias disponibles",
+    "saveFeatured": "Error al guardar insignia destacada"
+  },
+  "featured": {
+    "empty": "No tienes insignias aún. ¡Sigue participando para obtenerlas!",
+    "title": "Insignia Destacada",
+    "hint": "Selecciona una insignia para mostrarla junto a tu nombre de usuario.",
+    "saved": "Insignia destacada actualizada correctamente",
+    "saving": "Guardando...",
+    "remove": "Remover Insignia",
+    "choose": "Elegir Insignia Destacada",
+    "unsaved": "Tienes cambios sin guardar"
+  },
+  "list": {
+    "defaultTitle": "Insignias",
+    "empty": "Aún no hay insignias",
+    "howEarned": "Cómo la obtuviste:",
+    "earnedOn": "Obtenida el {{date}}"
+  },
+  "notification": {
+    "unlocked": "¡Nueva Insignia Desbloqueada!",
+    "points_one": "+{{count}} punto",
+    "points_other": "+{{count}} puntos"
+  },
+  "earning": {
+    "pathCompletedNamed": "Completaste el camino de conocimiento \"{{title}}\"",
+    "pathCompleted": "Completaste tu primer camino de conocimiento",
+    "quizMasterCount_one": "Completaste {{count}} cuestionario con puntuación perfecta",
+    "quizMasterCount_other": "Completaste {{count}} cuestionarios con puntuación perfecta",
+    "quizMaster": "Completaste 5 cuestionarios con puntuación perfecta",
+    "nodesCount_one": "Completaste {{count}} nodo de conocimiento",
+    "nodesCount_other": "Completaste {{count}} nodos de conocimiento",
+    "nodes": "Completaste 20 nodos de conocimiento",
+    "firstComment": "Publicaste tu primer comentario",
+    "pathCreatedNamed": "Creaste el camino de conocimiento \"{{title}}\"",
+    "pathCreated": "Creaste tu primer camino de conocimiento con 2+ nodos",
+    "contentCreatorCount_one": "Creaste {{count}} contenido con 5+ votos cada uno",
+    "contentCreatorCount_other": "Creaste {{count}} contenidos con 5+ votos cada uno",
+    "contentCreator": "Creaste 3 contenidos con 5+ votos cada uno",
+    "commentVotes_one": "Uno de tus comentarios alcanzó {{count}} voto positivo",
+    "commentVotes_other": "Uno de tus comentarios alcanzó {{count}} votos positivos",
+    "commentVotesDefault": "Uno de tus comentarios alcanzó 5+ votos positivos",
+    "contentVotes_one": "Uno de tus contenidos alcanzó {{count}} voto positivo",
+    "contentVotes_other": "Uno de tus contenidos alcanzó {{count}} votos positivos",
+    "contentVotesDefault": "Uno de tus contenidos alcanzó 10+ votos positivos",
+    "communityVotes_one": "Acumulaste {{count}} voto en total en tus comentarios",
+    "communityVotes_other": "Acumulaste {{count}} votos en total en tus comentarios",
+    "communityVotesDefault": "Acumulaste 20+ votos en total en tus comentarios",
+    "topicCuratorNamed": "Creaste el tema \"{{title}}\" con {{contents}} contenidos, {{withVotes}} de ellos con votos positivos",
+    "topicCurator": "Creaste un tema con 5+ contenidos, 2+ con votos positivos",
+    "topicArchitectNamed": "El tema \"{{title}}\" alcanzó amplio reconocimiento: {{withVotes}} contenidos con votos, {{totalVotes}} votos totales, {{voters}} usuarios únicos votaron",
+    "topicArchitect": "Creaste un tema con amplio reconocimiento comunitario",
+    "default": "Insignia obtenida por tu participación en la comunidad"
+  }
+}

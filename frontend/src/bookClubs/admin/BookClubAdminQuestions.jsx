@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useOutletContext, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -18,15 +19,10 @@ import knowledgePathsApi from '../../api/knowledgePathsApi';
 import {
   extractApiError,
   formatClubDate,
-  QUESTION_STATUS_LABELS,
+  QUESTION_STATUSES,
   toDatetimeLocal,
   toIsoOrNull,
 } from '../clubTheme';
-
-const STATUS_OPTIONS = Object.entries(QUESTION_STATUS_LABELS).map(([value, label]) => ({
-  value,
-  label,
-}));
 
 const emptyForm = {
   body: '',
@@ -39,6 +35,7 @@ const emptyForm = {
 };
 
 const BookClubAdminQuestions = () => {
+  const { t } = useTranslation('bookClubs');
   const { slug } = useParams();
   const { club } = useOutletContext();
   const [questions, setQuestions] = useState([]);
@@ -60,9 +57,9 @@ const BookClubAdminQuestions = () => {
       setEvents(Array.isArray(clubEvents) ? clubEvents : []);
       setError(null);
     } catch (err) {
-      setError(extractApiError(err, 'No se pudieron cargar las preguntas.'));
+      setError(extractApiError(err, t('errors.loadQuestions')));
     }
-  }, [slug]);
+  }, [slug, t]);
 
   useEffect(() => {
     load();
@@ -105,7 +102,7 @@ const BookClubAdminQuestions = () => {
 
   const buildPayload = () => {
     if (!form.body.trim()) {
-      throw new Error('El texto de la pregunta es obligatorio.');
+      throw new Error(t('questionAdmin.bodyRequired'));
     }
     const payload = {
       body: form.body.trim(),
@@ -118,14 +115,14 @@ const BookClubAdminQuestions = () => {
     }
     if (form.opens_at) {
       const iso = toIsoOrNull(form.opens_at);
-      if (!iso) throw new Error('opens_at no es válida.');
+      if (!iso) throw new Error(t('questionAdmin.opensInvalid'));
       payload.opens_at = iso;
     } else if (editingId) {
       payload.opens_at = null;
     }
     if (form.closes_at) {
       const iso = toIsoOrNull(form.closes_at);
-      if (!iso) throw new Error('closes_at no es válida.');
+      if (!iso) throw new Error(t('questionAdmin.closesInvalid'));
       payload.closes_at = iso;
     } else if (editingId) {
       payload.closes_at = null;
@@ -141,7 +138,7 @@ const BookClubAdminQuestions = () => {
       const payload = buildPayload();
       if (editingId) {
         await bookClubsApi.updateDiscussionQuestion(slug, editingId, payload);
-        setSuccess('Pregunta actualizada.');
+        setSuccess(t('questionAdmin.updated'));
       } else {
         await bookClubsApi.createDiscussionQuestion(slug, {
           ...payload,
@@ -149,8 +146,8 @@ const BookClubAdminQuestions = () => {
         });
         setSuccess(
           payload.status === 'draft'
-            ? 'Borrador guardado.'
-            : 'Pregunta publicada.'
+            ? t('questionAdmin.draftSaved')
+            : t('questionAdmin.published')
         );
       }
       cancelEdit();
@@ -159,7 +156,7 @@ const BookClubAdminQuestions = () => {
       setError(
         err?.message && !err?.response
           ? err.message
-          : extractApiError(err, 'No se pudo guardar la pregunta.')
+          : extractApiError(err, t('errors.saveQuestion'))
       );
     } finally {
       setSaving(false);
@@ -172,35 +169,35 @@ const BookClubAdminQuestions = () => {
       await bookClubsApi.updateDiscussionQuestion(slug, q.id, { status });
       await load();
     } catch (err) {
-      setError(extractApiError(err, 'No se pudo cambiar el estado.'));
+      setError(extractApiError(err, t('errors.changeStatus')));
     }
   };
 
   const handleDelete = async (q) => {
-    if (!window.confirm('¿Eliminar esta pregunta del foro? No se puede deshacer.')) return;
+    if (!window.confirm(t('questionAdmin.confirmDelete'))) return;
     setError(null);
     try {
       await bookClubsApi.deleteDiscussionQuestion(slug, q.id);
       if (editingId === q.id) cancelEdit();
-      setSuccess('Pregunta eliminada.');
+      setSuccess(t('questionAdmin.deleted'));
       await load();
     } catch (err) {
-      setError(extractApiError(err, 'No se pudo eliminar la pregunta.'));
+      setError(extractApiError(err, t('errors.deleteQuestion')));
     }
   };
 
   const statusLabel = (q) =>
-    QUESTION_STATUS_LABELS[q.effective_status || q.status] || q.effective_status || q.status;
+    t(`questionStatus.${q.effective_status || q.status}`, {
+      defaultValue: q.effective_status || q.status,
+    });
 
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        Preguntas del foro
+        {t('questionAdmin.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Crea, programa y cierra preguntas ligadas a misiones o reuniones. Se muestran en el hub
-        (Foro) según su estado y fechas. Los miembros solo ven las respuestas de otros después de
-        publicar la suya.
+        {t('questionAdmin.intro')}
       </Typography>
 
       {error && (
@@ -226,10 +223,10 @@ const BookClubAdminQuestions = () => {
         }}
       >
         <Typography variant="subtitle1" fontWeight={700}>
-          {editingId ? `Editando pregunta #${editingId}` : 'Nueva pregunta'}
+          {editingId ? t('questionAdmin.editing', { id: editingId }) : t('questionAdmin.new')}
         </Typography>
         <TextField
-          label="Texto de la pregunta"
+          label={t('questionAdmin.body')}
           fullWidth
           multiline
           minRows={2}
@@ -239,54 +236,54 @@ const BookClubAdminQuestions = () => {
         />
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <FormControl fullWidth>
-            <InputLabel id="q-status">Estado</InputLabel>
+            <InputLabel id="q-status">{t('questionAdmin.status')}</InputLabel>
             <Select
               labelId="q-status"
-              label="Estado"
+              label={t('questionAdmin.status')}
               value={form.status}
               onChange={setField('status')}
             >
-              {STATUS_OPTIONS.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  {opt.label}
+              {QUESTION_STATUSES.map((value) => (
+                <MenuItem key={value} value={value}>
+                  {t(`questionStatus.${value}`)}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
           <TextField
-            label="Orden"
+            label={t('questionAdmin.order')}
             type="number"
             fullWidth
             value={form.order}
             onChange={setField('order')}
-            helperText="Opcional"
+            helperText={t('questionAdmin.optional')}
           />
         </Stack>
         <FormControl fullWidth>
-          <InputLabel id="q-node">Después de la misión</InputLabel>
+          <InputLabel id="q-node">{t('questionAdmin.afterMission')}</InputLabel>
           <Select
             labelId="q-node"
-            label="Después de la misión"
+            label={t('questionAdmin.afterMission')}
             value={form.node}
             onChange={setField('node')}
           >
-            <MenuItem value="">Sin misión vinculada</MenuItem>
+            <MenuItem value="">{t('questionAdmin.noMission')}</MenuItem>
             {nodes.map((n) => (
               <MenuItem key={n.id} value={String(n.id)}>
-                Misión {n.order}: {n.title}
+                {t('questionAdmin.missionOption', { order: n.order, title: n.title })}
               </MenuItem>
             ))}
           </Select>
         </FormControl>
         <FormControl fullWidth>
-          <InputLabel id="q-event">Después del directo</InputLabel>
+          <InputLabel id="q-event">{t('questionAdmin.afterLive')}</InputLabel>
           <Select
             labelId="q-event"
-            label="Después del directo"
+            label={t('questionAdmin.afterLive')}
             value={form.event}
             onChange={setField('event')}
           >
-            <MenuItem value="">Sin reunión vinculada</MenuItem>
+            <MenuItem value="">{t('questionAdmin.noMeeting')}</MenuItem>
             {events.map((ev) => (
               <MenuItem key={ev.event_id} value={String(ev.event_id)}>
                 {ev.title}
@@ -296,41 +293,41 @@ const BookClubAdminQuestions = () => {
         </FormControl>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <TextField
-            label="Abrir en"
+            label={t('questionAdmin.opensAt')}
             type="datetime-local"
             fullWidth
             InputLabelProps={{ shrink: true }}
             value={form.opens_at}
             onChange={setField('opens_at')}
-            helperText="Opcional · auto-abre borradores"
+            helperText={t('questionAdmin.opensHelper')}
           />
           <TextField
-            label="Cerrar en"
+            label={t('questionAdmin.closesAt')}
             type="datetime-local"
             fullWidth
             InputLabelProps={{ shrink: true }}
             value={form.closes_at}
             onChange={setField('closes_at')}
-            helperText="Opcional · auto-cierra abiertas"
+            helperText={t('questionAdmin.closesHelper')}
           />
         </Stack>
         <Stack direction="row" spacing={1}>
           <Button variant="contained" onClick={handleSave} disabled={saving || !form.body.trim()}>
-            {saving ? 'Guardando…' : editingId ? 'Guardar cambios' : 'Crear pregunta'}
+            {saving ? t('questionAdmin.saving') : editingId ? t('questionAdmin.saveChanges') : t('questionAdmin.create')}
           </Button>
           {editingId && (
             <Button onClick={cancelEdit} disabled={saving}>
-              Cancelar
+              {t('questionAdmin.cancel')}
             </Button>
           )}
         </Stack>
       </Stack>
 
       <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
-        Preguntas del club ({questions.length})
+        {t('questionAdmin.list', { count: questions.length })}
       </Typography>
       {!questions.length ? (
-        <Typography color="text.secondary">Todavía no hay preguntas.</Typography>
+        <Typography color="text.secondary">{t('questionAdmin.empty')}</Typography>
       ) : (
         <Stack spacing={1.5}>
           {questions.map((q) => (
@@ -356,38 +353,38 @@ const BookClubAdminQuestions = () => {
                       <Chip size="small" variant="outlined" label={q.mission_label} />
                     )}
                     {q.event_title && (
-                      <Chip size="small" variant="outlined" label={`Directo: ${q.event_title}`} />
+                      <Chip size="small" variant="outlined" label={t('questionAdmin.liveChip', { title: q.event_title })} />
                     )}
                   </Stack>
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                    {q.answer_count} respuesta{q.answer_count === 1 ? '' : 's'}
-                    {q.opens_at ? ` · abre ${formatClubDate(q.opens_at)}` : ''}
-                    {q.closes_at ? ` · cierra ${formatClubDate(q.closes_at)}` : ''}
+                    {t('overview.answers', { count: q.answer_count })}
+                    {q.opens_at ? t('questionAdmin.opens', { date: formatClubDate(q.opens_at) }) : ''}
+                    {q.closes_at ? t('questionAdmin.closes', { date: formatClubDate(q.closes_at) }) : ''}
                   </Typography>
                 </Box>
                 <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
                   {q.status !== 'open' && (
                     <Button size="small" onClick={() => quickStatus(q, 'open')}>
-                      Abrir
+                      {t('questionAdmin.open')}
                     </Button>
                   )}
                   {q.status === 'open' && (
                     <Button size="small" onClick={() => quickStatus(q, 'closed')}>
-                      Cerrar
+                      {t('questionAdmin.close')}
                     </Button>
                   )}
                   <Button size="small" onClick={() => startEdit(q)}>
-                    Editar
+                    {t('questionAdmin.edit')}
                   </Button>
                   <Button
                     size="small"
                     component={RouterLink}
                     to={`/club-de-lectura/${club.slug}/foro/${q.id}`}
                   >
-                    Ver en foro
+                    {t('questionAdmin.viewInForum')}
                   </Button>
                   <Button size="small" color="error" onClick={() => handleDelete(q)}>
-                    Eliminar
+                    {t('questionAdmin.delete')}
                   </Button>
                 </Stack>
               </Stack>

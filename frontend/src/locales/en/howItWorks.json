@@ -1,0 +1,58 @@
+{
+  "kicker": "GUIDE",
+  "title": "How Academia Blockchain works",
+  "pageLabel": "How Academia Blockchain works guide",
+  "navLabel": "Guide chapters",
+  "videoTitle": "Video: {{title}}",
+  "videoSoon": "Video coming soon",
+  "videoSoonHint": "This chapter's video will appear here.",
+  "videoPlaceholder": "Space reserved for the YouTube video",
+  "previous": "PREVIOUS CHAPTER",
+  "next": "NEXT CHAPTER",
+  "back": "BACK",
+  "backTitle": "Explore Academia Blockchain",
+  "chapters": {
+    "archivo-y-preservacion": {
+      "shortTitle": "The archive is yours",
+      "eyebrow": "ACCESS, OWNERSHIP, AND MEMORY",
+      "title": "Preserving knowledge is a form of freedom.",
+      "introduction": "Having access to something does not mean you own it. When you depend entirely on a platform, you also depend on its decisions, its permissions, and its permanence. Saving the files can mean important knowledge for the next generations.",
+      "sections": [
+        {
+          "title": "Access is not preservation",
+          "body": "We call lists, libraries, and collections “ours” when they actually live behind external services. A link can break, a video can disappear, and an account can become unavailable. For someone researching a topic, that fragility is not a detail: it affects the memory they can build and share."
+        },
+        {
+          "title": "A library you can take with you",
+          "body": "Academia Blockchain lets you download the available files and preserve them outside the platform. The aim is that useful knowledge is not locked inside an intermediary."
+        },
+        {
+          "title": "Preserve together",
+          "body": "If a piece of content only has an external link (URL) and you have the file, you can suggest it and upload it to Academia Blockchain. The community then relates sources, keeps materials, and strengthens shared research."
+        }
+      ],
+      "takeaway": "A community preserves what it values better when it does not depend on a single place to reach it. Download the files."
+    },
+    "aprender-sin-algoritmos": {
+      "shortTitle": "Learning without the algorithm",
+      "eyebrow": "ATTENTION, CURIOSITY, AND JUDGMENT",
+      "title": "Your curiosity should not obey a wall of recommendations.",
+      "introduction": "Social network algorithms optimize the time you spend looking, not the depth of what you learn. Academia Blockchain offers another way to discover knowledge.",
+      "sections": [
+        {
+          "title": "Your attention has a purpose",
+          "body": "An automatic recommendation decides what appears in front of you and what stays out. Its incentive is usually to keep you inside the platform, alternating stimuli and advertising, not to help you understand a complex subject."
+        },
+        {
+          "title": "Convenience can also limit you",
+          "body": "When we constantly delegate discovery, we stop exercising curiosity. Content becomes more immediate and superficial, while there is less room to pause, compare, and think deeply."
+        },
+        {
+          "title": "Explore with intention",
+          "body": "On Academia Blockchain you can follow topics built collaboratively and knowledge paths organized with a purpose. This is not about keeping scrolling. It is about choosing a question and moving toward your own understanding."
+        }
+      ],
+      "takeaway": "The platform offers routes to explore; the direction of your learning remains yours."
+    }
+  }
+}

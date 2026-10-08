@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { Container, Box, Typography, TextField, Button, Alert, useTheme } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { submitNewsletterSubscription } from '../api/profilesApi';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 import { emailField } from '../utils/formSchemas';
@@ -13,6 +14,7 @@ const schema = yup.object({
 });
 
 const NewsletterSubscribe = () => {
+  const { t } = useTranslation('public');
   const [successMessage, setSuccessMessage] = useState('');
   const [generalError, setGeneralError] = useState('');
   const theme = useTheme();
@@ -38,13 +40,13 @@ const NewsletterSubscribe = () => {
 
     try {
       await submitNewsletterSubscription(email.trim());
-      setSuccessMessage('¡Gracias por suscribirte! Te avisaremos de las próximas novedades.');
+      setSuccessMessage(t('newsletter.success'));
       reset({ email: '' });
     } catch (err) {
       const { generalError: parsed } = applyApiErrorsToForm(
         err,
         setError,
-        'No se ha podido completar la suscripción. Inténtalo de nuevo más tarde.',
+        t('newsletter.error'),
       );
       if (parsed) {
         setGeneralError(parsed);
@@ -102,7 +104,7 @@ const NewsletterSubscribe = () => {
               fontSize: { xs: '1.7rem', md: '2rem' },
             }}
           >
-            Únete a la comunidad
+            {t('newsletter.title')}
           </Typography>
 
           <Typography
@@ -114,10 +116,7 @@ const NewsletterSubscribe = () => {
               lineHeight: 1.6,
             }}
           >
-            Déjanos tu email y te mantendremos al tanto del avance del proyecto, las novedades de
-            Academia Blockchain y documentales clave. También podrás sumarte a investigaciones de
-            código abierto, conectar con una comunidad de estudio y compartir, junto a nosotros, la
-            construcción de esta plataforma revolucionaria.
+            {t('newsletter.lead')}
           </Typography>
 
           <Box
@@ -128,11 +127,11 @@ const NewsletterSubscribe = () => {
           >
             <TextField
               type="email"
-              label="Email"
+              label={t('newsletter.email')}
               {...bindMuiRhfField(register('email'), emailValue)}
               error={!!errors.email}
               helperText={errors.email?.message}
-              placeholder="tu@email"
+              placeholder={t('newsletter.placeholder')}
               fullWidth
               variant="outlined"
               size="medium"
@@ -167,7 +166,7 @@ const NewsletterSubscribe = () => {
                 }}
                 fullWidth
               >
-                {isSubmitting ? 'Enviando...' : 'Quiero suscribirme'}
+                {isSubmitting ? t('newsletter.sending') : t('newsletter.submit')}
               </Button>
             </Box>
           </Box>
@@ -181,8 +180,7 @@ const NewsletterSubscribe = () => {
               lineHeight: 1.5,
             }}
           >
-            Solo usaremos tu correo para enviarte información relevante sobre Academia Blockchain.
-            Puedes darte de baja en cualquier momento.
+            {t('newsletter.privacy')}
           </Typography>
         </Box>
       </Container>

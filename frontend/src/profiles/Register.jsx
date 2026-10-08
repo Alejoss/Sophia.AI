@@ -1,4 +1,5 @@
-import { useState, useContext, useRef } from 'react';
+import { useState, useContext, useRef, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
@@ -31,19 +32,6 @@ import {
   Typography,
 } from '@mui/material';
 
-const registerSchema = yup.object({
-  username: usernameField(),
-  email: emailField('correo electrónico'),
-  password: passwordField(),
-  confirmPassword: yup
-    .string()
-    .required('Por favor, confirma tu contraseña.')
-    .oneOf(
-      [yup.ref('password')],
-      'Las contraseñas no coinciden. Por favor, verifica que ambas contraseñas sean iguales.',
-    ),
-});
-
 /**
  * Registration — auth contract (docs/api/authentication.md):
  * POST /api/profiles/register/ with { username, email, password } only.
@@ -51,6 +39,20 @@ const registerSchema = yup.object({
  * Never send confirmPassword; never log tokens.
  */
 const Register = () => {
+  const { t } = useTranslation('auth');
+  const registerSchema = useMemo(
+    () =>
+      yup.object({
+        username: usernameField(),
+        email: emailField(),
+        password: passwordField(),
+        confirmPassword: yup
+          .string()
+          .required(() => t('register.confirmRequired'))
+          .oneOf([yup.ref('password')], () => t('register.passwordMismatch')),
+      }),
+    [t],
+  );
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -124,24 +126,20 @@ const Register = () => {
 
       // User created but token missing (backend edge case) — stay on page with guidance
       if (response.data) {
-        setServerError(
-          'Tu cuenta se creó, pero no se pudo iniciar sesión automáticamente. Prueba iniciar sesión manualmente.',
-        );
+        setServerError(t('register.createdNoSession'));
       }
     } catch (error) {
       console.error('Registration error:', error);
 
       if (error.request && !error.response) {
-        setServerError(
-          'No se pudo conectar con el servidor. Por favor, verifica tu conexión a internet e intenta nuevamente.',
-        );
+        setServerError(t('register.networkError'));
         return;
       }
 
       const { generalError } = applyApiErrorsToForm(
         error,
         setError,
-        'Ocurrió un error inesperado durante el registro. Por favor, intenta nuevamente.',
+        t('register.unexpected'),
       );
       if (generalError) {
         setServerError(generalError);
@@ -153,7 +151,7 @@ const Register = () => {
     <Container maxWidth="sm" sx={{ py: { xs: 2, md: 4 } }}>
       <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3.5 } }}>
         <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-          Crear cuenta
+          {t('register.title')}
         </Typography>
 
         {serverError && (
@@ -166,7 +164,7 @@ const Register = () => {
           <Stack spacing={2}>
             <TextField
               id="username"
-              label="Nombre de usuario"
+              label={t('register.username')}
               {...bindField('username', usernameValue)}
               onKeyDown={(e) => {
                 if (e.key === '@') {
@@ -181,7 +179,7 @@ const Register = () => {
 
             <TextField
               id="email"
-              label="Correo electrónico"
+              label={t('register.email')}
               type="email"
               {...bindField('email', emailValue)}
               error={Boolean(errors.email)}
@@ -192,7 +190,7 @@ const Register = () => {
 
             <TextField
               id="password"
-              label="Contraseña"
+              label={t('register.password')}
               type={showPassword ? 'text' : 'password'}
               {...bindField('password', passwordValue)}
               error={Boolean(errors.password)}
@@ -213,7 +211,7 @@ const Register = () => {
                     <IconButton
                       edge="end"
                       onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      aria-label={showPassword ? t('hidePassword') : t('showPassword')}
                     >
                       {showPassword ? (
                         <VisibilityOffIcon fontSize="small" />
@@ -228,13 +226,13 @@ const Register = () => {
 
             {passwordOk && (
               <Alert severity="success">
-                La contraseña cumple con todos los requisitos de seguridad.
+                {t('register.passwordMeetsRules')}
               </Alert>
             )}
 
             <TextField
               id="confirmPassword"
-              label="Confirmar contraseña"
+              label={t('register.confirmPassword')}
               type={showConfirmPassword ? 'text' : 'password'}
               {...bindField('confirmPassword', confirmPasswordValue)}
               error={Boolean(errors.confirmPassword)}
@@ -248,7 +246,7 @@ const Register = () => {
                       edge="end"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       aria-label={
-                        showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'
+                        showConfirmPassword ? t('hidePassword') : t('showPassword')
                       }
                     >
                       {showConfirmPassword ? (
@@ -263,12 +261,12 @@ const Register = () => {
             />
 
             <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
-              {isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
+              {isSubmitting ? t('register.submitting') : t('register.submit')}
             </Button>
           </Stack>
         </Box>
 
-        <Divider sx={{ my: 3 }}>O continúa con</Divider>
+        <Divider sx={{ my: 3 }}>{t('register.orContinue')}</Divider>
         <SocialLogin />
       </Paper>
     </Container>

@@ -1,4 +1,5 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
@@ -22,16 +23,20 @@ import { passwordField, usernameField } from '../utils/formSchemas';
 import { bindMuiRhfField } from '../utils/muiRhfField.js';
 import { clearGuestSession } from '../bookClubs/guestStorage';
 
-const schema = yup.object({
-  username: usernameField(),
-  password: passwordField(),
-  confirmPassword: yup
-    .string()
-    .required('Confirma tu contraseña.')
-    .oneOf([yup.ref('password')], 'Las contraseñas no coinciden.'),
-});
-
 const CompletarCuenta = () => {
+  const { t } = useTranslation('auth');
+  const schema = useMemo(
+    () =>
+      yup.object({
+        username: usernameField(),
+        password: passwordField(),
+        confirmPassword: yup
+          .string()
+          .required(() => t('completar.confirmRequired'))
+          .oneOf([yup.ref('password')], () => t('completar.mismatch')),
+      }),
+    [t],
+  );
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { updateAuthState } = useContext(AuthContext);
@@ -63,7 +68,7 @@ const CompletarCuenta = () => {
     let cancelled = false;
     (async () => {
       if (!token) {
-        setPreviewError('Falta el enlace de invitación. Vuelve al club e introduce tu correo.');
+        setPreviewError(t('completar.missingInvite'));
         setLoadingPreview(false);
         return;
       }
@@ -73,7 +78,7 @@ const CompletarCuenta = () => {
       } catch (err) {
         if (!cancelled) {
           setPreviewError(
-            err?.response?.data?.detail || 'Este enlace no es válido o ha caducado.'
+            err?.response?.data?.detail || t('completar.invalidLink')
           );
         }
       } finally {
@@ -83,7 +88,7 @@ const CompletarCuenta = () => {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, t]);
 
   const onSubmit = async ({ username, password }) => {
     setServerError('');
@@ -97,9 +102,7 @@ const CompletarCuenta = () => {
         navigate(dest, { replace: true });
         return;
       }
-      setServerError(
-        'Cuenta creada, pero no se pudo iniciar sesión automáticamente. Prueba iniciar sesión.'
-      );
+      setServerError(t('completar.createdNoSession'));
     } catch (error) {
       if (error?.response?.data?.code === 'email_exists') {
         const hint = error.response.data.next_hint || next || '/club-de-lectura';
@@ -109,7 +112,7 @@ const CompletarCuenta = () => {
       const { generalError } = applyApiErrorsToForm(
         error,
         setError,
-        'No se pudo completar el registro.'
+        t('completar.completeError')
       );
       if (generalError) setServerError(generalError);
     }
@@ -130,7 +133,7 @@ const CompletarCuenta = () => {
           {previewError}
         </Alert>
         <Button component={RouterLink} to={next || '/club-de-lectura'}>
-          Volver al club
+          {t('completar.backToClub')}
         </Button>
       </Container>
     );
@@ -142,12 +145,15 @@ const CompletarCuenta = () => {
     <Container maxWidth="sm" sx={{ py: 6 }}>
       <Paper sx={{ p: { xs: 3, md: 4 } }}>
         <Typography variant="h4" gutterBottom fontWeight={700}>
-          Crea tu cuenta
+          {t('completar.title')}
         </Typography>
         <Typography color="text.secondary" sx={{ mb: 3 }}>
-          Completa tu perfil para participar en{' '}
-          <strong>{preview?.club_title || 'el Club de Lectura'}</strong>. Tu correo ya está
-          confirmado.
+          <Trans
+            t={t}
+            i18nKey="completar.lead"
+            values={{ club: preview?.club_title || t('completar.fallbackClub') }}
+            components={{ strong: <strong /> }}
+          />
         </Typography>
 
         {serverError && (
@@ -160,7 +166,7 @@ const CompletarCuenta = () => {
                   component={RouterLink}
                   to={`/profiles/login?next=${encodeURIComponent(loginNext)}`}
                 >
-                  Ir a iniciar sesión
+                  {t('completar.goToLogin')}
                 </Button>
               </Box>
             )}
@@ -174,21 +180,21 @@ const CompletarCuenta = () => {
           noValidate
         >
           <TextField
-            label="Correo"
+            label={t('completar.email')}
             value={preview?.email || ''}
             fullWidth
             InputProps={{ readOnly: true }}
             InputLabelProps={{ shrink: Boolean(preview?.email) || undefined }}
           />
           <TextField
-            label="Nombre de usuario"
+            label={t('completar.username')}
             fullWidth
             {...bindMuiRhfField(register('username'), usernameValue)}
             error={Boolean(errors.username)}
             helperText={errors.username?.message}
           />
           <TextField
-            label="Contraseña"
+            label={t('completar.password')}
             type="password"
             fullWidth
             {...bindMuiRhfField(register('password'), passwordValue)}
@@ -196,7 +202,7 @@ const CompletarCuenta = () => {
             helperText={errors.password?.message}
           />
           <TextField
-            label="Confirmar contraseña"
+            label={t('completar.confirmPassword')}
             type="password"
             fullWidth
             {...bindMuiRhfField(register('confirmPassword'), confirmPasswordValue)}
@@ -204,7 +210,7 @@ const CompletarCuenta = () => {
             helperText={errors.confirmPassword?.message}
           />
           <Button type="submit" variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? 'Creando cuenta…' : 'Crear cuenta y volver al club'}
+            {isSubmitting ? t('completar.submitting') : t('completar.submit')}
           </Button>
         </Stack>
       </Paper>

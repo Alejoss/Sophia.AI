@@ -1,3 +1,5 @@
+import i18n from '../i18n';
+
 /**
  * Browser helpers to download knowledge-path snapshot artifacts for offline
  * hash verification (SHA-256 of RFC 8785 JCS bytes).
@@ -55,7 +57,7 @@ export const downloadSnapshotForHashVerification = ({
   label,
 } = {}) => {
   if (!canonical || !String(canonical).trim()) {
-    throw new Error('No hay bytes canónicos JCS para descargar.');
+    throw new Error(i18n.t('paths:download.noBytes'));
   }
   const basename = buildSnapshotDownloadBasename({
     knowledgePathId,

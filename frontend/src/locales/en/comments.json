@@ -1,0 +1,49 @@
+{
+  "validation": {
+    "empty": "The comment cannot be empty",
+    "writeBeforePost": "Write a comment before posting."
+  },
+  "edit": {
+    "saving": "Saving...",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "reply": {
+    "placeholder": "Write a reply...",
+    "sending": "Sending...",
+    "send": "Send",
+    "cancel": "Cancel",
+    "addFailed": "Could not add the reply. Please try again."
+  },
+  "comment": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirmDelete": "Are you sure you want to delete this comment?",
+    "deleteFailed": "Could not delete the comment. Please try again.",
+    "editFailed": "Could not edit the comment. Please try again.",
+    "edited": " (edited)",
+    "reply": "Reply",
+    "hideReplies": "Hide Replies",
+    "showReplies_one": "Show {{count}} Reply",
+    "showReplies_other": "Show {{count}} Replies"
+  },
+  "section": {
+    "title": "Comments",
+    "placeholder": "Write a comment...",
+    "submit": "Post Comment",
+    "submitting": "Posting...",
+    "empty": "No comments yet.",
+    "loadFailed": "Could not load comments",
+    "loginToComment": "You must sign in to comment",
+    "addFailed": "Could not add the comment. Please try again.",
+    "deleteFailed": "Could not delete the comment",
+    "updateFailed": "Could not update the comment",
+    "loginToReply": "You must sign in to reply",
+    "loading": "Loading comments...",
+    "closed": "This conversation is closed.",
+    "closedHidden": " Post your answer once it opens to see everyone else's.",
+    "closedReadable": " You can read the replies.",
+    "loginPrompt": "Please sign in to leave a comment.",
+    "lockedEmpty": "Post your answer to see other members' answers."
+  }
+}

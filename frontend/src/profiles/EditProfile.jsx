@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
@@ -29,43 +30,46 @@ const MAX_DESCRIPTION_LENGTH = 500;
 const MAX_INTERESTS = 10;
 const MAX_USERNAME_CHANGES = 2;
 
-const schema = yup.object({
-    username: yup
-        .string()
-        .trim()
-        .required('El nombre de usuario es requerido.')
-        .min(3, 'El nombre de usuario debe tener al menos 3 caracteres.')
-        .matches(
-            /^[a-zA-Z0-9_]+$/,
-            'El nombre de usuario solo puede contener letras, números y guiones bajos (_).',
-        ),
-    profile_description: yup
-        .string()
-        .max(MAX_DESCRIPTION_LENGTH, `Máximo ${MAX_DESCRIPTION_LENGTH} caracteres.`),
-    external_url: yup
-        .string()
-        .trim()
-        .test(
-            'url-or-empty',
-            'Introduce una URL válida (incluye https://).',
-            (value) => {
-                if (!value) return true;
-                try {
-                    // eslint-disable-next-line no-new
-                    new URL(value);
-                    return true;
-                } catch {
-                    return false;
-                }
-            },
-        ),
-});
-
 /**
  * Profile edit — if username changes and API returns user, updateAuthState with
  * existing access token (do not touch refresh cookie; never log tokens).
  */
 const EditProfile = () => {
+    const { t } = useTranslation('auth');
+    const schema = useMemo(
+        () =>
+            yup.object({
+                username: yup
+                    .string()
+                    .trim()
+                    .required(() => t('edit.usernameRequired'))
+                    .min(3, () => t('edit.usernameMin'))
+                    .matches(/^[a-zA-Z0-9_]+$/, () => t('edit.usernameCharset')),
+                profile_description: yup
+                    .string()
+                    .max(MAX_DESCRIPTION_LENGTH, () =>
+                        t('edit.descriptionMax', { max: MAX_DESCRIPTION_LENGTH }),
+                    ),
+                external_url: yup
+                    .string()
+                    .trim()
+                    .test(
+                        'url-or-empty',
+                        () => t('edit.invalidUrl'),
+                        (value) => {
+                            if (!value) return true;
+                            try {
+                                // eslint-disable-next-line no-new
+                                new URL(value);
+                                return true;
+                            } catch {
+                                return false;
+                            }
+                        },
+                    ),
+            }),
+        [t],
+    );
     const navigate = useNavigate();
     const { updateAuthState } = useContext(AuthContext);
     const [loading, setLoading] = useState(true);
@@ -120,14 +124,14 @@ const EditProfile = () => {
                 setPreviewUrl(profile.profile_picture);
                 setLoadError(null);
             } catch (err) {
-                setLoadError('Error al cargar el perfil');
+                setLoadError(t('edit.loadError'));
             } finally {
                 setLoading(false);
             }
         };
 
         fetchProfile();
-    }, [reset]);
+    }, [reset, t]);
 
     const addInterestFromValue = (value) => {
         if (interests.length >= MAX_INTERESTS) return;
@@ -215,7 +219,7 @@ const EditProfile = () => {
             const { generalError: parsed } = applyApiErrorsToForm(
                 err,
                 setError,
-                'Error al actualizar el perfil',
+                t('edit.updateError'),
             );
             if (parsed) {
                 setGeneralError(parsed);
@@ -253,7 +257,7 @@ const EditProfile = () => {
                         mb: 3,
                     }}
                 >
-                    Editar perfil
+                    {t('edit.title')}
                 </Typography>
 
                 {generalError && (
@@ -271,7 +275,7 @@ const EditProfile = () => {
                             sx={{ mb: 2 }}
                         />
                         <Button variant="outlined" component="label">
-                            Cambiar foto de perfil
+                            {t('edit.changePhoto')}
                             <input
                                 type="file"
                                 hidden
@@ -282,7 +286,7 @@ const EditProfile = () => {
                     </Box>
 
                     <TextField
-                        label="Nombre de usuario"
+                        label={t('edit.username')}
                         {...bindMuiRhfField(register('username'), username)}
                         fullWidth
                         disabled={!canEditUsername}
@@ -290,24 +294,22 @@ const EditProfile = () => {
                         helperText={
                             errors.username?.message ||
                             (canEditUsername
-                                ? remainingUsernameChanges === 2
-                                    ? 'Puedes cambiar tu nombre de usuario hasta 2 veces. Te quedan 2 cambios.'
-                                    : `Puedes cambiar tu nombre de usuario hasta 2 veces. Te queda ${remainingUsernameChanges} cambio.`
-                                : 'Ya no puedes cambiar tu nombre de usuario.')
+                                ? t('edit.usernameChanges', { count: remainingUsernameChanges })
+                                : t('edit.usernameLocked'))
                         }
                         sx={{ mb: 3 }}
                         autoComplete="username"
                     />
 
                     <TextField
-                        label="Sitio web o enlace externo"
+                        label={t('edit.website')}
                         {...bindMuiRhfField(register('external_url'), externalUrl)}
                         fullWidth
-                        placeholder="https://tu-sitio-web.com"
+                        placeholder={t('edit.websitePlaceholder')}
                         error={!!errors.external_url}
                         helperText={
                             errors.external_url?.message ||
-                            'Comparte tu sitio web, blog, portafolio o cualquier enlace relevante'
+                            t('edit.websiteHelper')
                         }
                         InputProps={{
                             startAdornment: (
@@ -321,20 +323,23 @@ const EditProfile = () => {
 
                     <Box>
                         <TextField
-                            label="Intereses"
+                            label={t('edit.interests')}
                             value={interestInput}
                             onChange={handleInterestInputChange}
                             onKeyDown={handleInterestInputKeyDown}
                             fullWidth
                             placeholder={
                                 interests.length === 0
-                                    ? 'Escribe un interés y presiona Enter o coma (,) para agregar'
-                                    : 'Escribe otro interés...'
+                                    ? t('edit.interestPlaceholderEmpty')
+                                    : t('edit.interestPlaceholderMore')
                             }
                             helperText={
                                 interests.length >= MAX_INTERESTS
-                                    ? `Límite alcanzado (${MAX_INTERESTS} intereses)`
-                                    : `${interests.length}/${MAX_INTERESTS} intereses. Escribe y presiona Enter o coma (,) para agregar`
+                                    ? t('edit.interestsLimit', { max: MAX_INTERESTS })
+                                    : t('edit.interestsHelper', {
+                                          current: interests.length,
+                                          max: MAX_INTERESTS,
+                                      })
                             }
                             disabled={interests.length >= MAX_INTERESTS || isSubmitting}
                             InputProps={{
@@ -364,13 +369,13 @@ const EditProfile = () => {
                         />
                         {interests.length > 0 && (
                             <FormHelperText sx={{ mt: -1, mb: 2, color: 'text.secondary', fontSize: '0.75rem' }}>
-                                Tip: Escribe y presiona Enter o coma (,) para crear un tag. Presiona la X en un tag para eliminarlo.
+                                {t('edit.interestTip')}
                             </FormHelperText>
                         )}
                     </Box>
 
                     <TextField
-                        label="Sobre ti"
+                        label={t('edit.about')}
                         {...(() => {
                             const field = bindMuiRhfField(
                                 register('profile_description'),
@@ -387,7 +392,7 @@ const EditProfile = () => {
                         multiline
                         rows={5}
                         fullWidth
-                        placeholder="Cuéntanos quién eres, qué te apasiona y qué aportas a la comunidad. Sé auténtico y comparte lo que te hace único en el mundo de la tecnología y blockchain."
+                        placeholder={t('edit.aboutPlaceholder')}
                         error={!!errors.profile_description}
                         helperText={
                             errors.profile_description?.message || (
@@ -395,13 +400,13 @@ const EditProfile = () => {
                                     component="span"
                                     sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}
                                 >
-                                    <span>Comparte tu historia y conecta con otros miembros de la comunidad</span>
+                                    <span>{t('edit.aboutHelper')}</span>
                                     <span
                                         style={{
                                             fontWeight: remainingChars < 50 ? 600 : 400,
                                         }}
                                     >
-                                        {remainingChars} caracteres restantes
+                                        {t('edit.charsRemaining', { remaining: remainingChars })}
                                     </span>
                                 </Box>
                             )
@@ -426,10 +431,10 @@ const EditProfile = () => {
                             variant="outlined"
                             disabled={isSubmitting}
                         >
-                            Cancelar
+                            {t('edit.cancel')}
                         </Button>
                         <Button type="submit" variant="contained" disabled={isSubmitting}>
-                            {isSubmitting ? 'Guardando...' : 'Guardar cambios'}
+                            {isSubmitting ? t('edit.submitting') : t('edit.save')}
                         </Button>
                     </Box>
                 </form>

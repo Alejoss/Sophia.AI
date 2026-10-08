@@ -27,12 +27,14 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
+import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import LibrarySelectMultiple from './LibrarySelectMultiple';
 
 const DEFAULT_PAGE_SIZE = 24;
 
 const CollectionEditContent = () => {
+  const { t } = useTranslation('content');
   const { collectionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -74,13 +76,13 @@ const CollectionEditContent = () => {
         setMetaReady(true);
       } catch (err) {
         console.error('Error fetching collection data:', err);
-        setError('Error al obtener los datos de la colección');
+        setError(t('collectionEdit.loadError'));
         setLoading(false);
       }
     };
 
     fetchCollectionMeta();
-  }, [collectionId, navigate, location.state]);
+  }, [collectionId, navigate, location.state, t]);
 
   const loadContentPage = useCallback(async () => {
     if (!metaReady) return;
@@ -102,11 +104,11 @@ const CollectionEditContent = () => {
       );
     } catch (err) {
       console.error('Error fetching collection content:', err);
-      setError('Error al obtener los datos de la colección');
+      setError(t('collectionEdit.loadError'));
     } finally {
       setLoading(false);
     }
-  }, [collectionId, metaReady, page, rowsPerPage]);
+  }, [collectionId, metaReady, page, rowsPerPage, t]);
 
   useEffect(() => {
     loadContentPage();
@@ -134,7 +136,7 @@ const CollectionEditContent = () => {
       setSaving(false);
     } catch (err) {
       console.error('Error removing content:', err);
-      setError('Error al eliminar contenido de la colección');
+      setError(t('collectionEdit.removeError'));
       setSaving(false);
     }
   };
@@ -166,7 +168,7 @@ const CollectionEditContent = () => {
       );
     } catch (error) {
       console.error('Error adding content:', error);
-      setError('Error al agregar contenido a la colección');
+      setError(t('collectionEdit.addError'));
       setSaving(false);
     }
   };
@@ -183,7 +185,7 @@ const CollectionEditContent = () => {
 
   const handleSaveName = async () => {
     if (!tempCollectionName.trim()) {
-      setError('El nombre de la colección no puede estar vacío');
+      setError(t('collectionEdit.nameEmpty'));
       return;
     }
 
@@ -197,7 +199,7 @@ const CollectionEditContent = () => {
       setSavingName(false);
     } catch (err) {
       console.error('Error updating collection name:', err);
-      setError('Error al actualizar el nombre de la colección');
+      setError(t('collectionEdit.nameUpdateError'));
       setSavingName(false);
     }
   };
@@ -215,7 +217,7 @@ const CollectionEditContent = () => {
   const handleSaveDescription = async () => {
     const next = (tempDescription || '').trim();
     if (next.length > 300) {
-      setError('La descripción no debe exceder 300 caracteres');
+      setError(t('collectionEdit.descriptionMax'));
       return;
     }
 
@@ -230,7 +232,7 @@ const CollectionEditContent = () => {
       setSavingDescription(false);
     } catch (err) {
       console.error('Error updating collection description:', err);
-      setError('Error al actualizar la descripción de la colección');
+      setError(t('collectionEdit.descriptionUpdateError'));
       setSavingDescription(false);
     }
   };
@@ -244,7 +246,7 @@ const CollectionEditContent = () => {
       setIsPublic(!!updated.is_public);
     } catch (err) {
       console.error('Error updating collection visibility:', err);
-      setError('No se pudo actualizar la visibilidad de la colección');
+      setError(t('collectionEdit.visibilityError'));
     } finally {
       setSavingPrivacy(false);
     }
@@ -256,7 +258,7 @@ const CollectionEditContent = () => {
   };
 
   if (loading && collectionData.length === 0 && !error) {
-    return <Typography>Cargando contenido de la colección...</Typography>;
+    return <Typography>{t('collections.loadingContent')}</Typography>;
   }
   if (error && !metaReady) {
     return <Alert severity="error">{error}</Alert>;
@@ -265,8 +267,8 @@ const CollectionEditContent = () => {
   if (showAddContent) {
     return (
       <LibrarySelectMultiple
-        title="Agregar contenido a la colección"
-        description="Selecciona contenido de tu biblioteca para agregar a esta colección"
+        title={t('collectionEdit.addTitle')}
+        description={t('collectionEdit.addDescription')}
         onCancel={handleCancelAdd}
         onSave={handleSaveAdd}
         filterFunction={filterContent}
@@ -327,7 +329,7 @@ const CollectionEditContent = () => {
             onClick={() => setShowAddContent(true)}
             sx={{ ml: 'auto' }}
           >
-            Agregar contenido de tu biblioteca
+            {t('collectionEdit.addFromLibrary')}
           </Button>
         </Box>
 
@@ -341,7 +343,7 @@ const CollectionEditContent = () => {
           {editingDescription ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <TextField
-                label="Descripción corta"
+                label={t('collectionEdit.shortDescription')}
                 value={tempDescription}
                 onChange={(e) => setTempDescription(e.target.value)}
                 multiline
@@ -378,7 +380,7 @@ const CollectionEditContent = () => {
                 color={collectionDescription ? 'text.secondary' : 'text.disabled'}
                 sx={{ flexGrow: 1 }}
               >
-                {collectionDescription || 'Sin descripción. Añade una descripción corta.'}
+                {collectionDescription || t('collectionEdit.noDescription')}
               </Typography>
               <IconButton onClick={handleStartEditDescription} size="small">
                 <EditIcon fontSize="small" />
@@ -400,11 +402,10 @@ const CollectionEditContent = () => {
             label={
               <Box>
                 <Typography variant="body2" component="span" display="block">
-                  Colección pública
+                  {t('collectionEdit.public')}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block">
-                  Visible en la biblioteca para otros usuarios (solo ítems con visibilidad en
-                  búsqueda).
+                  {t('collectionEdit.publicHelp')}
                 </Typography>
               </Box>
             }
@@ -414,28 +415,28 @@ const CollectionEditContent = () => {
         <Divider sx={{ my: 3 }} />
 
         <Typography variant="h6" sx={{ mb: 2 }}>
-          Contenido en la colección ({totalCount})
+          {t('collectionEdit.inCollection', { value: totalCount })}
         </Typography>
 
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Título</TableCell>
-                <TableCell>Tipo</TableCell>
-                <TableCell>Autor</TableCell>
-                <TableCell>Ver</TableCell>
-                <TableCell>Acciones</TableCell>
+                <TableCell>{t('common.title')}</TableCell>
+                <TableCell>{t('common.type')}</TableCell>
+                <TableCell>{t('common.author')}</TableCell>
+                <TableCell>{t('actions.view')}</TableCell>
+                <TableCell>{t('common.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {collectionData.map((content) => (
                 <TableRow key={content.id} hover sx={{ cursor: 'pointer' }}>
-                  <TableCell>{content.title || 'Sin título'}</TableCell>
+                  <TableCell>{content.title || t('common.untitled')}</TableCell>
                   <TableCell>
                     <Chip label={content.content.media_type} size="small" color="primary" />
                   </TableCell>
-                  <TableCell>{content.author || 'Desconocido'}</TableCell>
+                  <TableCell>{content.author || t('common.unknownAuthor')}</TableCell>
                   <TableCell>
                     <MuiLink
                       href={`/content/${content.content.id}`}
@@ -452,7 +453,7 @@ const CollectionEditContent = () => {
                         },
                       }}
                     >
-                      Ver
+                      {t('actions.view')}
                       <OpenInNewIcon fontSize="small" />
                     </MuiLink>
                   </TableCell>
@@ -464,7 +465,7 @@ const CollectionEditContent = () => {
                       onClick={() => handleContentRemove(content.id)}
                       disabled={saving}
                     >
-                      Eliminar
+                      {t('actions.remove')}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -472,7 +473,7 @@ const CollectionEditContent = () => {
               {collectionData.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} align="center">
-                    No hay contenido en esta colección
+                    {t('collectionEdit.empty')}
                   </TableCell>
                 </TableRow>
               )}
@@ -489,9 +490,11 @@ const CollectionEditContent = () => {
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={handleChangeRowsPerPage}
             rowsPerPageOptions={[24, 48, 96]}
-            labelRowsPerPage="Por página"
+            labelRowsPerPage={t('pagination.perPage')}
             labelDisplayedRows={({ from, to, count }) =>
-              `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`
+              count !== -1
+                ? t('pagination.range', { from, to, total: count })
+                : t('pagination.rangeMore', { from, to })
             }
             sx={{ mt: 1, borderTop: 1, borderColor: 'divider' }}
           />
