@@ -8,7 +8,9 @@ import { getUserProfile, getProfileById, getNotifications, markNotificationAsRea
 import { useNotifications } from '../context/NotificationsContext.jsx';
 import ProfileHeader from './ProfileHeader';
 import ProfileHeaderSkeleton from '../components/ProfileHeaderSkeleton';
-import ProfileVerticalNavigation from './ProfileVerticalNavigation';
+import ProfileVerticalNavigation, {
+    SHOW_FAVORITE_CRYPTOS_SECTION,
+} from './ProfileVerticalNavigation';
 import PublicationList from '../publications/PublicationList';
 import Notifications from './Notifications';
 import UserEvents from '../events/UserEvents';
@@ -332,12 +334,17 @@ const Profile = () => {
                 'events': 'events',
                 'certificates': 'certificates',
                 'saved-items': 'saved-items',
-                'cryptos': 'cryptos',
+                ...(SHOW_FAVORITE_CRYPTOS_SECTION ? { cryptos: 'cryptos' } : {}),
                 'tokens': 'tokens',
                 'badges': 'badges',
                 'notifications': 'notifications',
                 'security': 'security',
             };
+            if (sectionParam === 'cryptos' && !SHOW_FAVORITE_CRYPTOS_SECTION) {
+                setActiveSection('publications');
+                updateProfileSectionUrl('publications');
+                return;
+            }
             if (sectionMap[sectionParam]) {
                 setActiveSection(sectionMap[sectionParam]);
             }
@@ -460,6 +467,9 @@ const Profile = () => {
             case 'saved-items':
                 return isOwnProfile ? <Bookmarks /> : null;
             case 'cryptos':
+                if (!SHOW_FAVORITE_CRYPTOS_SECTION) {
+                    return null;
+                }
                 return <FavoriteCryptos isOwnProfile={isOwnProfile} userId={profile?.user?.id} />;
             case 'tokens':
                 return isOwnProfile ? (

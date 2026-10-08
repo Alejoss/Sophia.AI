@@ -194,7 +194,10 @@ const FavoriteCryptos = ({ isOwnProfile = false, userId = null }) => {
 
       {isOwnProfile && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          Por razones legales, todavía no podemos activar los pagos en cripto.
+          Por el momento no usamos pagos con casi ninguna de las criptomonedas
+          populares. Aceptamos Bitcoin Cash de forma preferente y sin terceros
+          involucrados. También aceptamos Monero: para pagar con Monero, envíanos
+          un mensaje privado desde la plataforma.
         </Alert>
       )}
 
