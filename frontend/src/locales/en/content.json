@@ -450,7 +450,17 @@
     "searching": "Looking for a transcript…",
     "available": "Transcript available",
     "continuous": "Continuous text",
-    "view": "View transcript"
+    "view": "View transcript",
+    "generateTitle": "No transcript yet",
+    "generateBody": "Pay ${{price}} to generate a transcript. It will be public for everyone and, once indexed, available in Consultas for topics that include this file.",
+    "generateCta": "Generate transcript for ${{price}}",
+    "checkoutTitle": "Generate a public transcript",
+    "continuePayment": "Continue payment",
+    "generating": "Transcript is being generated",
+    "generatingBody": "Payment received. The transcript will appear here for everyone and will be indexed for Consultas.",
+    "awaitingOther": "Someone is already paying to generate this transcript.",
+    "loginToGenerate": "Sign in to generate the transcript",
+    "startError": "Could not start transcript generation."
   },
   "transcript": {
     "missing": "This content does not have a transcript yet.",

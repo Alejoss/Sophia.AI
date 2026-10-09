@@ -499,6 +499,8 @@ def _fulfill_if_needed(crypto_payment: CryptoPayment) -> None:
         _mark_token_purchase_paid_if_needed(crypto_payment)
     elif crypto_payment.course_purchase_id:
         _mark_course_purchase_paid_if_needed(crypto_payment)
+    elif crypto_payment.transcript_generation_id:
+        _mark_transcript_generation_paid_if_needed(crypto_payment)
 
 
 def sync_payment_from_provider(crypto_payment: CryptoPayment, payload: dict) -> CryptoPayment:
@@ -549,6 +551,7 @@ def nowpayments_queryset(
     path_purchase=None,
     token_purchase=None,
     course_purchase=None,
+    transcript_generation=None,
 ):
     if anchor_request is not None:
         return CryptoPayment.objects.filter(anchor_request=anchor_request)
@@ -558,6 +561,8 @@ def nowpayments_queryset(
         return CryptoPayment.objects.filter(token_purchase=token_purchase)
     if course_purchase is not None:
         return CryptoPayment.objects.filter(course_purchase=course_purchase)
+    if transcript_generation is not None:
+        return CryptoPayment.objects.filter(transcript_generation=transcript_generation)
     return CryptoPayment.objects.none()
 
 
@@ -567,12 +572,14 @@ def has_in_flight_nowpayments(
     path_purchase=None,
     token_purchase=None,
     course_purchase=None,
+    transcript_generation=None,
 ) -> bool:
     return nowpayments_queryset(
         anchor_request=anchor_request,
         path_purchase=path_purchase,
         token_purchase=token_purchase,
         course_purchase=course_purchase,
+        transcript_generation=transcript_generation,
     ).filter(payment_status__in=IN_FLIGHT_NOWPAYMENTS_STATUSES).exists()
 
 
@@ -582,6 +589,7 @@ def abandon_waiting_nowpayments(
     path_purchase=None,
     token_purchase=None,
     course_purchase=None,
+    transcript_generation=None,
 ) -> int:
     """Mark unused hosted invoices expired so the user can switch to BCH."""
     return nowpayments_queryset(
@@ -589,6 +597,7 @@ def abandon_waiting_nowpayments(
         path_purchase=path_purchase,
         token_purchase=token_purchase,
         course_purchase=course_purchase,
+        transcript_generation=transcript_generation,
     ).filter(payment_status__in=SWITCHABLE_NOWPAYMENTS_STATUSES).update(
         payment_status='expired',
     )
@@ -601,6 +610,7 @@ def _abandon_pending_payphone_for_now(
     anchor_request=None,
     token_purchase=None,
     course_purchase=None,
+    transcript_generation=None,
 ) -> None:
     """Drop unused Payphone button orders when starting a NOWPayments invoice."""
     from payments.payphone_services import abandon_pending_payphone
@@ -611,6 +621,7 @@ def _abandon_pending_payphone_for_now(
         anchor_request=anchor_request,
         token_purchase=token_purchase,
         course_purchase=course_purchase,
+        transcript_generation=transcript_generation,
     )
 
 
@@ -1092,3 +1103,183 @@ def create_token_purchase_payment(*, token_purchase: TokenPurchase, user, pay_cu
             provider_payload=stored_payload,
         )
     return crypto_payment
+
+
+def _mark_transcript_generation_paid_if_needed(crypto_payment: CryptoPayment) -> None:
+    from content.models import TranscriptGenerationRequest
+    from content.transcript_generation import mark_generation_request_paid
+
+    req = mark_generation_request_paid(
+        TranscriptGenerationRequest.objects.get(pk=crypto_payment.transcript_generation_id),
+        source='nowpayments',
+    )
+    try:
+        on_crypto_payment_completed(crypto_payment)
+    except Exception as exc:
+        logger.error(
+            'on_crypto_payment_completed failed for transcript_generation %s: %s',
+            req.id,
+            exc,
+            exc_info=True,
+        )
+
+
+def create_transcript_generation_payment(
+    *,
+    transcript_generation,
+    user,
+    pay_currency=None,
+) -> CryptoPayment:
+    from django.conf import settings
+
+    from content.models import TranscriptGenerationRequest
+
+    if transcript_generation.requester_id != user.id:
+        raise PermissionError('Solo quien solicitó la transcripción puede iniciar el pago.')
+    if transcript_generation.status == TranscriptGenerationRequest.STATUS_QUEUED:
+        raise ValueError('Esta transcripción ya está pagada y en cola.')
+    if transcript_generation.status == TranscriptGenerationRequest.STATUS_COMPLETED:
+        raise ValueError('Esta transcripción ya fue generada.')
+    if transcript_generation.status == TranscriptGenerationRequest.STATUS_CANCELLED:
+        raise ValueError('Esta solicitud fue cancelada.')
+
+    client = NOWPaymentsClient()
+    if not client.configured:
+        raise NOWPaymentsError('La pasarela de pagos no está configurada en el servidor.')
+
+    reused = _reuse_or_refresh_open_payment(
+        CryptoPayment.objects.filter(transcript_generation=transcript_generation)
+    )
+    if reused:
+        return reused
+
+    _abandon_pending_payphone_for_now(transcript_generation=transcript_generation)
+
+    order_id = f'transcript-gen-{transcript_generation.id}-{uuid.uuid4().hex[:12]}'
+    ipn_url = f'{_public_base_url()}/api/payments/ipn/'
+    frontend_base = getattr(settings, 'FRONTEND_PUBLIC_URL', 'http://localhost:5173').rstrip('/')
+    content_url = f'{frontend_base}/content/{transcript_generation.content_id}'
+
+    order_description = prepare_text_for_db(
+        'Generar transcripción pública'
+    )[:120]
+    price_amount = float(
+        transcript_generation.price_amount
+        or getattr(settings, 'TRANSCRIPT_GENERATION_PRICE_USD', 1)
+    )
+    payload = client.create_invoice(
+        price_amount=price_amount,
+        price_currency='usd',
+        order_id=order_id,
+        order_description=order_description,
+        ipn_callback_url=ipn_url,
+        success_url=content_url,
+        cancel_url=content_url,
+    )
+
+    invoice_url = payload.get('invoice_url') or ''
+    if not invoice_url:
+        raise NOWPaymentsError('NOWPayments no devolvió invoice_url.')
+
+    logger.info(
+        'NOWPayments invoice created order=%s transcript_generation=%s invoice_id=%s',
+        order_id,
+        transcript_generation.id,
+        payload.get('id'),
+    )
+
+    stored_payload = prepare_json_for_db(payload)
+    if payload.get('id') is not None and not stored_payload.get('invoice_id'):
+        stored_payload['invoice_id'] = payload.get('id')
+
+    with transaction.atomic():
+        crypto_payment = CryptoPayment.objects.create(
+            transcript_generation=transcript_generation,
+            order_id=order_id,
+            nowpayments_payment_id=payload.get('id'),
+            pay_currency=(pay_currency or '').lower().strip(),
+            price_amount=price_amount,
+            price_currency='usd',
+            payment_status='waiting',
+            invoice_url=invoice_url,
+            provider_payload=stored_payload,
+        )
+    return crypto_payment
+
+
+def pay_transcript_generation_with_tokens(*, transcript_generation, user):
+    """Debit platform tokens and queue transcript generation. Idempotent."""
+    from django.conf import settings
+    from django.utils import timezone as dj_tz
+
+    from content.models import TranscriptGenerationRequest
+    from content.transcript_generation import mark_generation_request_paid
+    from payments.models import BchDirectPayment
+    from payments.token_ledger import debit_platform_tokens
+    from payments.token_pricing import tokens_required_for_usd
+
+    if transcript_generation.requester_id != user.id:
+        raise PermissionError('Solo quien solicitó la transcripción puede pagar con tokens.')
+    if transcript_generation.status in (
+        TranscriptGenerationRequest.STATUS_QUEUED,
+        TranscriptGenerationRequest.STATUS_COMPLETED,
+    ):
+        return transcript_generation
+    if transcript_generation.status == TranscriptGenerationRequest.STATUS_CANCELLED:
+        raise ValueError('Esta solicitud fue cancelada.')
+    if transcript_generation.status != TranscriptGenerationRequest.STATUS_PENDING_PAYMENT:
+        raise ValueError('Esta solicitud no está pendiente de pago.')
+
+    price_usd = float(
+        transcript_generation.price_amount
+        or getattr(settings, 'TRANSCRIPT_GENERATION_PRICE_USD', 1)
+    )
+    tokens_needed = tokens_required_for_usd(price_usd)
+
+    with transaction.atomic():
+        req = TranscriptGenerationRequest.objects.select_for_update().get(pk=transcript_generation.pk)
+        if req.status in (
+            TranscriptGenerationRequest.STATUS_QUEUED,
+            TranscriptGenerationRequest.STATUS_COMPLETED,
+        ):
+            return req
+        if req.status != TranscriptGenerationRequest.STATUS_PENDING_PAYMENT:
+            raise ValueError('Esta solicitud no está pendiente de pago.')
+
+        if has_in_flight_nowpayments(transcript_generation=req):
+            raise ValueError(
+                'Hay un pago NOWPayments en confirmación. Espera a que termine o expire.'
+            )
+        abandon_waiting_nowpayments(transcript_generation=req)
+
+        from payments.payphone_services import abandon_pending_payphone, has_pending_payphone
+        if has_pending_payphone(transcript_generation=req):
+            abandon_pending_payphone(transcript_generation=req)
+
+        pending_bch = BchDirectPayment.objects.filter(
+            transcript_generation=req,
+            status=BchDirectPayment.STATUS_PENDING,
+            expires_at__gt=dj_tz.now(),
+        ).exists()
+        if pending_bch:
+            raise ValueError(
+                'Hay una orden BCH pendiente. Verifícala o espera a que expire '
+                'antes de pagar con tokens.'
+            )
+
+        debit_platform_tokens(
+            user=user,
+            amount=tokens_needed,
+            reason=TokenLedgerEntry.REASON_SPEND,
+            transcript_generation=req,
+        )
+        req.status = TranscriptGenerationRequest.STATUS_QUEUED
+        req.save(update_fields=['status', 'updated_at'])
+
+    logger.info(
+        'Transcript generation %s paid with tokens (tokens=%s user=%s)',
+        req.pk,
+        tokens_needed,
+        user.pk,
+    )
+    return mark_generation_request_paid(req, source='tokens')

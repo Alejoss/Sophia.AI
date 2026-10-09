@@ -450,7 +450,17 @@
     "searching": "Buscando transcripción…",
     "available": "Transcripción disponible",
     "continuous": "Texto continuo",
-    "view": "Ver transcripción"
+    "view": "Ver transcripción",
+    "generateTitle": "Aún no hay transcripción",
+    "generateBody": "Paga ${{price}} para generar la transcripción. Quedará pública para todos y, al indexarse, disponible en Consultas de los temas que incluyen este archivo.",
+    "generateCta": "Generar transcripción por ${{price}}",
+    "checkoutTitle": "Generar transcripción pública",
+    "continuePayment": "Continuar el pago",
+    "generating": "La transcripción se está generando",
+    "generatingBody": "Pago recibido. La transcripción aparecerá aquí para todos y se indexará para Consultas.",
+    "awaitingOther": "Alguien ya está pagando la generación de esta transcripción.",
+    "loginToGenerate": "Inicia sesión para generar la transcripción",
+    "startError": "No se pudo iniciar la generación de la transcripción."
   },
   "transcript": {
     "missing": "Este contenido aún no tiene transcripción.",

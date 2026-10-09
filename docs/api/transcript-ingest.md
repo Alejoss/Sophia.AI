@@ -61,6 +61,7 @@ Lists VIDEO/AUDIO/TEXT contents for the worker.
 |-------|------|---------|-------------|
 | `topic_id` | int | — | Only contents linked to this topic. Unknown id → **404**. |
 | `include_completed` | bool | `false` | If `true`/`1`/`yes`/`on`, also return items that already have a transcript (for local reconciliation). Default queue = pending only. |
+| `funded_only` | bool | `false` | If `true`, only content with a **paid** transcript-generation request (`status=queued`). |
 | `media_type` | string | — | `VIDEO`, `AUDIO`, or `TEXT` |
 | `content_id` | int | — | Single content filter |
 | `limit` | int | `100` | Page size (max `500`) |
@@ -106,6 +107,7 @@ Lists VIDEO/AUDIO/TEXT contents for the worker.
 | `file_size` | Bytes when known (plan audio-only vs full video) |
 | `has_spanish_subtitles` / `has_spanish_dubbing` | Accessibility flags from upload (not proof a `ContentTranscript` exists) |
 | `has_transcript` | Whether Django already stores a transcript |
+| `generation_funded` | `true` when a buyer has paid and the item is queued. Funded rows are ordered first. |
 
 `file_key` is the storage key only (e.g. `content/video/...`). There is **no** pre-signed URL in this API.
 

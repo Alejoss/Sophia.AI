@@ -94,6 +94,7 @@ from .views_social_preview import (
     SiteSocialPreviewView,
     TopicSocialPreviewView,
 )
+from .views_transcript_generation import ContentTranscriptGenerationView
 from .views_transcript_ingest import (
     ContentTranscriptIngestQueueView,
     ContentTranscriptIngestDetailView,
@@ -163,6 +164,11 @@ urlpatterns = [
         'content_details/<int:content_id>/transcript/',
         ContentTranscriptPublicView.as_view(),
         name='content-transcript',
+    ),
+    path(
+        'content_details/<int:content_id>/transcript/generation/',
+        ContentTranscriptGenerationView.as_view(),
+        name='content-transcript-generation',
     ),
     path(
         'content_details/<int:content_id>/transcript/anchor/',

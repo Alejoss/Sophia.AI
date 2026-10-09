@@ -1,6 +1,13 @@
 from django.urls import path
 
 from payments import views
+from payments.views_transcript_generation import (
+    TranscriptGenerationBchPaymentView,
+    TranscriptGenerationBchVerifyView,
+    TranscriptGenerationPaymentView,
+    TranscriptGenerationPaymentsListView,
+    TranscriptGenerationTokenPaymentView,
+)
 
 urlpatterns = [
     path('status/', views.PaymentGatewayStatusView.as_view(), name='payment-gateway-status'),
@@ -27,6 +34,31 @@ urlpatterns = [
     path('anchor-request/<int:request_id>/bch/', views.AnchorRequestBchPaymentView.as_view(), name='anchor-request-bch'),
     path('anchor-request/<int:request_id>/bch/verify/', views.AnchorRequestBchVerifyView.as_view(), name='anchor-request-bch-verify'),
     path('anchor-request/<int:request_id>/tokens/', views.AnchorRequestTokenPaymentView.as_view(), name='anchor-request-tokens'),
+    path(
+        'transcript-generation/<int:request_id>/',
+        TranscriptGenerationPaymentView.as_view(),
+        name='transcript-generation-payment-create',
+    ),
+    path(
+        'transcript-generation/<int:request_id>/list/',
+        TranscriptGenerationPaymentsListView.as_view(),
+        name='transcript-generation-payments-list',
+    ),
+    path(
+        'transcript-generation/<int:request_id>/bch/',
+        TranscriptGenerationBchPaymentView.as_view(),
+        name='transcript-generation-bch',
+    ),
+    path(
+        'transcript-generation/<int:request_id>/bch/verify/',
+        TranscriptGenerationBchVerifyView.as_view(),
+        name='transcript-generation-bch-verify',
+    ),
+    path(
+        'transcript-generation/<int:request_id>/tokens/',
+        TranscriptGenerationTokenPaymentView.as_view(),
+        name='transcript-generation-tokens',
+    ),
     path('path-purchase/<int:purchase_id>/bch/', views.PathPurchaseBchPaymentView.as_view(), name='path-purchase-bch'),
     path('path-purchase/<int:purchase_id>/bch/verify/', views.PathPurchaseBchVerifyView.as_view(), name='path-purchase-bch-verify'),
     path('topic-purchase/<int:purchase_id>/bch/', views.TopicPurchaseBchPaymentView.as_view(), name='topic-purchase-bch'),

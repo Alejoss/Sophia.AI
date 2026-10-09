@@ -60,6 +60,13 @@ class CryptoPayment(models.Model):
         null=True,
         blank=True,
     )
+    transcript_generation = models.ForeignKey(
+        'content.TranscriptGenerationRequest',
+        on_delete=models.CASCADE,
+        related_name='crypto_payments',
+        null=True,
+        blank=True,
+    )
     order_id = models.CharField(max_length=128, unique=True)
     nowpayments_payment_id = models.BigIntegerField(null=True, blank=True, db_index=True)
     pay_currency = models.CharField(max_length=16, blank=True, default='')
@@ -85,6 +92,7 @@ class CryptoPayment(models.Model):
                         anchor_request__isnull=True,
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
@@ -92,6 +100,7 @@ class CryptoPayment(models.Model):
                         anchor_request__isnull=True,
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
@@ -99,6 +108,7 @@ class CryptoPayment(models.Model):
                         anchor_request__isnull=False,
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
@@ -106,6 +116,7 @@ class CryptoPayment(models.Model):
                         anchor_request__isnull=True,
                         token_purchase__isnull=False,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
@@ -113,6 +124,15 @@ class CryptoPayment(models.Model):
                         anchor_request__isnull=True,
                         token_purchase__isnull=True,
                         course_purchase__isnull=False,
+                        transcript_generation__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=True,
+                        transcript_generation__isnull=False,
                     )
                 ),
                 name='cryptopayment_exactly_one_target',
@@ -140,6 +160,8 @@ class CryptoPayment(models.Model):
             return self.token_purchase.user
         if self.course_purchase_id:
             return self.course_purchase.user
+        if self.transcript_generation_id:
+            return self.transcript_generation.requester
         return None
 
 
@@ -304,6 +326,13 @@ class BchDirectPayment(models.Model):
         null=True,
         blank=True,
     )
+    transcript_generation = models.ForeignKey(
+        'content.TranscriptGenerationRequest',
+        on_delete=models.CASCADE,
+        related_name='bch_direct_payments',
+        null=True,
+        blank=True,
+    )
     address = models.CharField(max_length=128)
     expected_amount_sats = models.BigIntegerField(
         help_text='Target amount in satoshis; verify allows BCH_AMOUNT_TOLERANCE_USD variance.',
@@ -342,6 +371,7 @@ class BchDirectPayment(models.Model):
                         topic_purchase__isnull=True,
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
@@ -349,6 +379,7 @@ class BchDirectPayment(models.Model):
                         topic_purchase__isnull=True,
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
@@ -356,6 +387,7 @@ class BchDirectPayment(models.Model):
                         topic_purchase__isnull=False,
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
@@ -363,6 +395,7 @@ class BchDirectPayment(models.Model):
                         topic_purchase__isnull=True,
                         token_purchase__isnull=False,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
@@ -370,6 +403,15 @@ class BchDirectPayment(models.Model):
                         topic_purchase__isnull=True,
                         token_purchase__isnull=True,
                         course_purchase__isnull=False,
+                        transcript_generation__isnull=True,
+                    )
+                    | Q(
+                        anchor_request__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=True,
+                        transcript_generation__isnull=False,
                     )
                 ),
                 name='bchdirectpayment_exactly_one_target',
@@ -403,6 +445,8 @@ class BchDirectPayment(models.Model):
             return self.token_purchase.user
         if self.course_purchase_id:
             return self.course_purchase.user
+        if self.transcript_generation_id:
+            return self.transcript_generation.requester
         return None
 
     def mark_expired_if_needed(self):
@@ -470,6 +514,13 @@ class PayphonePayment(models.Model):
         null=True,
         blank=True,
     )
+    transcript_generation = models.ForeignKey(
+        'content.TranscriptGenerationRequest',
+        on_delete=models.CASCADE,
+        related_name='payphone_payments',
+        null=True,
+        blank=True,
+    )
     client_transaction_id = models.CharField(max_length=64, unique=True)
     payphone_payment_id = models.CharField(max_length=64, blank=True, default='', db_index=True)
     transaction_id = models.BigIntegerField(null=True, blank=True, db_index=True)
@@ -506,6 +557,7 @@ class PayphonePayment(models.Model):
                         anchor_request__isnull=True,
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
@@ -514,6 +566,7 @@ class PayphonePayment(models.Model):
                         anchor_request__isnull=True,
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
@@ -522,6 +575,7 @@ class PayphonePayment(models.Model):
                         anchor_request__isnull=True,
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
@@ -530,6 +584,7 @@ class PayphonePayment(models.Model):
                         anchor_request__isnull=False,
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
@@ -538,6 +593,7 @@ class PayphonePayment(models.Model):
                         anchor_request__isnull=True,
                         token_purchase__isnull=False,
                         course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
                     )
                     | Q(
                         event_registration__isnull=True,
@@ -546,6 +602,16 @@ class PayphonePayment(models.Model):
                         anchor_request__isnull=True,
                         token_purchase__isnull=True,
                         course_purchase__isnull=False,
+                        transcript_generation__isnull=True,
+                    )
+                    | Q(
+                        event_registration__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        anchor_request__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=True,
+                        transcript_generation__isnull=False,
                     )
                 ),
                 name='payphonepayment_exactly_one_target',
@@ -583,6 +649,8 @@ class PayphonePayment(models.Model):
             return self.token_purchase.user
         if self.course_purchase_id:
             return self.course_purchase.user
+        if self.transcript_generation_id:
+            return self.transcript_generation.requester
         return None
 
     def mark_expired_if_needed(self):
@@ -735,6 +803,14 @@ class TokenLedgerEntry(models.Model):
         related_name='token_ledger_entries',
         help_text='Set when reason=spend for a paid Bitcoin anchor request.',
     )
+    transcript_generation = models.ForeignKey(
+        'content.TranscriptGenerationRequest',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='token_ledger_entries',
+        help_text='Set when reason=spend for a paid transcript generation request.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -749,6 +825,11 @@ class TokenLedgerEntry(models.Model):
                 fields=['anchor_request'],
                 condition=Q(reason='spend') & Q(anchor_request__isnull=False),
                 name='unique_token_anchor_request_spend',
+            ),
+            models.UniqueConstraint(
+                fields=['transcript_generation'],
+                condition=Q(reason='spend') & Q(transcript_generation__isnull=False),
+                name='unique_token_transcript_generation_spend',
             ),
         ]
 

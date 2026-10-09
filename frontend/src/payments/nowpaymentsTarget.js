@@ -1,10 +1,12 @@
 import {
   createAnchorRequestPayment,
+  createTranscriptGenerationPayment,
   createPathPurchasePayment,
   createCoursePurchasePayment,
   createRegistrationPayment,
   createTokenPurchasePayment,
   listAnchorRequestPayments,
+  listTranscriptGenerationPayments,
   listPathPurchasePayments,
   listCoursePurchasePayments,
   listRegistrationPayments,
@@ -25,6 +27,10 @@ const NOWPAYMENTS_API_BY_KIND = {
   [PRODUCT_KINDS.ANCHOR]: {
     list: listAnchorRequestPayments,
     create: createAnchorRequestPayment,
+  },
+  [PRODUCT_KINDS.TRANSCRIPT_GENERATION]: {
+    list: listTranscriptGenerationPayments,
+    create: createTranscriptGenerationPayment,
   },
   [PRODUCT_KINDS.PATH]: {
     list: listPathPurchasePayments,

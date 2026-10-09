@@ -275,6 +275,21 @@ const contentApi = {
     }
   },
 
+  getTranscriptGeneration: async (contentId) => {
+    const response = await axiosInstance.get(
+      `/content/content_details/${contentId}/transcript/generation/`,
+    );
+    return response.data;
+  },
+
+  createTranscriptGeneration: async (contentId) => {
+    const response = await axiosInstance.post(
+      `/content/content_details/${contentId}/transcript/generation/`,
+      {},
+    );
+    return response.data;
+  },
+
   getContentTranscript: async (contentId, { summary = false } = {}) => {
     try {
       const response = await axiosInstance.get(

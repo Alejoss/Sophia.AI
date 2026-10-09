@@ -48,6 +48,13 @@
       "chooserTitle": "Choose how to pay",
       "paidSuccess": "Payment received! Your place in the course is confirmed."
     },
+    "transcript_generation": {
+      "productLabel": "transcript",
+      "chooserTitle": "Choose how to pay",
+      "defaultTitle": "Generate a public transcript",
+      "paidSuccess": "Payment received! The transcript is being generated and will be available to everyone.",
+      "tokenPaidSuccess": "Token payment received! The transcript is being generated and will be available to everyone."
+    },
     "token_package": {
       "productLabel": "token package",
       "chooserTitle": "Pay for token package"
@@ -57,14 +64,16 @@
     "payFor": "Payment for {{product}}",
     "header": {
       "path": "Path payment",
-      "anchor": "Send hash to Bitcoin"
+      "anchor": "Send hash to Bitcoin",
+      "transcript_generation": "Generate transcript"
     },
     "success": {
       "event": "Payment complete! Your registration is confirmed.",
       "path": "Payment complete! The path is now unlocked.",
       "anchor": "Payment complete! Publishing the SHA-256 hash on Bitcoin. Network confirmation usually takes about 10 minutes or more.",
       "token_package": "Payment complete! The tokens are now on your profile.",
-      "course": "Payment complete! Your place in the course is confirmed."
+      "course": "Payment complete! Your place in the course is confirmed.",
+      "transcript_generation": "Payment complete! The transcript is being generated and will be available to everyone."
     }
   },
   "checkout": {
