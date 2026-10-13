@@ -123,6 +123,7 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
     user_has_access = serializers.SerializerMethodField()
     user_purchase_status = serializers.SerializerMethodField()
     user_purchase_id = serializers.SerializerMethodField()
+    linked_book_clubs = serializers.SerializerMethodField()
 
     class Meta:
         model = KnowledgePath
@@ -133,6 +134,7 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
             'certificates_enabled', 'reference_price', 'is_paid_path',
             'sales_enabled', 'is_for_sale', 'bch_direct_available',
             'user_has_access', 'user_purchase_status', 'user_purchase_id',
+            'linked_book_clubs',
         ]
 
     def get_bch_direct_available(self, obj):
@@ -201,6 +203,26 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
     def get_image_preview(self, obj):
         _image, preview = _knowledge_path_image_urls(obj, self.context.get('request'))
         return preview
+
+    def get_linked_book_clubs(self, obj):
+        """Active/closed clubs linked to this path for discovery CTAs on the detail page."""
+        from book_clubs.models import BookClubStatus
+
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        clubs = obj.book_clubs.exclude(status=BookClubStatus.DRAFT).order_by(
+            '-starts_at', '-created_at'
+        )
+        return [
+            {
+                'id': club.id,
+                'slug': club.slug,
+                'title': club.title,
+                'status': club.status,
+                'is_member': club.user_is_member(user) if user else False,
+            }
+            for club in clubs
+        ]
 
 
 class KnowledgePathCreateSerializer(serializers.ModelSerializer):

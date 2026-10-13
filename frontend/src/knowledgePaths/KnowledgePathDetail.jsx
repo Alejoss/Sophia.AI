@@ -46,6 +46,7 @@ import VoteComponent from '../votes/VoteComponent';
 import BookmarkButton from '../bookmarks/BookmarkButton';
 import KnowledgePathDetailSkeleton from '../components/KnowledgePathDetailSkeleton';
 import BookClubReturnLink from '../bookClubs/BookClubReturnLink';
+import LinkedBookClubBanner from '../bookClubs/LinkedBookClubBanner';
 import PathCheckout from '../payments/adapters/PathCheckout';
 import { useDateLocales } from '../hooks/useDateLocales';
 
@@ -456,9 +457,16 @@ const KnowledgePathDetail = () => {
     );
   }
 
+  const linkedBookClubs = knowledgePath.linked_book_clubs || [];
+  const linkedClubSlugs = new Set(linkedBookClubs.map((club) => club.slug));
+  // Prefer the discovery banner over "back to club" when the path already
+  // exposes its linked reading club(s).
+  const showReturnLink = Boolean(clubSlug) && !linkedClubSlugs.has(clubSlug);
+
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
-      <BookClubReturnLink sx={{ mb: 3 }} />
+      {showReturnLink && <BookClubReturnLink sx={{ mb: 3 }} />}
+      <LinkedBookClubBanner clubs={linkedBookClubs} sx={{ mb: 3 }} />
 
       {/* Hero Header Section */}
       <Paper 
