@@ -94,6 +94,51 @@ class BookClubAPITestCase(APITestCase):
         token = RefreshToken.for_user(user).access_token
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
 
+    def test_knowledge_path_detail_exposes_linked_book_clubs(self):
+        """Path detail surfaces active/closed clubs for discovery CTAs (not drafts)."""
+        draft = BookClub.objects.create(
+            title='Draft Club',
+            slug='draft-club',
+            knowledge_path=self.path,
+            status=BookClubStatus.DRAFT,
+            created_by=self.admin,
+        )
+        closed = BookClub.objects.create(
+            title='Closed Club',
+            slug='closed-club',
+            knowledge_path=self.path,
+            status=BookClubStatus.CLOSED,
+            created_by=self.admin,
+            starts_at=timezone.now() - timezone.timedelta(days=90),
+            ends_at=timezone.now() - timezone.timedelta(days=10),
+        )
+        BookClubMembership.objects.create(book_club=self.club, user=self.member)
+
+        self.auth(self.member)
+        response = self.client.get(f'/api/knowledge_paths/{self.path.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        linked = response.data['linked_book_clubs']
+        slugs = {item['slug'] for item in linked}
+        self.assertIn(self.club.slug, slugs)
+        self.assertIn(closed.slug, slugs)
+        self.assertNotIn(draft.slug, slugs)
+
+        active = next(item for item in linked if item['slug'] == self.club.slug)
+        self.assertEqual(active['title'], self.club.title)
+        self.assertEqual(active['status'], BookClubStatus.ACTIVE)
+        self.assertTrue(active['is_member'])
+
+        # Non-members still see linked clubs (discovery), without membership.
+        self.auth(self.outsider)
+        outsider = self.client.get(f'/api/knowledge_paths/{self.path.id}/')
+        self.assertEqual(outsider.status_code, status.HTTP_200_OK)
+        outsider_active = next(
+            item
+            for item in outsider.data['linked_book_clubs']
+            if item['slug'] == self.club.slug
+        )
+        self.assertFalse(outsider_active['is_member'])
+
     def test_join_club(self):
         self.auth(self.member)
         response = self.client.post('/api/book_clubs/cypherpunk/join/')
