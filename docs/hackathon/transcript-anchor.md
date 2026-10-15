@@ -20,6 +20,7 @@ needs a live signet demonstration.
 | Model | `TranscriptAnchor` in `acbc_app/content/models.py` |
 | API | `acbc_app/content/views_transcript_anchor.py` |
 | Broadcast | `acbc_app/content/bitcoin/` + `manage.py broadcast_transcript_anchor` |
+| Restore missing text | `manage.py restore_anchor_certified_text` and `POST /api/content/transcript-anchors/restore-certified-text/` |
 | UI | `frontend/src/content/ContentBitcoinAnchor.jsx` |
 | Env | [`BTC_*`](../deployment/environment-variables.md#bitcoin-op_return-transcript-anchoring) |
 
@@ -87,7 +88,10 @@ Base path under content details:
 | `POST` | `/api/content/content_details/{content_id}/transcript/anchor/` | Authenticated **staff** only. Ensures pending + **broadcasts**. **503** if fee USD &gt; `BTC_MAX_FEE_USD`. |
 | `GET`/`POST` | `/api/content/content_details/{content_id}/transcript/anchor-requests/` | Authenticated (any user). Create/pay flow for public `$1` requests → auto-broadcast. |
 | `GET` | `/api/content/content_details/{content_id}/transcript/anchors/` | Public |
-| `GET` | `/api/content/content_details/{content_id}/transcript/anchors/{anchor_id}/certified-text/` | Public. Exact UTF-8 snapshot download (`text/plain`) with `X-Text-Hash` / `X-Expected-Text-Hash` / `X-Hash-Match` headers. **404** when `certified_plain_text` was never saved. |
+| `GET` | `/api/content/content_details/{content_id}/transcript/anchors/{anchor_id}/certified-text/` | Public. Exact UTF-8 snapshot download (`text/plain`) with `X-Text-Hash` / `X-Expected-Text-Hash` / `X-Hash-Match` headers. If the snapshot is empty and the live transcript still hashes to `text_hash`, the snapshot is stored and then downloaded. **404** `certified_text_missing` when no matching text can be recovered. |
+| `POST` | `/api/content/content_details/{content_id}/transcript/anchors/{anchor_id}/certified-text/` | Authenticated. Restores a missing snapshot from the live transcript, or from `{"plain_text": "..."}`. Saves only when SHA-256 equals `text_hash`. **409** `certified_text_mismatch` otherwise, with `computed_text_hash`. |
+| `GET` | `/api/content/transcript-anchors/restore-certified-text/` | Staff. Reports anchors with a missing snapshot: `would_restore` when the live transcript still matches, `unmatched` when it does not. Optional `content_id` / `anchor_id`. |
+| `POST` | `/api/content/transcript-anchors/restore-certified-text/` | Staff. Same report, and stores every restorable snapshot. Body may include `content_id`, `anchor_id`, `plain_text` (exact Vincent/worker text; requires an id), and `dry_run`. |
 | `POST` | `/api/content/content_details/{content_id}/transcript/anchors/` | Authenticated **staff** only (prepare pending row) |
 
 Public paid requests use `TranscriptAnchorRequest` and a payment method chooser:
@@ -204,9 +208,37 @@ For an older anchor, download
 `GET .../transcript/anchors/{id}/certified-text/` (or use
 `certified_plain_text` from the anchor-history API), not the current transcript
 endpoint. Hash its exact UTF-8 bytes without adding a newline or BOM. A legacy
-anchor with no saved text returns **404** `certified_text_missing` and cannot be
-independently reconstructed from its digest alone. An `ipfs_cid` field does not
+anchor with no saved text returns **404** `certified_text_missing` until the
+snapshot is restored. An `ipfs_cid` field does not
 demonstrate that upload, pinning or long-term availability has been implemented.
+
+### Restore a missing snapshot
+
+Staff API (does not write on GET, or on POST with `"dry_run": true`):
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://www.academiablockchain.com/api/content/transcript-anchors/restore-certified-text/?content_id=46"
+```
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"content_id":46}' \
+  https://www.academiablockchain.com/api/content/transcript-anchors/restore-certified-text/
+```
+
+When the live transcript was degraded, send the original worker file for one anchor:
+
+```bash
+python manage.py restore_anchor_certified_text --dry-run
+python manage.py restore_anchor_certified_text
+python manage.py restore_anchor_certified_text --anchor-id 2 --plain-text-file original.txt
+```
+
+Each row is `restored`, `would_restore`, `already_present`, or `unmatched`.
+`unmatched` includes `computed_text_hash` (SHA-256 of the candidate) and
+`text_hash` (the digest in the Bitcoin transaction). Text is stored only when
+those two are equal.
 
 Broadcast durability: before Esplora submission the service persists
 `metadata.signed_raw_tx_hex` and `metadata.predicted_txid`, then reconciles by

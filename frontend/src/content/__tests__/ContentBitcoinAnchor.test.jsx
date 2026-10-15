@@ -116,4 +116,34 @@ describe('ContentBitcoinAnchor', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Texto certificado de prueba.')).toBeInTheDocument();
   });
+
+  it('hides the download and offers sign-in when certified text is missing', async () => {
+    contentApi.getTranscriptAnchor.mockResolvedValue({
+      content_id: 3,
+      has_transcript: true,
+      current_text_hash: '96670eafb82e2cf31a6a6035e9754df8aea792437297f22247202925a0f9abc7',
+      can_certify: false,
+      anchor: {
+        id: 9,
+        status: 'anchored',
+        is_btc_confirmed: true,
+        btc_network: 'mainnet',
+        text_hash: '96670eafb82e2cf31a6a6035e9754df8aea792437297f22247202925a0f9abc7',
+        btc_txid: '7cd2c1618ad885768c39a1cf9af030cdb270d115d061497dd8558c533e0935e9',
+        certified_plain_text: '',
+      },
+    });
+
+    render(<ContentBitcoinAnchor contentId={3} />);
+
+    expect(
+      await screen.findByText(/no guardó el texto certificado/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /descargar texto certificado/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /inicia sesión para restaurar/i }),
+    ).toHaveAttribute('href', expect.stringContaining('/profiles/login?next='));
+  });
 });

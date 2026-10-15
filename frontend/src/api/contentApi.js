@@ -355,6 +355,14 @@ const contentApi = {
     `/api/content/content_details/${contentId}/transcript/anchors/${anchorId}/certified-text/`
   ),
 
+  restoreTranscriptAnchorCertifiedText: async (contentId, anchorId, payload = {}) => {
+    const response = await axiosInstance.post(
+      `/content/content_details/${contentId}/transcript/anchors/${anchorId}/certified-text/`,
+      payload,
+    );
+    return response.data;
+  },
+
   getContentPreview: async (contentId, context = null, contextId = null) => {
     try {
       let url = `/content/content_preview/${contentId}/`;

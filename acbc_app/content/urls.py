@@ -102,6 +102,7 @@ from .views_transcript_ingest import (
     ContentTranscriptTextHashView,
 )
 from .views_transcript_anchor import (
+    ContentTranscriptAnchorCertifiedTextRestoreView,
     ContentTranscriptAnchorCertifiedTextView,
     ContentTranscriptAnchorCurrentView,
     ContentTranscriptAnchorListView,
@@ -184,6 +185,11 @@ urlpatterns = [
         'content_details/<int:content_id>/transcript/anchors/<int:anchor_id>/certified-text/',
         ContentTranscriptAnchorCertifiedTextView.as_view(),
         name='content-transcript-anchor-certified-text',
+    ),
+    path(
+        'transcript-anchors/restore-certified-text/',
+        ContentTranscriptAnchorCertifiedTextRestoreView.as_view(),
+        name='transcript-anchor-certified-text-restore',
     ),
     path(
         'content_details/<int:content_id>/transcript/anchor-requests/',
