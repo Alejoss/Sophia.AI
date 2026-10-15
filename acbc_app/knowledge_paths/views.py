@@ -426,7 +426,10 @@ class KnowledgePathDetailView(APIView):
     def get(self, request, pk):
         """Allow anonymous users to view knowledge paths"""
         try:
-            knowledge_path = get_object_or_404(KnowledgePath, pk=pk)
+            knowledge_path = get_object_or_404(
+                KnowledgePath.objects.prefetch_related('book_clubs'),
+                pk=pk,
+            )
             book_club = resolve_book_club_context(
                 knowledge_path,
                 request.user,
