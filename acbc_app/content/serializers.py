@@ -1597,6 +1597,7 @@ class ContentTranscriptQueueItemSerializer(serializers.ModelSerializer):
     is_youtube = serializers.SerializerMethodField()
     youtube_video_id = serializers.SerializerMethodField()
     has_transcript = serializers.SerializerMethodField()
+    generation_funded = serializers.SerializerMethodField()
 
     class Meta:
         model = Content
@@ -1614,6 +1615,7 @@ class ContentTranscriptQueueItemSerializer(serializers.ModelSerializer):
             'has_spanish_subtitles',
             'has_spanish_dubbing',
             'has_transcript',
+            'generation_funded',
             'created_at',
         ]
 
@@ -1650,6 +1652,16 @@ class ContentTranscriptQueueItemSerializer(serializers.ModelSerializer):
             return obj.transcript is not None
         except ContentTranscript.DoesNotExist:
             return False
+
+    def get_generation_funded(self, obj):
+        annotated = getattr(obj, 'generation_funded', None)
+        if annotated is not None and not callable(annotated):
+            return bool(annotated)
+        from content.models import TranscriptGenerationRequest
+        return TranscriptGenerationRequest.objects.filter(
+            content=obj,
+            status=TranscriptGenerationRequest.STATUS_QUEUED,
+        ).exists()
 
 
 class ContentEmbeddingTopicRefSerializer(serializers.ModelSerializer):

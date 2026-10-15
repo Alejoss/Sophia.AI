@@ -15,6 +15,7 @@ from content.models import (
     ContentEmbedding,
     TranscriptAnchor,
     TranscriptAnchorRequest,
+    TranscriptGenerationRequest,
     Topic,
     Publication,
     TopicCreationRequest,
@@ -147,6 +148,15 @@ class TranscriptAnchorAdmin(admin.ModelAdmin):
         if not obj.text_hash:
             return ''
         return f'{obj.text_hash[:12]}…'
+
+
+@admin.register(TranscriptGenerationRequest)
+class TranscriptGenerationRequestAdmin(admin.ModelAdmin):
+    list_display = ['id', 'content', 'requester', 'status', 'price_amount', 'created_at']
+    list_filter = ['status', 'created_at']
+    search_fields = ['requester__username', 'content__original_title']
+    raw_id_fields = ['content', 'requester']
+    readonly_fields = ['created_at', 'updated_at']
 
 
 @admin.register(TranscriptAnchorRequest)

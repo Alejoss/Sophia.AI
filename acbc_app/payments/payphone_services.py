@@ -13,7 +13,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from content.models import TopicPurchase, TranscriptAnchorRequest
+from content.models import TopicPurchase, TranscriptAnchorRequest, TranscriptGenerationRequest
 from events.models import EventRegistration
 from knowledge_paths.models import KnowledgePathPurchase
 from payments.models import CoursePurchase, PayphonePayment, TokenPurchase
@@ -27,6 +27,7 @@ from payments.services import (
     mark_token_purchase_paid,
     mark_topic_purchase_paid,
 )
+from content.transcript_generation import mark_generation_request_paid
 from utils.db_encoding import prepare_json_for_db, prepare_text_for_db
 
 logger = logging.getLogger(__name__)
@@ -104,6 +105,7 @@ def _target_filter(
     anchor_request=None,
     token_purchase=None,
     course_purchase=None,
+    transcript_generation=None,
 ) -> Q:
     if event_registration is not None:
         return Q(event_registration=event_registration)
@@ -117,6 +119,8 @@ def _target_filter(
         return Q(token_purchase=token_purchase)
     if course_purchase is not None:
         return Q(course_purchase=course_purchase)
+    if transcript_generation is not None:
+        return Q(transcript_generation=transcript_generation)
     raise ValueError('Falta el producto del pago Payphone.')
 
 
@@ -128,6 +132,7 @@ def payphone_queryset(
     anchor_request=None,
     token_purchase=None,
     course_purchase=None,
+    transcript_generation=None,
 ):
     return PayphonePayment.objects.filter(
         _target_filter(
@@ -137,6 +142,7 @@ def payphone_queryset(
             anchor_request=anchor_request,
             token_purchase=token_purchase,
             course_purchase=course_purchase,
+            transcript_generation=transcript_generation,
         )
     )
 
@@ -157,6 +163,7 @@ def has_pending_payphone(
     anchor_request=None,
     token_purchase=None,
     course_purchase=None,
+    transcript_generation=None,
 ) -> bool:
     expire_stale_payphone_payments()
     return payphone_queryset(
@@ -166,6 +173,7 @@ def has_pending_payphone(
         anchor_request=anchor_request,
         token_purchase=token_purchase,
         course_purchase=course_purchase,
+        transcript_generation=transcript_generation,
     ).filter(
         status=PayphonePayment.STATUS_PENDING,
         expires_at__gt=timezone.now(),
@@ -180,6 +188,7 @@ def abandon_pending_payphone(
     anchor_request=None,
     token_purchase=None,
     course_purchase=None,
+    transcript_generation=None,
 ) -> int:
     """Cancel unused pending Payphone orders so the buyer can switch methods."""
     expire_stale_payphone_payments()
@@ -190,6 +199,7 @@ def abandon_pending_payphone(
         anchor_request=anchor_request,
         token_purchase=token_purchase,
         course_purchase=course_purchase,
+        transcript_generation=transcript_generation,
     ).filter(status=PayphonePayment.STATUS_PENDING).update(
         status=PayphonePayment.STATUS_CANCELED,
         updated_at=timezone.now(),
@@ -204,6 +214,7 @@ def _release_other_rails(
     anchor_request=None,
     token_purchase=None,
     course_purchase=None,
+    transcript_generation=None,
 ) -> None:
     """Block if NOWPayments coins are in flight; abandon waiting invoices and BCH."""
     from payments.models import BchDirectPayment
@@ -217,6 +228,8 @@ def _release_other_rails(
         now_kwargs['token_purchase'] = token_purchase
     if course_purchase is not None:
         now_kwargs['course_purchase'] = course_purchase
+    if transcript_generation is not None:
+        now_kwargs['transcript_generation'] = transcript_generation
     # Event registrations only use NOWPayments (no BCH rail).
     if event_registration is not None:
         from payments.models import CryptoPayment
@@ -252,6 +265,8 @@ def _release_other_rails(
         bch_q = Q(token_purchase=token_purchase)
     elif course_purchase is not None:
         bch_q = Q(course_purchase=course_purchase)
+    elif transcript_generation is not None:
+        bch_q = Q(transcript_generation=transcript_generation)
     else:
         return
 
@@ -275,6 +290,7 @@ def _usd_and_reference(
     anchor_request=None,
     token_purchase=None,
     course_purchase=None,
+    transcript_generation=None,
 ) -> tuple[Decimal, str, str]:
     """Return (usd_amount, reference, frontend_return_path)."""
     if event_registration is not None:
@@ -313,6 +329,17 @@ def _usd_and_reference(
         title = prepare_text_for_db(course.title)[:180]
         return usd, f'Curso: {title}', f'/cursos/{course.code}/checkout'
 
+    if transcript_generation is not None:
+        usd = Decimal(str(
+            transcript_generation.price_amount
+            or getattr(settings, 'TRANSCRIPT_GENERATION_PRICE_USD', 1)
+        ))
+        return (
+            usd,
+            'Generar transcripción pública',
+            f'/content/{transcript_generation.content_id}',
+        )
+
     raise ValueError('Falta el producto del pago Payphone.')
 
 
@@ -325,6 +352,7 @@ def _authorize_create(
     anchor_request=None,
     token_purchase=None,
     course_purchase=None,
+    transcript_generation=None,
 ) -> None:
     if not is_payphone_configured():
         raise PayphoneError('Payphone no está configurado en el servidor.')
@@ -394,6 +422,13 @@ def _authorize_create(
             raise ValueError('Este curso no tiene un precio de pago.')
         return
 
+    if transcript_generation is not None:
+        if transcript_generation.requester_id != user.id:
+            raise PermissionError('Solo quien solicitó la transcripción puede iniciar el pago.')
+        if transcript_generation.status != TranscriptGenerationRequest.STATUS_PENDING_PAYMENT:
+            raise ValueError('Esta solicitud no admite un nuevo pago.')
+        return
+
     raise ValueError('Falta el producto del pago Payphone.')
 
 
@@ -406,12 +441,13 @@ def create_or_reuse_payphone_payment(
     anchor_request: TranscriptAnchorRequest | None = None,
     token_purchase: TokenPurchase | None = None,
     course_purchase: CoursePurchase | None = None,
+    transcript_generation: TranscriptGenerationRequest | None = None,
     client: PayphoneClient | None = None,
 ) -> PayphonePayment:
     targets = [
         t for t in (
             event_registration, path_purchase, topic_purchase,
-            anchor_request, token_purchase, course_purchase,
+            anchor_request, token_purchase, course_purchase, transcript_generation,
         ) if t is not None
     ]
     if len(targets) != 1:
@@ -425,6 +461,7 @@ def create_or_reuse_payphone_payment(
         anchor_request=anchor_request,
         token_purchase=token_purchase,
         course_purchase=course_purchase,
+        transcript_generation=transcript_generation,
     )
     _release_other_rails(
         event_registration=event_registration,
@@ -433,6 +470,7 @@ def create_or_reuse_payphone_payment(
         anchor_request=anchor_request,
         token_purchase=token_purchase,
         course_purchase=course_purchase,
+        transcript_generation=transcript_generation,
     )
 
     expire_stale_payphone_payments()
@@ -443,6 +481,7 @@ def create_or_reuse_payphone_payment(
         anchor_request=anchor_request,
         token_purchase=token_purchase,
         course_purchase=course_purchase,
+        transcript_generation=transcript_generation,
     )
     existing = (
         PayphonePayment.objects.filter(target_q)
@@ -466,6 +505,7 @@ def create_or_reuse_payphone_payment(
         anchor_request=anchor_request,
         token_purchase=token_purchase,
         course_purchase=course_purchase,
+        transcript_generation=transcript_generation,
     )
     if usd <= 0:
         raise ValueError('No se pudo calcular el monto a cobrar.')
@@ -505,6 +545,7 @@ def create_or_reuse_payphone_payment(
         anchor_request=anchor_request,
         token_purchase=token_purchase,
         course_purchase=course_purchase,
+        transcript_generation=transcript_generation,
         client_transaction_id=client_transaction_id,
         payphone_payment_id=str(payment_id),
         amount_cents=amount_fields['amount'],
@@ -594,6 +635,13 @@ def _fulfill_payphone_payment(payment: PayphonePayment) -> None:
     if payment.course_purchase_id:
         mark_course_purchase_paid(
             CoursePurchase.objects.get(pk=payment.course_purchase_id),
+        )
+        return
+
+    if payment.transcript_generation_id:
+        mark_generation_request_paid(
+            TranscriptGenerationRequest.objects.get(pk=payment.transcript_generation_id),
+            source='payphone',
         )
         return
 
@@ -739,5 +787,15 @@ def resolve_payphone_target(*, kind: str, purchase_id: int, user):
             }
         except CoursePurchase.DoesNotExist as exc:
             raise ValueError('Compra de curso no encontrada.') from exc
+
+    if kind in ('transcript_generation', 'transcript'):
+        try:
+            return {
+                'transcript_generation': TranscriptGenerationRequest.objects.select_related(
+                    'content', 'requester',
+                ).get(pk=purchase_id),
+            }
+        except TranscriptGenerationRequest.DoesNotExist as exc:
+            raise ValueError('Solicitud de transcripción no encontrada.') from exc
 
     raise ValueError(f'Tipo de producto no soportado para Payphone: {kind}')

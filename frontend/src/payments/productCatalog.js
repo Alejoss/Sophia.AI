@@ -17,6 +17,7 @@ export const PRODUCT_KINDS = Object.freeze({
   ANCHOR: 'anchor',
   TOKEN_PACKAGE: 'token_package',
   COURSE: 'course',
+  TRANSCRIPT_GENERATION: 'transcript_generation',
 });
 
 /** Kinds that can create NOWPayments invoices (no topic). */
@@ -26,6 +27,7 @@ export const NOWPAYMENTS_KINDS = Object.freeze([
   PRODUCT_KINDS.ANCHOR,
   PRODUCT_KINDS.TOKEN_PACKAGE,
   PRODUCT_KINDS.COURSE,
+  PRODUCT_KINDS.TRANSCRIPT_GENERATION,
 ]);
 
 export const PRODUCT_CATALOG = Object.freeze({
@@ -107,6 +109,22 @@ export const PRODUCT_CATALOG = Object.freeze({
       bch: 'gateway',
       monero: true,
       platform_tokens: false,
+    }),
+  }),
+  [PRODUCT_KINDS.TRANSCRIPT_GENERATION]: Object.freeze({
+    kind: PRODUCT_KINDS.TRANSCRIPT_GENERATION,
+    productLabel: 'transcripción',
+    defaultTitle: 'Generar transcripción pública',
+    chooserTitle: 'Elige cómo pagar',
+    paidSuccessMessage: '¡Pago recibido! La transcripción se está generando y quedará disponible para todos.',
+    tokenPaidSuccessMessage:
+      '¡Pago con tokens recibido! La transcripción se está generando y quedará disponible para todos.',
+    methods: Object.freeze({
+      nowpayments: 'gateway',
+      payphone: 'gateway',
+      bch: 'gateway',
+      monero: true,
+      platform_tokens: 'gateway_tokens',
     }),
   }),
   [PRODUCT_KINDS.TOKEN_PACKAGE]: Object.freeze({
@@ -248,12 +266,15 @@ export const NOWPAYMENTS_SUCCESS_MESSAGES = Object.freeze({
     + 'La confirmación en la red suele tardar unos 10 minutos o más.',
   [PRODUCT_KINDS.TOKEN_PACKAGE]: '¡Pago completado! Los tokens ya están en tu perfil.',
   [PRODUCT_KINDS.COURSE]: '¡Pago completado! Tu lugar en el curso está confirmado.',
+  [PRODUCT_KINDS.TRANSCRIPT_GENERATION]:
+    '¡Pago completado! La transcripción se está generando y quedará disponible para todos.',
 });
 
 export const NOWPAYMENTS_HEADER_TITLES = Object.freeze({
   [PRODUCT_KINDS.EVENT]: null, // falls back to `Pago del ${productLabel}`
   [PRODUCT_KINDS.PATH]: 'Pago del camino',
   [PRODUCT_KINDS.ANCHOR]: 'Enviar hash a Bitcoin',
+  [PRODUCT_KINDS.TRANSCRIPT_GENERATION]: 'Generar transcripción',
   [PRODUCT_KINDS.TOKEN_PACKAGE]: null,
 });
 

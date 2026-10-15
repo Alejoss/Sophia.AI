@@ -48,6 +48,13 @@
       "chooserTitle": "Elige cómo pagar",
       "paidSuccess": "¡Pago recibido! Tu lugar en el curso está confirmado."
     },
+    "transcript_generation": {
+      "productLabel": "transcripción",
+      "chooserTitle": "Elige cómo pagar",
+      "defaultTitle": "Generar transcripción pública",
+      "paidSuccess": "¡Pago recibido! La transcripción se está generando y quedará disponible para todos.",
+      "tokenPaidSuccess": "¡Pago con tokens recibido! La transcripción se está generando y quedará disponible para todos."
+    },
     "token_package": {
       "productLabel": "paquete de tokens",
       "chooserTitle": "Pagar paquete de tokens"
@@ -57,14 +64,16 @@
     "payFor": "Pago del {{product}}",
     "header": {
       "path": "Pago del camino",
-      "anchor": "Enviar hash a Bitcoin"
+      "anchor": "Enviar hash a Bitcoin",
+      "transcript_generation": "Generar transcripción"
     },
     "success": {
       "event": "¡Pago completado! Tu inscripción está confirmada.",
       "path": "¡Pago completado! El camino ya está desbloqueado.",
       "anchor": "¡Pago completado! Publicando el hash SHA-256 en Bitcoin. La confirmación en la red suele tardar unos 10 minutos o más.",
       "token_package": "¡Pago completado! Los tokens ya están en tu perfil.",
-      "course": "¡Pago completado! Tu lugar en el curso está confirmado."
+      "course": "¡Pago completado! Tu lugar en el curso está confirmado.",
+      "transcript_generation": "¡Pago completado! La transcripción se está generando y quedará disponible para todos."
     }
   },
   "checkout": {

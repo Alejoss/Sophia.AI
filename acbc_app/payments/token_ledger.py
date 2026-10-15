@@ -82,11 +82,13 @@ def debit_platform_tokens(
     amount: int,
     reason: str = TokenLedgerEntry.REASON_SPEND,
     anchor_request=None,
+    transcript_generation=None,
 ) -> TokenLedgerEntry:
     """
     Debit `amount` tokens from `user` and append a negative ledger row.
 
-    Spends linked to a TranscriptAnchorRequest are unique so retries are safe.
+    Spends linked to a TranscriptAnchorRequest or TranscriptGenerationRequest
+    are unique so retries are safe.
     """
     if amount <= 0:
         raise ValueError('El débito de tokens debe ser positivo.')
@@ -110,6 +112,20 @@ def debit_platform_tokens(
             if existing:
                 return existing
 
+        if (
+            reason == TokenLedgerEntry.REASON_SPEND
+            and transcript_generation is not None
+        ):
+            existing = (
+                TokenLedgerEntry.objects.filter(
+                    transcript_generation=transcript_generation,
+                    reason=TokenLedgerEntry.REASON_SPEND,
+                )
+                .first()
+            )
+            if existing:
+                return existing
+
         if profile.token_balance < amount:
             raise InsufficientTokenBalance(
                 required=amount,
@@ -121,15 +137,17 @@ def debit_platform_tokens(
             delta=-amount,
             reason=reason,
             anchor_request=anchor_request,
+            transcript_generation=transcript_generation,
         )
         Profile.objects.filter(pk=profile.pk).update(
             token_balance=F('token_balance') - amount,
         )
         logger.info(
-            'Platform tokens debited user=%s amount=%s reason=%s anchor_request=%s',
+            'Platform tokens debited user=%s amount=%s reason=%s anchor_request=%s generation=%s',
             user.pk,
             amount,
             reason,
             getattr(anchor_request, 'pk', None),
+            getattr(transcript_generation, 'pk', None),
         )
         return entry

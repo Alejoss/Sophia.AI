@@ -94,6 +94,7 @@ from .views_social_preview import (
     SiteSocialPreviewView,
     TopicSocialPreviewView,
 )
+from .views_transcript_generation import ContentTranscriptGenerationView
 from .views_transcript_ingest import (
     ContentTranscriptIngestQueueView,
     ContentTranscriptIngestDetailView,
@@ -101,6 +102,7 @@ from .views_transcript_ingest import (
     ContentTranscriptTextHashView,
 )
 from .views_transcript_anchor import (
+    ContentTranscriptAnchorCertifiedTextRestoreView,
     ContentTranscriptAnchorCertifiedTextView,
     ContentTranscriptAnchorCurrentView,
     ContentTranscriptAnchorListView,
@@ -165,6 +167,11 @@ urlpatterns = [
         name='content-transcript',
     ),
     path(
+        'content_details/<int:content_id>/transcript/generation/',
+        ContentTranscriptGenerationView.as_view(),
+        name='content-transcript-generation',
+    ),
+    path(
         'content_details/<int:content_id>/transcript/anchor/',
         ContentTranscriptAnchorCurrentView.as_view(),
         name='content-transcript-anchor-current',
@@ -178,6 +185,11 @@ urlpatterns = [
         'content_details/<int:content_id>/transcript/anchors/<int:anchor_id>/certified-text/',
         ContentTranscriptAnchorCertifiedTextView.as_view(),
         name='content-transcript-anchor-certified-text',
+    ),
+    path(
+        'transcript-anchors/restore-certified-text/',
+        ContentTranscriptAnchorCertifiedTextRestoreView.as_view(),
+        name='transcript-anchor-certified-text-restore',
     ),
     path(
         'content_details/<int:content_id>/transcript/anchor-requests/',

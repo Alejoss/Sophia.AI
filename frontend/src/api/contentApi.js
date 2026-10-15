@@ -275,6 +275,21 @@ const contentApi = {
     }
   },
 
+  getTranscriptGeneration: async (contentId) => {
+    const response = await axiosInstance.get(
+      `/content/content_details/${contentId}/transcript/generation/`,
+    );
+    return response.data;
+  },
+
+  createTranscriptGeneration: async (contentId) => {
+    const response = await axiosInstance.post(
+      `/content/content_details/${contentId}/transcript/generation/`,
+      {},
+    );
+    return response.data;
+  },
+
   getContentTranscript: async (contentId, { summary = false } = {}) => {
     try {
       const response = await axiosInstance.get(
@@ -339,6 +354,14 @@ const contentApi = {
   getTranscriptAnchorCertifiedTextUrl: (contentId, anchorId) => (
     `/api/content/content_details/${contentId}/transcript/anchors/${anchorId}/certified-text/`
   ),
+
+  restoreTranscriptAnchorCertifiedText: async (contentId, anchorId, payload = {}) => {
+    const response = await axiosInstance.post(
+      `/content/content_details/${contentId}/transcript/anchors/${anchorId}/certified-text/`,
+      payload,
+    );
+    return response.data;
+  },
 
   getContentPreview: async (contentId, context = null, contextId = null) => {
     try {

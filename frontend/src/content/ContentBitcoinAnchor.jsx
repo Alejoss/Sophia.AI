@@ -7,6 +7,7 @@ import {
   CircularProgress,
   Link,
   Paper,
+  TextField,
   Typography,
 } from '@mui/material';
 import VerifiedIcon from '@mui/icons-material/Verified';
@@ -46,6 +47,9 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
   const [tokenBalance, setTokenBalance] = useState(0);
   const [supportOpen, setSupportOpen] = useState(false);
   const [localHashMatch, setLocalHashMatch] = useState(null);
+  const [restoring, setRestoring] = useState(false);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
 
   const loadAnchor = useCallback(async () => {
     if (!contentId) {
@@ -113,6 +117,36 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
       cancelled = true;
     };
   }, [info?.anchor?.certified_plain_text, info?.anchor?.text_hash]);
+
+  const restoreCertifiedText = async (plainText) => {
+    const anchorId = info?.anchor?.id;
+    if (!contentId || !anchorId || restoring) return;
+    setRestoring(true);
+    setActionError(null);
+    try {
+      const payload = plainText === undefined ? {} : { plain_text: plainText };
+      const restored = await contentApi.restoreTranscriptAnchorCertifiedText(
+        contentId,
+        anchorId,
+        payload,
+      );
+      setInfo((prev) => ({ ...(prev || {}), anchor: restored }));
+      setPasteOpen(false);
+      setPasteText('');
+    } catch (error) {
+      const code = error.response?.data?.code;
+      if (code === 'certified_text_mismatch' && plainText === undefined) {
+        setPasteOpen(true);
+        setActionError(t('anchor.pasteHint'));
+      } else if (code === 'certified_text_mismatch') {
+        setActionError(t('anchor.pasteMismatch'));
+      } else {
+        setActionError(t('anchor.restoreFailed'));
+      }
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const handleStartAnchor = async () => {
     if (!contentId || requesting) return;
@@ -236,7 +270,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
           </Typography>
         )}
 
-        {(certifiedText || downloadUrl) && (
+        {certifiedText ? (
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
               {t('anchor.certifiedHelp')}
@@ -246,7 +280,7 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
                 size="small"
                 variant="outlined"
                 startIcon={<DownloadIcon />}
-                sx={{ mb: certifiedText ? 1 : 0 }}
+                sx={{ mb: 1 }}
                 onClick={async () => {
                   try {
                     const response = await fetch(downloadUrl);
@@ -273,27 +307,76 @@ const ContentBitcoinAnchor = ({ contentId, contentTitle }) => {
                 {t('anchor.downloadCertified')}
               </Button>
             )}
-            {certifiedText && (
-              <Typography
-                variant="body2"
-                sx={{
-                  ...monoSx,
-                  maxHeight: 120,
-                  overflow: 'auto',
-                  whiteSpace: 'pre-wrap',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  p: 1,
-                }}
-              >
-                {certifiedText}
+            <Typography
+              variant="body2"
+              sx={{
+                ...monoSx,
+                maxHeight: 120,
+                overflow: 'auto',
+                whiteSpace: 'pre-wrap',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                p: 1,
+              }}
+            >
+              {certifiedText}
+            </Typography>
+          </Box>
+        ) : (
+          <Box sx={{ mt: 1 }}>
+            <Alert severity="warning" sx={{ mb: 1 }}>
+              {t('anchor.certifiedMissing')}
+            </Alert>
+            {isAuthenticated ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={restoring}
+                  onClick={() => restoreCertifiedText()}
+                >
+                  {restoring ? t('anchor.restoring') : t('anchor.restoreFromTranscript')}
+                </Button>
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => setPasteOpen((open) => !open)}
+                >
+                  {t('anchor.pasteToggle')}
+                </Button>
+                {pasteOpen && (
+                  <>
+                    <TextField
+                      fullWidth
+                      multiline
+                      minRows={4}
+                      size="small"
+                      label={t('anchor.pasteLabel')}
+                      value={pasteText}
+                      onChange={(event) => setPasteText(event.target.value)}
+                    />
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={restoring || !pasteText.trim()}
+                      onClick={() => restoreCertifiedText(pasteText)}
+                    >
+                      {t('anchor.pasteSubmit')}
+                    </Button>
+                  </>
+                )}
+              </Box>
+            ) : (
+              <Typography variant="body2">
+                <Link
+                  href={`/profiles/login?next=${encodeURIComponent(
+                    `${window.location.pathname}${window.location.search}`,
+                  )}`}
+                >
+                  {t('anchor.signInToRestore')}
+                </Link>
               </Typography>
-            )}
-            {!certifiedText && (
-              <Alert severity="warning" sx={{ mt: 1 }}>
-                {t('anchor.certifiedMissing')}
-              </Alert>
             )}
           </Box>
         )}

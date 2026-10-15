@@ -384,6 +384,9 @@ class ContentTranscript(models.Model):
         self.obsidian_frontmatter = prepare_json_for_db(self.obsidian_frontmatter or {})
         self.segments = prepare_json_for_db(self.segments or [])
         super().save(*args, **kwargs)
+        from content.transcript_generation import settle_generation_requests_for_content
+
+        settle_generation_requests_for_content(self.content)
 
 
 class ContentEmbedding(models.Model):
@@ -736,6 +739,64 @@ class TranscriptAnchorRequest(models.Model):
     @property
     def is_paid_pending_review(self):
         return self.status == self.STATUS_PAID_PENDING_REVIEW
+
+
+class TranscriptGenerationRequest(models.Model):
+    """
+    Paid request to generate a missing transcript for one content item.
+
+    After payment, the row is queued for the external transcript worker.
+    When the worker stores a ContentTranscript, the text is public and
+    ContentEmbedding is marked pending so Consultas can index it.
+    """
+
+    STATUS_PENDING_PAYMENT = 'pending_payment'
+    STATUS_QUEUED = 'queued'
+    STATUS_COMPLETED = 'completed'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_CHOICES = [
+        (STATUS_PENDING_PAYMENT, 'Pending payment'),
+        (STATUS_QUEUED, 'Paid — queued for transcription'),
+        (STATUS_COMPLETED, 'Completed'),
+        (STATUS_CANCELLED, 'Cancelled'),
+    ]
+    OPEN_STATUSES = (STATUS_PENDING_PAYMENT, STATUS_QUEUED)
+
+    requester = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='transcript_generation_requests',
+    )
+    content = models.ForeignKey(
+        Content,
+        on_delete=models.CASCADE,
+        related_name='transcript_generation_requests',
+    )
+    price_amount = models.FloatField(default=1.0)
+    status = models.CharField(
+        max_length=32,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING_PAYMENT,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'created_at'], name='transcript_gen_status_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['content'],
+                condition=models.Q(status__in=['pending_payment', 'queued']),
+                name='unique_open_transcript_generation',
+            ),
+        ]
+
+    def __str__(self):
+        return f'TranscriptGeneration {self.pk} content={self.content_id} [{self.status}]'
 
 
 def topic_image_path(instance, filename):

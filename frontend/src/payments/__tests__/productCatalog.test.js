@@ -38,6 +38,7 @@ describe('productCatalog matrix', () => {
       'path',
       'token_package',
       'topic',
+      'transcript_generation',
     ]);
   });
 

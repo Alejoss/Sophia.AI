@@ -9,7 +9,11 @@ Machine-to-machine ingest (header ``X-Transcript-Ingest-Key`` or ``Authorization
   - ``media_type`` — ``VIDEO``, ``AUDIO``, or ``TEXT``
   - ``content_id`` — single content
   - ``include_completed`` — ``true``/``1`` to also return items that already have a transcript
+  - ``funded_only`` — ``true``/``1`` to return only content with a paid transcript-generation request
   - ``limit`` / ``offset`` — pagination (default limit 100, max 500)
+
+Paid generation requests (``generation_funded``) are ordered ahead of the rest of the
+queue so a worker that polls the default list transcribes funded items first.
 
 * ``GET  /api/content/transcript-ingest/<content_id>/``
   One-item manifest + transcript summary (if any).
@@ -40,13 +44,14 @@ User-facing read (JWT optional, same visibility as content detail GET):
 import logging
 
 from django.core.exceptions import ValidationError
+from django.db.models import Exists, OuterRef
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from content.models import Content, ContentTranscript, Topic
+from content.models import Content, ContentTranscript, Topic, TranscriptGenerationRequest
 from content.permissions import TranscriptIngestPermission
 from content.serializers import (
     ContentTranscriptIngestSerializer,
@@ -175,11 +180,17 @@ class ContentTranscriptIngestQueueView(TranscriptIngestAPIView):
         offset = max(0, offset)
 
         include_completed = _parse_bool(request.query_params.get('include_completed'))
+        funded_only = _parse_bool(request.query_params.get('funded_only'))
 
+        funded = TranscriptGenerationRequest.objects.filter(
+            content_id=OuterRef('pk'),
+            status=TranscriptGenerationRequest.STATUS_QUEUED,
+        )
         queryset = (
             Content.objects.filter(media_type__in=TRANSCRIPT_MEDIA_TYPES)
             .select_related('file_details', 'transcript')
-            .order_by('id')
+            .annotate(generation_funded=Exists(funded))
+            .order_by('-generation_funded', 'id')
         )
         if not include_completed:
             queryset = queryset.filter(transcript__isnull=True)
@@ -189,6 +200,8 @@ class ContentTranscriptIngestQueueView(TranscriptIngestAPIView):
             queryset = queryset.filter(topics__id=topic_id).distinct()
         if content_id is not None:
             queryset = queryset.filter(pk=content_id)
+        if funded_only:
+            queryset = queryset.filter(generation_funded=True)
 
         total = queryset.count()
         items = queryset[offset:offset + limit]
@@ -199,6 +212,7 @@ class ContentTranscriptIngestQueueView(TranscriptIngestAPIView):
             'limit': limit,
             'offset': offset,
             'include_completed': include_completed,
+            'funded_only': funded_only,
             'topic_id': topic_id,
             'items': serializer.data,
         })

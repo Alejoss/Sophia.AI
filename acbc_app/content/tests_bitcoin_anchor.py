@@ -297,13 +297,237 @@ class CertifiedTextDownloadAPITests(TestCase):
             self.anchor.certified_plain_text,
         )
 
-    def test_download_missing_certified_text_returns_404(self):
-        self.anchor.certified_plain_text = ''
-        self.anchor.save(update_fields=['certified_plain_text', 'updated_at'])
-        url = (
+    def _certified_url(self):
+        return (
             f'/api/content/content_details/{self.content.id}/'
             f'transcript/anchors/{self.anchor.id}/certified-text/'
         )
+
+    def _clear_snapshot(self):
+        self.anchor.certified_plain_text = ''
+        self.anchor.save(update_fields=['certified_plain_text', 'updated_at'])
+
+    def _change_live_transcript(self):
+        self.transcript.processed_plain = 'Texto distinto que no coincide.'
+        self.transcript.text_hash_locked = False
+        self.transcript.hash_plain_text = ''
+        self.transcript.save()
+
+    def test_download_backfills_certified_text_when_transcript_still_matches(self):
+        original = self.anchor.certified_plain_text
+        self._clear_snapshot()
+        response = self.client.get(self._certified_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content.decode('utf-8'), original)
+        self.anchor.refresh_from_db()
+        self.assertEqual(self.anchor.certified_plain_text, original)
+
+    def test_current_anchor_backfills_missing_certified_text(self):
+        original = self.anchor.certified_plain_text
+        self._clear_snapshot()
+        url = f'/api/content/content_details/{self.content.id}/transcript/anchor/'
         response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['anchor']['certified_plain_text'], original)
+
+    def test_download_missing_certified_text_returns_404_when_transcript_changed(self):
+        self._change_live_transcript()
+        self._clear_snapshot()
+        response = self.client.get(self._certified_url())
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()['code'], 'certified_text_missing')
+        self.anchor.refresh_from_db()
+        self.assertEqual(self.anchor.certified_plain_text, '')
+
+    def test_post_restores_certified_text_from_live_transcript(self):
+        original = self.anchor.certified_plain_text
+        self._clear_snapshot()
+        self.client.force_authenticate(self.user)
+        response = self.client.post(self._certified_url(), {}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['certified_plain_text'], original)
+
+    def test_post_restores_pasted_text_when_live_transcript_differs(self):
+        original = self.anchor.certified_plain_text
+        self._change_live_transcript()
+        self._clear_snapshot()
+        self.client.force_authenticate(self.user)
+        response = self.client.post(
+            self._certified_url(),
+            {'plain_text': original},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.anchor.refresh_from_db()
+        self.assertEqual(self.anchor.certified_plain_text, original)
+
+    def test_post_rejects_text_that_does_not_match_hash(self):
+        self._change_live_transcript()
+        self._clear_snapshot()
+        self.client.force_authenticate(self.user)
+        response = self.client.post(
+            self._certified_url(),
+            {'plain_text': 'esto no es el texto certificado'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()['code'], 'certified_text_mismatch')
+        self.anchor.refresh_from_db()
+        self.assertEqual(self.anchor.certified_plain_text, '')
+
+    def test_post_requires_authentication(self):
+        self._clear_snapshot()
+        response = self.client.post(self._certified_url(), {}, format='json')
+        self.assertIn(response.status_code, (401, 403))
+        self.anchor.refresh_from_db()
+        self.assertEqual(self.anchor.certified_plain_text, '')
+
+    def test_post_mismatch_includes_computed_hash(self):
+        self._change_live_transcript()
+        self._clear_snapshot()
+        self.client.force_authenticate(self.user)
+        response = self.client.post(
+            self._certified_url(),
+            {'plain_text': 'esto no es el texto certificado'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 409)
+        body = response.json()
+        self.assertNotEqual(body['computed_text_hash'], self.anchor.text_hash)
+        self.assertEqual(len(body['computed_text_hash']), 64)
+
+
+class RestoreCertifiedTextCommandTests(TestCase):
+    def setUp(self):
+        from rest_framework.test import APIClient
+
+        self.client = APIClient()
+        self.user = User.objects.create_user('restore-user', 'restore@example.com', 'pass')
+        self.staff = User.objects.create_user('restore-staff', 'staff@example.com', 'pass')
+        self.staff.is_staff = True
+        self.staff.save(update_fields=['is_staff'])
+        self.content = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Matching anchor',
+        )
+        ContentTranscript.objects.create(
+            content=self.content,
+            processed_plain='Texto que sigue coincidiendo.',
+            language='es',
+        )
+        self.anchor = ensure_pending_anchor(self.content, network='signet')
+        self.anchor.certified_plain_text = ''
+        self.anchor.btc_txid = 'ab' * 32
+        self.anchor.status = TranscriptAnchor.STATUS_ANCHORED
+        self.anchor.save(update_fields=[
+            'certified_plain_text', 'btc_txid', 'status', 'updated_at',
+        ])
+
+        self.other = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Changed after anchor',
+        )
+        self.other_transcript = ContentTranscript.objects.create(
+            content=self.other,
+            processed_plain='Texto original anclado.',
+            language='es',
+        )
+        self.other_anchor = ensure_pending_anchor(self.other, network='signet')
+        self.original_other = self.other_anchor.certified_plain_text
+        self.other_transcript.processed_plain = 'Texto editado despues.'
+        self.other_transcript.text_hash_locked = False
+        self.other_transcript.hash_plain_text = ''
+        self.other_transcript.save()
+        self.other_anchor.certified_plain_text = ''
+        self.other_anchor.btc_txid = 'cd' * 32
+        self.other_anchor.status = TranscriptAnchor.STATUS_ANCHORED
+        self.other_anchor.save(update_fields=[
+            'certified_plain_text', 'btc_txid', 'status', 'updated_at',
+        ])
+
+    def test_command_restores_only_matching_transcripts(self):
+        from django.core.management import call_command
+
+        call_command('restore_anchor_certified_text')
+        self.anchor.refresh_from_db()
+        self.other_anchor.refresh_from_db()
+        self.assertEqual(self.anchor.certified_plain_text, 'Texto que sigue coincidiendo.')
+        self.assertEqual(self.other_anchor.certified_plain_text, '')
+
+    def test_command_dry_run_does_not_write(self):
+        from django.core.management import call_command
+
+        call_command('restore_anchor_certified_text', dry_run=True)
+        self.anchor.refresh_from_db()
+        self.assertEqual(self.anchor.certified_plain_text, '')
+
+    def test_command_plain_text_file_restores_changed_transcript(self):
+        import tempfile
+        from django.core.management import call_command
+
+        with tempfile.NamedTemporaryFile('w', encoding='utf-8', delete=False) as handle:
+            handle.write(self.original_other)
+            path = handle.name
+        call_command(
+            'restore_anchor_certified_text',
+            anchor_id=self.other_anchor.id,
+            plain_text_file=path,
+        )
+        self.other_anchor.refresh_from_db()
+        self.assertEqual(self.other_anchor.certified_plain_text, self.original_other)
+
+    def test_staff_post_restores_and_reports_unmatched(self):
+        self.client.force_authenticate(self.staff)
+        preview = self.client.get('/api/content/transcript-anchors/restore-certified-text/')
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.json()['would_restore'], 1)
+        self.assertEqual(preview.json()['unmatched'], 1)
+        self.anchor.refresh_from_db()
+        self.assertEqual(self.anchor.certified_plain_text, '')
+
+        applied = self.client.post(
+            '/api/content/transcript-anchors/restore-certified-text/',
+            {},
+            format='json',
+        )
+        self.assertEqual(applied.status_code, 200)
+        self.assertEqual(applied.json()['restored'], 1)
+        self.assertEqual(applied.json()['unmatched'], 1)
+        self.anchor.refresh_from_db()
+        self.assertTrue(self.anchor.certified_plain_text)
+
+    def test_staff_post_plain_text_for_one_anchor(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.post(
+            '/api/content/transcript-anchors/restore-certified-text/',
+            {
+                'anchor_id': self.other_anchor.id,
+                'plain_text': self.original_other,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['restored'], 1)
+        self.other_anchor.refresh_from_db()
+        self.assertEqual(self.other_anchor.certified_plain_text, self.original_other)
+
+    def test_plain_text_without_target_is_rejected(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.post(
+            '/api/content/transcript-anchors/restore-certified-text/',
+            {'plain_text': 'hola'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['code'], 'restore_target_required')
+
+    def test_non_staff_cannot_restore(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.post(
+            '/api/content/transcript-anchors/restore-certified-text/',
+            {},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 403)

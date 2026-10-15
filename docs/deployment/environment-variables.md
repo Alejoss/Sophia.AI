@@ -254,6 +254,11 @@ Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and kno
 - **Required**: No
 - **Default**: `1`
 
+#### `TRANSCRIPT_GENERATION_PRICE_USD`
+- **Description**: USD price to generate a missing transcript. After payment the transcript worker queues the file; the text is public and marked pending for Consultas embeddings.
+- **Required**: No
+- **Default**: `1`
+
 #### `PLATFORM_TOKEN_USD_PRICE`
 - **Description**: Face value of one platform token in USD. Packages in admin must price at `token_amount ×` this rate (default **$0.01**).
 - **Required**: No
@@ -261,7 +266,7 @@ Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and kno
 - Docs: [platform-tokens.md](../payments/platform-tokens.md)
 
 #### `TOKEN_CONTENT_DISCOUNT_PERCENT`
-- **Description**: Percent discount when spending platform tokens on paid content (transcript anchors today). Example: `10` → 90 tokens for a $1 anchor at `$0.01`/token.
+- **Description**: Percent discount when spending platform tokens on paid content (transcript anchors and transcript generation). Example: `10` → 90 tokens for a $1 purchase at `$0.01`/token.
 - **Required**: No
 - **Default**: `0`
 - Docs: [platform-tokens.md](../payments/platform-tokens.md)

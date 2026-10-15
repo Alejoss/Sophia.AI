@@ -21,6 +21,7 @@ All buyer checkouts share one chooser (`ProductPaymentCheckout`) entered through
 | Event registration | `EventCheckout` | yes | yes | no | yes | no |
 | Course (`CoursePurchase`) | `CourseCheckout` | yes | yes | when gateway BCH is configured | yes | no |
 | Transcript anchor | `AnchorCheckout` | gateway | gateway | gateway | yes | yes |
+| Transcript generation ($1) | `TranscriptGenerationCheckout` | gateway | gateway | gateway | yes | yes |
 | Token package | `TokenCheckout` | yes | yes | yes | **no** | n/a |
 
 Course checkout UX (`/courses/<code>/checkout`): confirm receipt email first, then open the method chooser. `CoursePurchase.receipt_email` stores the address from that step.

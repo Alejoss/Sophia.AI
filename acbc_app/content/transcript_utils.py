@@ -1,8 +1,11 @@
 import hashlib
+import logging
 import re
 import unicodedata
 
 from django.core.exceptions import ValidationError
+
+logger = logging.getLogger(__name__)
 
 TIMESTAMP_LINE = re.compile(
     r'(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})'
@@ -247,6 +250,202 @@ def resolve_public_transcript_text(transcript):
             if certified:
                 return certified
     return resolve_certified_plain_text(transcript)
+
+
+def plain_text_matching_hash(plain_text, expected_hash):
+    """
+    Return the exact UTF-8 string whose SHA-256 is ``expected_hash``.
+
+    Tries the given bytes first, then the NFC + collapsed-whitespace form used
+    for transcript anchors. Returns None when neither matches.
+    """
+    expected = (expected_hash or '').strip().lower()
+    if len(expected) != 64 or not (plain_text or '').strip():
+        return None
+    raw = plain_text
+    if hashlib.sha256(raw.encode('utf-8')).hexdigest() == expected:
+        return raw
+    normalized = normalize_plain_text_for_hash(raw)
+    if (
+        normalized
+        and hashlib.sha256(normalized.encode('utf-8')).hexdigest() == expected
+    ):
+        return normalized
+    return None
+
+
+def backfill_anchor_certified_text(anchor, plain_text=None):
+    """
+    Store ``certified_plain_text`` on an older anchor that only kept the digest.
+
+    Uses an explicit ``plain_text`` when given. Otherwise tries the transcript's
+    locked hash snapshot and the live normalized text. Saves only when the
+    bytes hash to ``anchor.text_hash``.
+
+    Returns (anchor, restored). ``restored`` is True only when this call wrote
+    the snapshot.
+    """
+    if (anchor.certified_plain_text or '').strip():
+        return anchor, False
+
+    candidates = []
+    if plain_text is not None:
+        candidates.append(plain_text)
+    else:
+        from content.models import ContentTranscript
+
+        transcript = ContentTranscript.objects.filter(content_id=anchor.content_id).first()
+        if transcript is not None:
+            locked = (getattr(transcript, 'hash_plain_text', None) or '')
+            if locked.strip():
+                candidates.append(locked)
+            live = resolve_certified_plain_text(transcript)
+            if live and live not in candidates:
+                candidates.append(live)
+
+    for candidate in candidates:
+        matched = plain_text_matching_hash(candidate, anchor.text_hash)
+        if not matched:
+            continue
+        anchor.certified_plain_text = matched
+        anchor.text_length = len(matched)
+        anchor.save(update_fields=['certified_plain_text', 'text_length', 'updated_at'])
+        logger.info(
+            'Backfilled certified_plain_text anchor=%s content=%s text_hash=%s',
+            anchor.pk,
+            anchor.content_id,
+            anchor.text_hash,
+        )
+        return anchor, True
+    return anchor, False
+
+
+def _normalized_text_hash(plain_text):
+    normalized = normalize_plain_text_for_hash(plain_text)
+    if not normalized:
+        return None
+    return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
+
+
+def anchor_certified_text_status(anchor, plain_text=None):
+    """
+    Report whether an anchor's Bitcoin digest can be recovered. Does not write.
+
+    ``status`` is ``already_present``, ``restorable``, or ``unmatched``.
+    ``computed_text_hash`` is the SHA-256 of the candidate that was tested
+    (NFC + collapsed whitespace), or the stored snapshot when one exists.
+    """
+    from content.models import ContentTranscript
+
+    transcript = ContentTranscript.objects.filter(content_id=anchor.content_id).first()
+    current_hash = (transcript.text_hash or '') if transcript else ''
+    row = {
+        'anchor_id': anchor.pk,
+        'content_id': anchor.content_id,
+        'text_hash': anchor.text_hash,
+        'text_length': anchor.text_length,
+        'btc_txid': anchor.btc_txid or '',
+        'btc_network': anchor.btc_network,
+        'current_text_hash': current_hash or None,
+        'matches_current_transcript': bool(current_hash) and current_hash == (anchor.text_hash or ''),
+        'has_certified_plain_text': bool((anchor.certified_plain_text or '').strip()),
+        'computed_text_hash': None,
+        'source': None,
+        'status': 'unmatched',
+    }
+    if row['has_certified_plain_text']:
+        row['status'] = 'already_present'
+        row['source'] = 'certified_plain_text'
+        row['computed_text_hash'] = hashlib.sha256(
+            anchor.certified_plain_text.encode('utf-8')
+        ).hexdigest()
+        return row
+
+    if plain_text is not None:
+        row['source'] = 'plain_text'
+        row['computed_text_hash'] = _normalized_text_hash(plain_text)
+        if plain_text_matching_hash(plain_text, anchor.text_hash):
+            row['status'] = 'restorable'
+        return row
+
+    candidates = []
+    if transcript is not None:
+        locked = (getattr(transcript, 'hash_plain_text', None) or '')
+        if locked.strip():
+            candidates.append(('hash_plain_text', locked))
+        live = resolve_certified_plain_text(transcript)
+        if live and all(live != item[1] for item in candidates):
+            candidates.append(('transcript', live))
+    for source_name, candidate in candidates:
+        if plain_text_matching_hash(candidate, anchor.text_hash):
+            row['status'] = 'restorable'
+            row['source'] = source_name
+            row['computed_text_hash'] = anchor.text_hash
+            return row
+    if candidates:
+        row['source'] = candidates[-1][0]
+        row['computed_text_hash'] = _normalized_text_hash(candidates[-1][1])
+    return row
+
+
+def restore_missing_anchor_certified_texts(
+    *,
+    content_id=None,
+    anchor_id=None,
+    plain_text=None,
+    dry_run=False,
+):
+    """
+    Fill empty ``certified_plain_text`` snapshots whose bytes hash to the anchor.
+
+    With no ``content_id``, ``anchor_id``, or ``plain_text``, only blank
+    snapshots are scanned and the live transcript (or locked
+    ``hash_plain_text``) is the candidate. A content or anchor id reports every
+    anchor for that target. ``plain_text`` is checked against that target and
+    stored only on a hash match.
+
+    Returns a report. ``dry_run`` classifies rows as ``would_restore`` and
+    does not write.
+    """
+    from content.models import TranscriptAnchor
+
+    queryset = TranscriptAnchor.objects.all().order_by('id')
+    if anchor_id is not None:
+        queryset = queryset.filter(pk=anchor_id)
+    if content_id is not None:
+        queryset = queryset.filter(content_id=content_id)
+    if plain_text is None and content_id is None and anchor_id is None:
+        queryset = queryset.filter(certified_plain_text='')
+
+    rows = []
+    for anchor in queryset:
+        status = anchor_certified_text_status(anchor, plain_text=plain_text)
+        if status['status'] == 'restorable':
+            if dry_run:
+                status['status'] = 'would_restore'
+            else:
+                _anchor, wrote = backfill_anchor_certified_text(
+                    anchor,
+                    plain_text=plain_text,
+                )
+                status['status'] = 'restored' if wrote else 'already_present'
+                status['has_certified_plain_text'] = bool(
+                    (_anchor.certified_plain_text or '').strip()
+                )
+        rows.append(status)
+
+    def _count(name):
+        return sum(1 for row in rows if row['status'] == name)
+
+    return {
+        'dry_run': bool(dry_run),
+        'checked': len(rows),
+        'restored': _count('restored'),
+        'would_restore': _count('would_restore'),
+        'already_present': _count('already_present'),
+        'unmatched': _count('unmatched'),
+        'anchors': rows,
+    }
 
 
 def _bind_embedding_on_content(content, embedding):

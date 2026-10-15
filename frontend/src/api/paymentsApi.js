@@ -154,6 +154,55 @@ export const createAnchorRequestBchPayment = async (requestId) => {
   }
 };
 
+export const createTranscriptGenerationPayment = async (requestId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/transcript-generation/${requestId}/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear el pago de la transcripción. Inténtalo de nuevo');
+  }
+};
+
+export const listTranscriptGenerationPayments = async (requestId) => {
+  try {
+    const response = await axiosInstance.get(`/payments/transcript-generation/${requestId}/list/`);
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo listar los pagos de la transcripción');
+  }
+};
+
+export const createTranscriptGenerationBchPayment = async (requestId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/transcript-generation/${requestId}/bch/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear la orden BCH. Inténtalo de nuevo');
+  }
+};
+
+export const verifyTranscriptGenerationBchPayment = async (requestId, txid) => {
+  try {
+    const body = txid ? { txid } : {};
+    const response = await axiosInstance.post(
+      `/payments/transcript-generation/${requestId}/bch/verify/`,
+      body,
+    );
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
+  }
+};
+
+export const payTranscriptGenerationWithTokens = async (requestId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/transcript-generation/${requestId}/tokens/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo pagar la transcripción con tokens. Inténtalo de nuevo');
+  }
+};
+
 export const payAnchorRequestWithTokens = async (requestId) => {
   try {
     const response = await axiosInstance.post(`/payments/anchor-request/${requestId}/tokens/`, {});
