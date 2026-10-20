@@ -32,7 +32,7 @@
     "signalLive": "Encuentros en vivo",
     "indexRupture": "01 / La ruptura",
     "ruptureTitle": "La Historia de Bitcoin no es lo que te cuentan",
-    "ruptureQuote": "Si le preguntas al ChatGPT, te va a repetir una mentira.",
+    "ruptureQuote": "Si preguntas a ChatGPT te va a repetir una mentira.",
     "ruptureBody": "Debes conocer la historia oficial para luego profundizar y entender la historia real. Y, esto no comienza ni termina con Bitcoin.",
     "eraBefore": "Antes",
     "eraBeforeBody": "Criptografía, privacidad, dinero digital, Cypherpunks, redes P2P.",
@@ -46,7 +46,7 @@
     "pullCaption": "Ocho fuerzas tiran de Bitcoin en direcciones distintas. Ninguna, por sí sola, explica en lo que se convirtió.",
     "indexVisions": "03 / Visiones en conflicto",
     "visionsTitle": "Entender la Tecnología",
-    "visionsLead": "Si no comprendes bien cómo funciona, y te parece importante, estás en el lugar correcto. He acompañado en el proceso de aprendizaje de la tecnología de Bitcoin a cientos de personas. Te lo voy a explicar de la manera más sencilla posible para que luego avancemos a un nivel más alto de comprensión, siempre con acompañamiento 1 a 1 cuando lo necesites. Una vez que entiendas la tecnología, será más sencillo ponderar las distinats visiones que existen sobre ella.",
+    "visionsLead": "Si no comprendes bien cómo funciona, y te parece importante, estás en el lugar correcto. He acompañado en el proceso de aprendizaje de la tecnología de Bitcoin a cientos de personas. Te lo voy a explicar de la manera más sencilla posible para que luego avancemos a un nivel más alto de comprensión, con acompañamiento 1 a 1 cuando lo necesites. Una vez que entiendas la tecnología, será más sencillo ponderar las distinats visiones que existen sobre ella.",
     "visionLabel": "Visión {{n}}",
     "visionAs": "Bitcoin como {{vision}}",
     "seePath": "Ver el recorrido",
@@ -78,7 +78,7 @@
     "guideAlt": "Alejandro Veintimilla hablando en una conferencia.",
     "guideName": "Alejandro Veintimilla",
     "guideRole": "Guía de investigación → estudiante. No gurú → seguidor.",
-    "guideBio1": "Fundador de Academia Blockchain, economista y desarrollador de software especializado en blockchain. Participa en el ecosistema Bitcoin y blockchain desde 2014–2015, combinando una perspectiva económica con la comprensión técnica que le dan más de 14 años desarrollando software.",
+    "guideBio1": "Fundador de Academia Blockchain, economista y desarrollador de aplicaciones web, experto en Bitcoin, blockchain y tokenomics. Participa en el ecosistema Bitcoin y blockchain desde 2014–2015, combinando una perspectiva económica con la comprensión técnica que le dan más de 14 años desarrollando aplicaciones web.",
     "guideBio2": "Desde 2015 ha enseñado y dado conferencias sobre Bitcoin, blockchain, dinero y poder en universidades, comunidades y eventos internacionales.",
     "indexEnroll": "09 / Inscripción",
     "enrollClosed": "La inscripción no está disponible en este momento.",
@@ -123,7 +123,7 @@
     },
     "war": {
       "period": "La guerra por el proyecto",
-      "question": "¿Qué debía ser Bitcoin?",
+      "question": "¿Qué planteó Bitcoin?",
       "meta": "Conflictos técnicos, económicos e ideológicos sobre su dirección."
     },
     "split": {
@@ -164,7 +164,7 @@
   },
   "meetings": {
     "m1": {
-      "topic": "¿Qué debía ser Bitcoin?",
+      "topic": "¿Qué planteó Bitcoin?",
       "date1": "Lunes 9 Noviembre 2026",
       "date2": "Lunes 23 Noviembre 2026"
     },
