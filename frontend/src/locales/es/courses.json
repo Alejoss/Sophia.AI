@@ -123,7 +123,7 @@
     },
     "war": {
       "period": "La guerra por el proyecto",
-      "question": "¿Qué debía ser Bitcoin?",
+      "question": "¿Qué planteó Bitcoin?",
       "meta": "Conflictos técnicos, económicos e ideológicos sobre su dirección."
     },
     "split": {
@@ -164,7 +164,7 @@
   },
   "meetings": {
     "m1": {
-      "topic": "¿Qué debía ser Bitcoin?",
+      "topic": "¿Qué planteó Bitcoin?",
       "date1": "Lunes 9 Noviembre 2026",
       "date2": "Lunes 23 Noviembre 2026"
     },
