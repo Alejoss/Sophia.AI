@@ -233,7 +233,11 @@ dumps in the public media bucket. Details and IAM policy:
 ### Install AWS CLI (for S3 upload)
 
 ```bash
-sudo apt install -y awscli
+# Ubuntu 24.04+ has no apt awscli package — install AWS CLI v2:
+curl -fsSL 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip' -o /tmp/awscliv2.zip
+sudo apt-get install -y unzip
+unzip -q /tmp/awscliv2.zip -d /tmp && sudo /tmp/aws/install
+aws --version
 ```
 
 ### Configure `acbc_app/.env` on the droplet

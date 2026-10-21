@@ -253,7 +253,12 @@ BACKUP_S3_RETENTION_DAYS=30
 
 **DigitalOcean droplet setup (one-time):**
 ```bash
-sudo apt update && sudo apt install -y awscli
+# Ubuntu 24.04+ has no apt awscli package — install AWS CLI v2:
+curl -fsSL 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip' -o /tmp/awscliv2.zip
+sudo apt-get install -y unzip
+unzip -q /tmp/awscliv2.zip -d /tmp && sudo /tmp/aws/install
+aws --version
+
 sudo mkdir -p /opt/backups /var/log
 sudo chown "$USER:$USER" /opt/backups
 # Ensure the cron user can run docker (root, or user in the docker group)
