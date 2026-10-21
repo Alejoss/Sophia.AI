@@ -73,7 +73,9 @@
   ```
 6. **Set up automated backups:** Use a private `BACKUP_S3_BUCKET` + backup IAM keys in `acbc_app/.env` (see [scripts/README.md](scripts/README.md#backup-dbsh)). Then:
   ```bash
-   sudo apt install -y awscli
+   # Ubuntu 24.04+: install AWS CLI v2 (no apt awscli package)
+   curl -fsSL 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip' -o /tmp/awscliv2.zip
+   sudo apt-get install -y unzip && unzip -q /tmp/awscliv2.zip -d /tmp && sudo /tmp/aws/install
    sudo mkdir -p /opt/backups && sudo chown "$USER:$USER" /opt/backups
    BACKUP_DIR=/opt/backups ./scripts/backup-db.sh   # smoke test
    (crontab -l 2>/dev/null; echo "0 2 * * * cd $(pwd) && PATH=/usr/local/bin:/usr/bin:/bin BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1") | crontab -

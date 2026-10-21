@@ -146,7 +146,9 @@ should_upload_to_s3() {
 
     if ! command -v aws >/dev/null 2>&1; then
         echo "❌ S3 upload enabled but AWS CLI is not installed."
-        echo "   Install with: sudo apt install -y awscli"
+        echo "   Ubuntu 24.04+: install AWS CLI v2 (apt has no awscli package):"
+        echo "     curl -fsSL 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip' -o /tmp/awscliv2.zip"
+        echo "     sudo apt-get install -y unzip && unzip -q /tmp/awscliv2.zip -d /tmp && sudo /tmp/aws/install"
         exit 1
     fi
 
