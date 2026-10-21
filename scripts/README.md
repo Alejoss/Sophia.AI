@@ -273,10 +273,10 @@ Outbound HTTPS to S3 must remain allowed (default with UFW inbound-only rules). 
 
 **Automated backup (cron):** Cron has a minimal `PATH`; the script also appends common dirs, but set `PATH` in crontab for clarity. With `BACKUP_DIR` in `.env`, no prefix vars are needed.
 
-Weekly (recommended minimum — Sundays 02:00 server time):
+Weekly (recommended minimum — Sundays 23:00 UTC, off-peak):
 
 ```bash
-0 2 * * 0 cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1
+0 23 * * 0 cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1
 ```
 
 Daily (optional):
@@ -346,8 +346,8 @@ Common script variables (set in `acbc_app/.env` or exported). Full backup table 
 ## Automated Backups
 
 ```bash
-# Weekly Sunday 02:00 — adjust /opt/acbc-app to your clone path on the droplet
-0 2 * * 0 cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1
+# Weekly Sunday 23:00 UTC — adjust /opt/acbc-app to your clone path on the droplet
+0 23 * * 0 cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1
 ```
 
 ## Troubleshooting
