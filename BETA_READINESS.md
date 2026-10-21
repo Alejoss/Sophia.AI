@@ -30,6 +30,6 @@ Revisar antes de abrir el beta a testers.
 
 ## 5. Recomendaciones adicionales
 
-- **Backups:** Si el beta usa base de datos real, tener backups automáticos (p. ej. cron con `scripts/backup-db.sh`).
+- **Backups:** Si el beta usa base de datos real, tener backups automáticos (cron + `scripts/backup-db.sh` → bucket S3 privado `BACKUP_S3_BUCKET`; ver `scripts/README.md`).
 - **Usuarios de prueba:** Crear 1–2 cuentas de prueba y comprobar flujos críticos (login, una ruta, un comentario, gamificación) antes de invitar a testers.
 - **Documentación para testers:** Tener listo y accesible `BETA_TESTING.md` (o equivalente) con las acciones recomendadas.

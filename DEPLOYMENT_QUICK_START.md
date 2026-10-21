@@ -71,10 +71,12 @@
   ```bash
    docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
   ```
-6. **Set up automated backups:**
+6. **Set up automated backups:** Use a private `BACKUP_S3_BUCKET` + backup IAM keys in `acbc_app/.env` (see [scripts/README.md](scripts/README.md#backup-dbsh)). Then:
   ```bash
-   # Add to crontab
-   (crontab -l 2>/dev/null; echo "0 2 * * * cd $(pwd) && ./scripts/backup-db.sh") | crontab -
+   sudo apt install -y awscli
+   sudo mkdir -p /opt/backups && sudo chown "$USER:$USER" /opt/backups
+   BACKUP_DIR=/opt/backups ./scripts/backup-db.sh   # smoke test
+   (crontab -l 2>/dev/null; echo "0 2 * * * cd $(pwd) && PATH=/usr/local/bin:/usr/bin:/bin BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1") | crontab -
   ```
 7. **Large file uploads (videos, etc.):** The stack allows uploads up to 5 GB (nginx `client_max_body_size`, Django limits, and longer timeouts). If you use **HTTPS with a generated `nginx-ssl.conf`**, re-run `./scripts/setup-ssl.sh yourdomain.com` after pulling config changes so the generated file includes the larger body size; then restart: `docker compose -f docker-compose.prod.yml restart nginx`.
 8. **S3 media (profile pictures, uploads) and 404s:** In production, media is served from **AWS S3**. Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optionally `AWS_STORAGE_BUCKET_NAME` in `acbc_app/.env`.
