@@ -242,6 +242,7 @@ sudo apt install -y awscli
 AWS_S3_REGION_NAME=us-west-2
 BACKUP_AWS_ACCESS_KEY_ID=AKIA...   # backup-only IAM (preferred over reusing media keys)
 BACKUP_AWS_SECRET_ACCESS_KEY=...
+BACKUP_DIR=/opt/backups
 BACKUP_S3_BUCKET=acbc-db-backups    # private bucket; Block Public Access ON
 BACKUP_S3_PREFIX=db-backups
 BACKUP_S3_UPLOAD=auto
@@ -266,18 +267,18 @@ Use your real clone path (examples below use `/opt/acbc-app`; some older docs us
 ```bash
 cd /opt/acbc-app
 chmod +x scripts/backup-db.sh
-BACKUP_DIR=/opt/backups ./scripts/backup-db.sh
+./scripts/backup-db.sh
 aws s3 ls "s3://${BACKUP_S3_BUCKET:-acbc-db-backups}/db-backups/"
 # Confirm the object is not publicly readable (no public ACL / no public GetObject policy).
 ```
 
 ### Add to crontab
 
-Cron needs `docker` and `aws` on `PATH`. The script also prepends common paths.
+Cron needs `docker` and `aws` on `PATH`. With `BACKUP_DIR` in `.env`, no inline prefix is required.
 
 ```bash
 # Daily backup at 2 AM (local + private S3 when BACKUP_S3_BUCKET + AWS keys are set)
-(crontab -l 2>/dev/null; echo "0 2 * * * cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 2 * * * cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1") | crontab -
 ```
 
 ## Step 9: Configure Monitoring (Optional)
