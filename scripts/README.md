@@ -161,63 +161,137 @@ python3 scripts/cloudflare_analytics_report.py --notify-notion
 **Cost:** $0 (included in Cloudflare plan; subject to API rate limits).
 
 ### `backup-db.sh`
-Creates a backup of the PostgreSQL database and optionally uploads it to Amazon S3. Run from the project root; uses `docker-compose.prod.yml` and reads DB/AWS settings from `acbc_app/.env`.
+
+Creates a compressed PostgreSQL dump, verifies it, optionally uploads it to a
+**dedicated private S3 bucket**, and prunes old local/S3 files.
+
+Run from the project root (directory that contains `docker-compose.prod.yml`).
+Uses `docker compose -f docker-compose.prod.yml` and reads settings from
+`acbc_app/.env` (shell exports override `.env`).
+
+**Security (required for S3):**
+- Use a **private** bucket (`BACKUP_S3_BUCKET`) with Block Public Access **on**.
+- Use a **dedicated IAM user** whose keys live only in `acbc_app/.env` on the droplet.
+- **Do not** reuse `AWS_STORAGE_BUCKET_NAME` (media is often `public-read`). The script **refuses** to upload when `BACKUP_S3_BUCKET` equals the media bucket name.
 
 **Usage:**
 ```bash
-cd /path/to/project
-chmod +x scripts/backup-db.sh
-BACKUP_DIR=/path/to/backups ./scripts/backup-db.sh
-```
-
-**What it does:**
-- Creates a compressed database backup via `docker compose exec postgres pg_dump`
-- Reads `DB_NAME` / `DB_USER` and AWS settings from `acbc_app/.env` (or environment)
-- Stores backups locally and deletes files older than `BACKUP_RETENTION_DAYS` (default: 7)
-- If `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_STORAGE_BUCKET_NAME` are set, uploads to `s3://<bucket>/<BACKUP_S3_PREFIX>/` (default prefix: `db-backups`)
-- Deletes S3 backups older than `BACKUP_S3_RETENTION_DAYS` (default: 7)
-
-**S3 variables** (optional, in `acbc_app/.env` or shell):
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `BACKUP_S3_PREFIX` | `db-backups` | S3 key prefix (keeps backups separate from media) |
-| `BACKUP_S3_UPLOAD` | `auto` | `auto` = upload when AWS creds exist; `false` to disable |
-| `BACKUP_RETENTION_DAYS` | `7` | Local retention |
-| `BACKUP_S3_RETENTION_DAYS` | `7` | S3 retention |
-
-**Server setup (one-time):**
-```bash
-sudo apt update && sudo apt install -y awscli
-mkdir -p /opt/backups
-chmod +x scripts/backup-db.sh
 cd /opt/acbc-app
+chmod +x scripts/backup-db.sh
 BACKUP_DIR=/opt/backups ./scripts/backup-db.sh
 ```
 
-**Automated daily backup (cron):**
-```bash
-0 2 * * * cd /opt/acbc-app && BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1
+**What it does:**
+1. `pg_dump` via `docker compose exec -T postgres` → `backup_YYYYMMDD_HHMMSS.sql.gz`
+2. Integrity checks: non-empty, minimum size (`BACKUP_MIN_BYTES`, default 1024), `gunzip -t`
+3. If S3 is enabled: upload with SSE-S3 (`AES256`) to `s3://$BACKUP_S3_BUCKET/$BACKUP_S3_PREFIX/`
+4. Prune local files older than `BACKUP_RETENTION_DAYS` and S3 objects older than `BACKUP_S3_RETENTION_DAYS`
+
+**Variables** (optional unless noted; set in `acbc_app/.env` or the shell):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BACKUP_DIR` | `./backups` | Local output directory |
+| `BACKUP_S3_BUCKET` | _(none)_ | **Required for S3 upload.** Private backup bucket name |
+| `BACKUP_AWS_ACCESS_KEY_ID` / `BACKUP_AWS_SECRET_ACCESS_KEY` | _(none)_ | **Preferred** backup-only IAM keys (override `AWS_*` for uploads) |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | _(none)_ | Fallback credentials if `BACKUP_AWS_*` unset |
+| `AWS_S3_REGION_NAME` | `us-west-2` | Region for the backup bucket |
+| `BACKUP_S3_PREFIX` | `db-backups` | Key prefix inside the backup bucket |
+| `BACKUP_S3_UPLOAD` | `auto` | `auto` = upload when creds + `BACKUP_S3_BUCKET` exist; `false` disables; `true` requires them |
+| `BACKUP_RETENTION_DAYS` | `7` | Local retention (days) |
+| `BACKUP_S3_RETENTION_DAYS` | same as local | S3 retention (days) |
+| `BACKUP_MIN_BYTES` | `1024` | Reject dumps whose **uncompressed** size is below this |
+| `DB_NAME` / `DB_USER` | from `.env` or `academiablockchain_prod` / `postgres` | Dump target |
+
+**AWS setup (one-time):**
+1. Create a private S3 bucket (e.g. `acbc-db-backups`). Enable Block Public Access; no public bucket policy.
+2. Create an IAM user for backups only. Attach a policy like:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListBackupPrefix",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": "arn:aws:s3:::acbc-db-backups",
+      "Condition": {
+        "StringLike": { "s3:prefix": ["db-backups", "db-backups/*"] }
+      }
+    },
+    {
+      "Sid": "ObjectRW",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::acbc-db-backups/db-backups/*"
+    }
+  ]
+}
 ```
+
+3. Put the backup IAM keys and bucket name in `acbc_app/.env` on the droplet (keep media keys on `AWS_*`):
+
+```env
+# Media (existing)
+AWS_ACCESS_KEY_ID=AKIA...media...
+AWS_SECRET_ACCESS_KEY=...
+AWS_STORAGE_BUCKET_NAME=academiablockchain
+AWS_S3_REGION_NAME=us-west-2
+
+# Backups (dedicated private bucket + IAM)
+BACKUP_AWS_ACCESS_KEY_ID=AKIA...backup...
+BACKUP_AWS_SECRET_ACCESS_KEY=...
+BACKUP_S3_BUCKET=acbc-db-backups
+BACKUP_S3_PREFIX=db-backups
+BACKUP_S3_UPLOAD=auto
+BACKUP_RETENTION_DAYS=7
+BACKUP_S3_RETENTION_DAYS=30
+```
+
+**DigitalOcean droplet setup (one-time):**
+```bash
+sudo apt update && sudo apt install -y awscli
+sudo mkdir -p /opt/backups /var/log
+sudo chown "$USER:$USER" /opt/backups
+# Ensure the cron user can run docker (root, or user in the docker group)
+cd /opt/acbc-app   # use your real clone path
+chmod +x scripts/backup-db.sh
+BACKUP_DIR=/opt/backups ./scripts/backup-db.sh
+# Confirm object exists and is NOT publicly readable:
+#   aws s3 ls s3://acbc-db-backups/db-backups/
+```
+
+Outbound HTTPS to S3 must remain allowed (default with UFW inbound-only rules). Droplet Backups (DigitalOcean disk snapshots) are optional and do **not** replace `pg_dump` → S3.
+
+**Automated daily backup (cron):** Cron has a minimal `PATH`; the script also prepends `/usr/local/bin:/usr/bin:/bin`, but set `PATH` in crontab for clarity:
+
+```bash
+0 2 * * * cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1
+```
+
+After the first scheduled run, check `/var/log/acbc-backup.log` and the S3 prefix. There is no built-in email/Sentry alert on failure — monitor that log (or a healthcheck wrapper) yourself.
 
 **Restore from S3:**
 ```bash
-aws s3 cp s3://YOUR_BUCKET/db-backups/backup_YYYYMMDD_HHMMSS.sql.gz /opt/backups/
+aws s3 cp s3://acbc-db-backups/db-backups/backup_YYYYMMDD_HHMMSS.sql.gz /opt/backups/
 ./scripts/restore-db.sh /opt/backups/backup_YYYYMMDD_HHMMSS.sql.gz
 ```
 
 ### `restore-db.sh`
-Restores the database from a backup file. Run from project root; uses `docker-compose.prod.yml` and `DB_NAME`/`DB_USER`.
+
+Restores PostgreSQL from a local `backup_*.sql.gz` produced by `backup-db.sh`.
+
+Run from the project root. Uses `docker compose -f docker-compose.prod.yml` and reads
+`DB_NAME` / `DB_USER` from `acbc_app/.env` (or the environment). Verifies gzip integrity
+before restoring. Prompts for confirmation unless `--yes` / `-y` is passed.
 
 **Usage:**
 ```bash
-cd /path/to/project
+cd /opt/acbc-app
 ./scripts/restore-db.sh backups/backup_20240101_120000.sql.gz
+./scripts/restore-db.sh --yes /opt/backups/backup_20240101_120000.sql.gz
 ```
-
-**What it does:**
-- Restores via `docker-compose -f docker-compose.prod.yml exec postgres psql`
-- Prompts for confirmation before proceeding
 
 ### `setup-nginx.sh`
 Sets up Nginx as a reverse proxy for the application.
@@ -246,23 +320,19 @@ sudo ./scripts/setup-nginx.sh
 
 ## Environment Variables
 
-The scripts use the following environment variables (can be set in `.env` or exported):
+Common script variables (set in `acbc_app/.env` or exported). Full backup table is under [`backup-db.sh`](#backup-dbsh).
 
-- `DB_NAME`: Database name (default: academiablockchain_prod)
-- `DB_USER`: Database user (default: postgres)
-- `BACKUP_DIR`: Backup directory (default: ./backups)
-- `BACKUP_RETENTION_DAYS`: Local backup retention in days (default: 7)
-- `BACKUP_S3_PREFIX`: S3 key prefix for backups (default: db-backups)
-- `BACKUP_S3_UPLOAD`: `auto` (default), `true`, or `false`
-- `BACKUP_S3_RETENTION_DAYS`: S3 backup retention in days (default: 7)
+- `DB_NAME` / `DB_USER`: Database target (defaults: `academiablockchain_prod` / `postgres`)
+- `BACKUP_DIR`: Local backup directory (default: `./backups`)
+- `BACKUP_S3_BUCKET`: Private S3 bucket for dumps (**required** for upload; must not equal media bucket)
+- `BACKUP_RETENTION_DAYS` / `BACKUP_S3_RETENTION_DAYS`: Local / S3 retention in days
+- `BACKUP_S3_PREFIX` / `BACKUP_S3_UPLOAD`: Key prefix and upload mode (`auto` / `true` / `false`)
 
 ## Automated Backups
 
-To set up automated daily backups, add to crontab:
-
 ```bash
-# Daily backup at 2 AM
-0 2 * * * cd /path/to/project && ./scripts/backup-db.sh
+# Daily at 2 AM — adjust /opt/acbc-app to your clone path on the droplet
+0 2 * * * cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1
 ```
 
 ## Troubleshooting
@@ -270,7 +340,7 @@ To set up automated daily backups, add to crontab:
 ### Deployment fails
 - Check that all required environment variables are set
 - Verify Docker is running
-- Check logs: `docker-compose -f docker-compose.prod.yml logs`
+- Check logs: `docker compose -f docker-compose.prod.yml logs`
 
 ### SSL setup fails
 - Ensure domain DNS points to server
@@ -278,6 +348,8 @@ To set up automated daily backups, add to crontab:
 - Verify nginx configuration
 
 ### Backup fails
-- Check database container is running
-- Verify database credentials
-- Ensure backup directory is writable
+- Check the postgres container is running: `docker compose -f docker-compose.prod.yml ps`
+- Verify `DB_NAME` / `DB_USER` in `acbc_app/.env`
+- Ensure `BACKUP_DIR` is writable
+- For S3: confirm `awscli` is installed, `BACKUP_S3_BUCKET` is set to a **private** bucket, IAM allows Put/List/Delete on the prefix, and the bucket name is **not** the media bucket
+- Read `/var/log/acbc-backup.log` after cron runs; cron without `PATH` often fails to find `docker`/`aws`
