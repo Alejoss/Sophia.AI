@@ -281,8 +281,9 @@ aws s3 ls "s3://${BACKUP_S3_BUCKET:-acbc-db-backups}/db-backups/"
 Cron needs `docker` and `aws` on `PATH`. With `BACKUP_DIR` in `.env`, no inline prefix is required.
 
 ```bash
-# Daily backup at 2 AM (local + private S3 when BACKUP_S3_BUCKET + AWS keys are set)
-(crontab -l 2>/dev/null; echo "0 2 * * * cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1") | crontab -
+# Weekly backup — Sundays at 2 AM (local + private S3 when BACKUP_S3_BUCKET + AWS keys are set)
+(crontab -l 2>/dev/null; echo "0 2 * * 0 cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1") | crontab -
+crontab -l   # confirm the line is present
 ```
 
 ## Step 9: Configure Monitoring (Optional)
