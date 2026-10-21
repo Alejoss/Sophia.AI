@@ -226,33 +226,58 @@ docker-compose -f docker-compose.prod.yml exec backend python manage.py createsu
 
 ## Step 8: Set Up Automated Backups
 
-### Install AWS CLI (for S3 upload)
+Use a **dedicated private S3 bucket** and a **backup-only IAM user**. Do not store
+dumps in the public media bucket. Details and IAM policy:
+[scripts/README.md](../../scripts/README.md#backup-dbsh).
 
-If `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_STORAGE_BUCKET_NAME` are set in `acbc_app/.env`, backups are uploaded automatically to `s3://<bucket>/db-backups/`.
+### Install AWS CLI (for S3 upload)
 
 ```bash
 sudo apt install -y awscli
 ```
 
+### Configure `acbc_app/.env` on the droplet
+
+```env
+AWS_S3_REGION_NAME=us-west-2
+BACKUP_AWS_ACCESS_KEY_ID=AKIA...   # backup-only IAM (preferred over reusing media keys)
+BACKUP_AWS_SECRET_ACCESS_KEY=...
+BACKUP_S3_BUCKET=acbc-db-backups    # private bucket; Block Public Access ON
+BACKUP_S3_PREFIX=db-backups
+BACKUP_S3_UPLOAD=auto
+BACKUP_RETENTION_DAYS=7
+BACKUP_S3_RETENTION_DAYS=30
+```
+
+Keep media credentials on `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. The backup script
+prefers `BACKUP_AWS_*` when both are present.
+
 ### Create backup directory
 
 ```bash
-mkdir -p /opt/backups
+sudo mkdir -p /opt/backups
+sudo chown "$USER:$USER" /opt/backups
 ```
 
 ### Test backup manually
 
+Use your real clone path (examples below use `/opt/acbc-app`; some older docs used `/opt/sophia-ai`).
+
 ```bash
-cd /opt/sophia-ai   # or /opt/acbc-app
+cd /opt/acbc-app
 chmod +x scripts/backup-db.sh
 BACKUP_DIR=/opt/backups ./scripts/backup-db.sh
+aws s3 ls "s3://${BACKUP_S3_BUCKET:-acbc-db-backups}/db-backups/"
+# Confirm the object is not publicly readable (no public ACL / no public GetObject policy).
 ```
 
 ### Add to crontab
 
+Cron needs `docker` and `aws` on `PATH`. The script also prepends common paths.
+
 ```bash
-# Daily backup at 2 AM (local + S3 when AWS vars are configured)
-(crontab -l 2>/dev/null; echo "0 2 * * * cd /opt/sophia-ai && BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1") | crontab -
+# Daily backup at 2 AM (local + private S3 when BACKUP_S3_BUCKET + AWS keys are set)
+(crontab -l 2>/dev/null; echo "0 2 * * * cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1") | crontab -
 ```
 
 ## Step 9: Configure Monitoring (Optional)
@@ -295,13 +320,16 @@ docker-compose -f docker-compose.prod.yml logs -f nginx
 ### Backup Database
 
 ```bash
-./scripts/backup-db.sh
+cd /opt/acbc-app
+BACKUP_DIR=/opt/backups ./scripts/backup-db.sh
 ```
 
 ### Restore Database
 
 ```bash
-./scripts/restore-db.sh backups/backup_YYYYMMDD_HHMMSS.sql.gz
+cd /opt/acbc-app
+# From S3: aws s3 cp s3://acbc-db-backups/db-backups/backup_YYYYMMDD_HHMMSS.sql.gz /opt/backups/
+./scripts/restore-db.sh /opt/backups/backup_YYYYMMDD_HHMMSS.sql.gz
 ```
 
 ## Troubleshooting

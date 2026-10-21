@@ -320,7 +320,20 @@ Self-custody exact-amount BCH for `TranscriptAnchorRequest` only (events and kno
 
 ### Database backups (`scripts/backup-db.sh`)
 
-Uses the same AWS credentials as media storage. Upload is automatic when `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_STORAGE_BUCKET_NAME` are set.
+Uploads go to a **dedicated private** bucket (`BACKUP_S3_BUCKET`), not the media bucket.
+Prefer a backup-only IAM user. The script refuses to upload when `BACKUP_S3_BUCKET`
+equals `AWS_STORAGE_BUCKET_NAME`. Full setup: [scripts/README.md](../../scripts/README.md#backup-dbsh).
+
+#### `BACKUP_S3_BUCKET`
+- **Description**: Private S3 bucket for database dumps (required for S3 upload)
+- **Required**: Yes for automated S3 upload
+- **Example**: `BACKUP_S3_BUCKET=acbc-db-backups`
+- **Note**: Must differ from `AWS_STORAGE_BUCKET_NAME`. Enable Block Public Access on this bucket.
+
+#### `BACKUP_AWS_ACCESS_KEY_ID` / `BACKUP_AWS_SECRET_ACCESS_KEY`
+- **Description**: Optional backup-only IAM credentials. When set, `backup-db.sh` uses these instead of `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` for upload/prune.
+- **Required**: No (falls back to `AWS_*`)
+- **Example**: `BACKUP_AWS_ACCESS_KEY_ID=AKIA...`
 
 #### `BACKUP_S3_PREFIX`
 - **Description**: S3 key prefix for database dumps
@@ -328,14 +341,19 @@ Uses the same AWS credentials as media storage. Upload is automatic when `AWS_AC
 - **Example**: `BACKUP_S3_PREFIX=db-backups`
 
 #### `BACKUP_S3_UPLOAD`
-- **Description**: Control S3 upload (`auto` uploads when AWS creds exist)
+- **Description**: Control S3 upload (`auto` uploads when AWS creds + `BACKUP_S3_BUCKET` exist)
 - **Default**: `auto`
 - **Example**: `BACKUP_S3_UPLOAD=false`
 
 #### `BACKUP_RETENTION_DAYS` / `BACKUP_S3_RETENTION_DAYS`
-- **Description**: Days to keep local / S3 backups
-- **Default**: `7`
+- **Description**: Days to keep local / S3 backups (read from `acbc_app/.env` or the shell)
+- **Default**: `7` (S3 defaults to the local value when unset)
 - **Example**: `BACKUP_S3_RETENTION_DAYS=30`
+
+#### `BACKUP_MIN_BYTES`
+- **Description**: Minimum **uncompressed** dump size in bytes; smaller dumps fail before upload
+- **Default**: `1024`
+- **Example**: `BACKUP_MIN_BYTES=1024`
 
 ### Email (Optional – SMTP2GO)
 
@@ -475,11 +493,20 @@ DB_PORT=5432
 GOOGLE_OAUTH_CLIENT_ID=your-client-id
 GOOGLE_OAUTH_SECRET_KEY=your-secret-key
 
-# AWS S3
+# AWS S3 (media)
 AWS_ACCESS_KEY_ID=your-access-key
 AWS_SECRET_ACCESS_KEY=your-secret-key
 AWS_STORAGE_BUCKET_NAME=academiablockchain
 AWS_S3_REGION_NAME=us-west-2
+
+# Database backups (private bucket + backup-only IAM keys)
+BACKUP_AWS_ACCESS_KEY_ID=your-backup-access-key
+BACKUP_AWS_SECRET_ACCESS_KEY=your-backup-secret-key
+BACKUP_S3_BUCKET=acbc-db-backups
+BACKUP_S3_PREFIX=db-backups
+BACKUP_S3_UPLOAD=auto
+BACKUP_RETENTION_DAYS=7
+BACKUP_S3_RETENTION_DAYS=30
 
 # Monitoring
 SENTRY_DSN=your-sentry-dsn

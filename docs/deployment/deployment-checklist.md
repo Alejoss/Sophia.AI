@@ -213,7 +213,7 @@ docker compose -f docker-compose.prod.yml logs backend --tail=20
 
 - [ ] **SSL/HTTPS**: `scripts/setup-ssl.sh`; Let's Encrypt. Ver [setup-ssl](../../scripts/README.md#setup-sslsh).
 - [ ] **Firewall**: Verificar que solo puertos necesarios están abiertos (22, 80, 443).
-- [ ] **Backups**: `scripts/backup-db.sh`; cron. Ver [scripts/README](../../scripts/README.md#backup-dbsh).
+- [ ] **Backups**: `BACKUP_S3_BUCKET` privado + IAM dedicado; `scripts/backup-db.sh` + cron. Ver [scripts/README](../../scripts/README.md#backup-dbsh).
 - [ ] **Monitoreo**: Alertas y monitoreo básico; health `GET /health/`, `GET /health`.
 - [ ] **Logs**: Rotación vía `LOGGING` (RotatingFileHandler). Ver [logging-and-observability](../../docs/backend/logging-and-observability.md).
 - [ ] **Actualizaciones**: Actualizaciones de seguridad del SO y de imágenes Docker.
@@ -278,12 +278,12 @@ git pull origin main
 
 ### Backups
 
-Usa `scripts/backup-db.sh` y `scripts/restore-db.sh` (desde la raíz del proyecto; usan `docker-compose.prod.yml`). Ver [scripts/README](../../scripts/README.md).
+Usa `scripts/backup-db.sh` y `scripts/restore-db.sh` (desde la raíz del proyecto; usan `docker-compose.prod.yml`). Configura `BACKUP_S3_BUCKET` (bucket privado) + IAM dedicado. Ver [scripts/README](../../scripts/README.md#backup-dbsh).
 
 ```bash
 cd /opt/acbc-app
-./scripts/backup-db.sh
-# Restaurar: ./scripts/restore-db.sh backups/backup_YYYYMMDD_HHMMSS.sql.gz
+BACKUP_DIR=/opt/backups ./scripts/backup-db.sh
+# Restaurar: ./scripts/restore-db.sh /opt/backups/backup_YYYYMMDD_HHMMSS.sql.gz
 ```
 
 ## ❌ Problemas Comunes
