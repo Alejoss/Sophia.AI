@@ -178,7 +178,8 @@ Uses `docker compose -f docker-compose.prod.yml` and reads settings from
 ```bash
 cd /opt/acbc-app
 chmod +x scripts/backup-db.sh
-BACKUP_DIR=/opt/backups ./scripts/backup-db.sh
+# Prefer BACKUP_DIR=/opt/backups in acbc_app/.env, then:
+./scripts/backup-db.sh
 ```
 
 **What it does:**
@@ -191,7 +192,7 @@ BACKUP_DIR=/opt/backups ./scripts/backup-db.sh
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BACKUP_DIR` | `./backups` | Local output directory |
+| `BACKUP_DIR` | `./backups` | Local output directory (set in `.env` or the shell) |
 | `BACKUP_S3_BUCKET` | _(none)_ | **Required for S3 upload.** Private backup bucket name |
 | `BACKUP_AWS_ACCESS_KEY_ID` / `BACKUP_AWS_SECRET_ACCESS_KEY` | _(none)_ | **Preferred** backup-only IAM keys (override `AWS_*` for uploads) |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | _(none)_ | Fallback credentials if `BACKUP_AWS_*` unset |
@@ -242,6 +243,7 @@ AWS_S3_REGION_NAME=us-west-2
 # Backups (dedicated private bucket + IAM)
 BACKUP_AWS_ACCESS_KEY_ID=AKIA...backup...
 BACKUP_AWS_SECRET_ACCESS_KEY=...
+BACKUP_DIR=/opt/backups
 BACKUP_S3_BUCKET=acbc-db-backups
 BACKUP_S3_PREFIX=db-backups
 BACKUP_S3_UPLOAD=auto
@@ -257,17 +259,17 @@ sudo chown "$USER:$USER" /opt/backups
 # Ensure the cron user can run docker (root, or user in the docker group)
 cd /opt/acbc-app   # use your real clone path
 chmod +x scripts/backup-db.sh
-BACKUP_DIR=/opt/backups ./scripts/backup-db.sh
+./scripts/backup-db.sh
 # Confirm object exists and is NOT publicly readable:
 #   aws s3 ls s3://acbc-db-backups/db-backups/
 ```
 
 Outbound HTTPS to S3 must remain allowed (default with UFW inbound-only rules). Droplet Backups (DigitalOcean disk snapshots) are optional and do **not** replace `pg_dump` → S3.
 
-**Automated daily backup (cron):** Cron has a minimal `PATH`; the script also prepends `/usr/local/bin:/usr/bin:/bin`, but set `PATH` in crontab for clarity:
+**Automated daily backup (cron):** Cron has a minimal `PATH`; the script also appends common dirs, but set `PATH` in crontab for clarity. With `BACKUP_DIR` in `.env`, no prefix vars are needed:
 
 ```bash
-0 2 * * * cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1
+0 2 * * * cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1
 ```
 
 After the first scheduled run, check `/var/log/acbc-backup.log` and the S3 prefix. There is no built-in email/Sentry alert on failure — monitor that log (or a healthcheck wrapper) yourself.

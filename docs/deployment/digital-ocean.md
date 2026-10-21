@@ -242,6 +242,7 @@ sudo apt install -y awscli
 AWS_S3_REGION_NAME=us-west-2
 BACKUP_AWS_ACCESS_KEY_ID=AKIA...   # backup-only IAM (preferred over reusing media keys)
 BACKUP_AWS_SECRET_ACCESS_KEY=...
+BACKUP_DIR=/opt/backups
 BACKUP_S3_BUCKET=acbc-db-backups    # private bucket; Block Public Access ON
 BACKUP_S3_PREFIX=db-backups
 BACKUP_S3_UPLOAD=auto
