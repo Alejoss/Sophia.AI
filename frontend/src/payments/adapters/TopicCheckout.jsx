@@ -7,7 +7,7 @@ import {
 import { PRODUCT_KINDS } from '../productCatalog';
 
 /**
- * Topic consultas checkout adapter (Payphone + BCH + Monero; no NOWPayments).
+ * Topic consultas checkout adapter (card message + BCH + Monero; no NOWPayments).
  */
 const TopicCheckout = ({
   open,

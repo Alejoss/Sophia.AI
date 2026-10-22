@@ -29,6 +29,11 @@ const formatApiError = (err, fallback) => {
   return fallback;
 };
 
+/**
+ * Operator-message checkout (Monero, card, etc.): prefill a DM to user #2.
+ *
+ * Pass `copyKey` + `buildMessage` + optional `contactUserId` to reuse for other rails.
+ */
 const MoneroPaymentModal = ({
   open,
   onClose,
@@ -36,12 +41,15 @@ const MoneroPaymentModal = ({
   title,
   priceUsd,
   productLabel,
+  copyKey = 'monero',
+  buildMessage = buildMoneroPaymentMessage,
+  contactUserId = MONERO_CONTACT_USER_ID,
 }) => {
   const { t } = useTranslation('payments');
   const navigate = useNavigate();
   const { authState } = useAuth();
   const currentUser = authState?.user;
-  const isSelf = Number(currentUser?.id) === MONERO_CONTACT_USER_ID;
+  const isSelf = Number(currentUser?.id) === Number(contactUserId);
 
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -53,13 +61,13 @@ const MoneroPaymentModal = ({
       setError(null);
       return undefined;
     }
-    setText(buildMoneroPaymentMessage({
+    setText(buildMessage({
       title,
       priceUsd,
       productLabel: productLabel || t('genericProduct'),
     }));
     return undefined;
-  }, [open, title, priceUsd, productLabel, t]);
+  }, [open, title, priceUsd, productLabel, t, buildMessage]);
 
   const handleSend = async () => {
     const message = text.trim();
@@ -68,16 +76,16 @@ const MoneroPaymentModal = ({
     setBusy(true);
     setError(null);
     try {
-      const threadRes = await fetchOrCreateThread(MONERO_CONTACT_USER_ID);
+      const threadRes = await fetchOrCreateThread(contactUserId);
       const thread = threadRes?.data;
       if (!thread?.id) {
-        throw new Error(t('monero.openThreadError'));
+        throw new Error(t(`${copyKey}.openThreadError`));
       }
       await sendMessage(thread.id, message);
       onClose?.();
-      navigate(`/messages/thread/${MONERO_CONTACT_USER_ID}`);
+      navigate(`/messages/thread/${contactUserId}`);
     } catch (err) {
-      setError(formatApiError(err, t('monero.sendError')));
+      setError(formatApiError(err, t(`${copyKey}.sendError`)));
     } finally {
       setBusy(false);
     }
@@ -88,7 +96,7 @@ const MoneroPaymentModal = ({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ pr: 6 }}>
-        {t('monero.title')}
+        {t(`${copyKey}.title`)}
         <IconButton
           aria-label={t('close')}
           onClick={onClose}
@@ -106,16 +114,16 @@ const MoneroPaymentModal = ({
             </Typography>
           )}
           <Typography variant="body1">
-            {t('monero.description')}
+            {t(`${copyKey}.description`)}
           </Typography>
           {isSelf && (
             <Alert severity="info">
-              {t('monero.self')}
+              {t(`${copyKey}.self`)}
             </Alert>
           )}
           {error && <Alert severity="error">{error}</Alert>}
           <TextField
-            label={t('monero.messageLabel')}
+            label={t(`${copyKey}.messageLabel`)}
             value={text}
             onChange={(event) => setText(event.target.value)}
             multiline
@@ -133,7 +141,7 @@ const MoneroPaymentModal = ({
           onClick={handleSend}
           startIcon={busy ? <CircularProgress size={16} color="inherit" /> : null}
         >
-          {busy ? t('sending') : t('monero.send')}
+          {busy ? t('sending') : t(`${copyKey}.send`)}
         </Button>
         <Button onClick={onClose} fullWidth>
           {t('close')}
