@@ -49,7 +49,7 @@ describe('productCatalog matrix', () => {
     expect(PRODUCT_CATALOG[PRODUCT_KINDS.ANCHOR].defaultTitle).toBe(ANCHOR_PAYMENT_TITLE);
   });
 
-  it('path: NOW + Payphone + Monero when for sale; BCH when flag + gateway', () => {
+  it('path: NOW + card message + Monero when for sale; BCH when flag + gateway; Payphone off', () => {
     const methods = resolveAvailableMethods({
       kind: PRODUCT_KINDS.PATH,
       gatewayStatus: gatewayAllOn,
@@ -57,26 +57,28 @@ describe('productCatalog matrix', () => {
     });
     expect(methods).toMatchObject({
       nowpayments: true,
-      payphone: true,
+      payphone: false,
+      card: true,
       bch_direct: true,
       monero: true,
       platform_tokens: false,
     });
   });
 
-  it('path: no NOW/Payphone/Monero when not for sale', () => {
+  it('path: no NOW/card/Monero when not for sale', () => {
     const methods = resolveAvailableMethods({
       kind: PRODUCT_KINDS.PATH,
       gatewayStatus: gatewayAllOn,
       productFlags: { isForSale: false, bchDirectAvailable: true },
     });
     expect(methods.nowpayments).toBe(false);
+    expect(methods.card).toBe(false);
     expect(methods.payphone).toBe(false);
     expect(methods.monero).toBe(false);
     expect(methods.bch_direct).toBe(true);
   });
 
-  it('topic: Payphone when for sale; never NOWPayments; BCH by flag', () => {
+  it('topic: card message when for sale; never NOWPayments or Payphone; BCH by flag', () => {
     const methods = resolveAvailableMethods({
       kind: PRODUCT_KINDS.TOPIC,
       gatewayStatus: gatewayAllOn,
@@ -84,7 +86,8 @@ describe('productCatalog matrix', () => {
     });
     expect(methods).toMatchObject({
       nowpayments: false,
-      payphone: true,
+      payphone: false,
+      card: true,
       bch_direct: true,
       monero: true,
       platform_tokens: false,
@@ -99,9 +102,10 @@ describe('productCatalog matrix', () => {
     });
     expect(methods.bch_direct).toBe(false);
     expect(methods.monero).toBe(true);
+    expect(methods.card).toBe(true);
   });
 
-  it('event: NOW + Payphone + Monero; never BCH or tokens', () => {
+  it('event: NOW + card + Monero; never BCH, tokens, or Payphone', () => {
     const methods = resolveAvailableMethods({
       kind: PRODUCT_KINDS.EVENT,
       gatewayStatus: gatewayAllOn,
@@ -109,14 +113,15 @@ describe('productCatalog matrix', () => {
     });
     expect(methods).toMatchObject({
       nowpayments: true,
-      payphone: true,
+      payphone: false,
+      card: true,
       bch_direct: false,
       monero: true,
       platform_tokens: false,
     });
   });
 
-  it('course: NOW + Payphone + BCH + Monero when gateway on; never tokens', () => {
+  it('course: NOW + card + BCH + Monero when gateway on; never tokens or Payphone', () => {
     const methods = resolveAvailableMethods({
       kind: PRODUCT_KINDS.COURSE,
       gatewayStatus: gatewayAllOn,
@@ -124,14 +129,15 @@ describe('productCatalog matrix', () => {
     });
     expect(methods).toMatchObject({
       nowpayments: true,
-      payphone: true,
+      payphone: false,
+      card: true,
       bch_direct: true,
       monero: true,
       platform_tokens: false,
     });
   });
 
-  it('course: disables NOW/Payphone/BCH when gateway reports them off', () => {
+  it('course: disables NOW/BCH when gateway reports them off; card and Monero stay', () => {
     const methods = resolveAvailableMethods({
       kind: PRODUCT_KINDS.COURSE,
       gatewayStatus: gatewayAllOff,
@@ -140,10 +146,11 @@ describe('productCatalog matrix', () => {
     expect(methods.nowpayments).toBe(false);
     expect(methods.payphone).toBe(false);
     expect(methods.bch_direct).toBe(false);
+    expect(methods.card).toBe(true);
     expect(methods.monero).toBe(true);
   });
 
-  it('anchor: tokens + NOW + Payphone + BCH + Monero when gateway on', () => {
+  it('anchor: tokens + NOW + card + BCH + Monero when gateway on; Payphone off', () => {
     const methods = resolveAvailableMethods({
       kind: PRODUCT_KINDS.ANCHOR,
       gatewayStatus: gatewayAllOn,
@@ -151,7 +158,8 @@ describe('productCatalog matrix', () => {
     });
     expect(methods).toMatchObject({
       nowpayments: true,
-      payphone: true,
+      payphone: false,
+      card: true,
       bch_direct: true,
       monero: true,
       platform_tokens: true,
@@ -168,10 +176,11 @@ describe('productCatalog matrix', () => {
     expect(methods.payphone).toBe(false);
     expect(methods.bch_direct).toBe(false);
     expect(methods.platform_tokens).toBe(false);
+    expect(methods.card).toBe(true);
     expect(methods.monero).toBe(true);
   });
 
-  it('token_package: NOW + Payphone + BCH; never Monero or platform tokens', () => {
+  it('token_package: NOW + card + BCH; never Monero, Payphone, or platform tokens', () => {
     const methods = resolveAvailableMethods({
       kind: PRODUCT_KINDS.TOKEN_PACKAGE,
       gatewayStatus: gatewayAllOn,
@@ -179,14 +188,15 @@ describe('productCatalog matrix', () => {
     });
     expect(methods).toMatchObject({
       nowpayments: true,
-      payphone: true,
+      payphone: false,
+      card: true,
       bch_direct: true,
       monero: false,
       platform_tokens: false,
     });
   });
 
-  it('disables NOW/Payphone/BCH when gateway reports them off', () => {
+  it('disables NOW/BCH when gateway reports them off', () => {
     const methods = resolveAvailableMethods({
       kind: PRODUCT_KINDS.PATH,
       gatewayStatus: gatewayAllOff,
@@ -195,6 +205,7 @@ describe('productCatalog matrix', () => {
     expect(methods.nowpayments).toBe(false);
     expect(methods.payphone).toBe(false);
     expect(methods.bch_direct).toBe(false);
+    expect(methods.card).toBe(true);
     expect(methods.monero).toBe(true);
   });
 });

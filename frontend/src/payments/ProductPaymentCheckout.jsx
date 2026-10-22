@@ -18,13 +18,17 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { createPayphonePayment, getPaymentGatewayStatus } from '../api/paymentsApi';
+import { getPaymentGatewayStatus } from '../api/paymentsApi';
 import CryptoPaymentModal from '../events/CryptoPaymentModal';
 import MoneroPaymentModal from './MoneroPaymentModal';
 import BchPaymentSupportModal from './BchPaymentSupportModal';
 import BchAddressQr from './BchAddressQr';
 import BchOrderExpiryNotice from './BchOrderExpiryNotice';
 import { isLikelyBchTxid, normalizeBchTxid } from './bchPaymentSupport';
+import {
+  CARD_CONTACT_USER_ID,
+  buildCardPaymentMessage,
+} from './cardPayment';
 import {
   PRODUCT_KINDS,
   getProductCatalogEntry,
@@ -55,7 +59,7 @@ const ProductPaymentCheckout = ({
   chooserTitle: chooserTitleProp,
   paidSuccessMessage: paidSuccessMessageProp,
   offerNowpayments,
-  offerPayphone,
+  offerCard,
   offerBch,
   offerMonero,
   offerTokens = false,
@@ -91,7 +95,7 @@ const ProductPaymentCheckout = ({
     : paidDeferredMessage;
 
   const explicitOffers = offerNowpayments != null
-    || offerPayphone != null
+    || offerCard != null
     || offerBch != null
     || offerMonero != null
     || offerTokens
@@ -99,7 +103,7 @@ const ProductPaymentCheckout = ({
 
   const [methods, setMethods] = useState({
     nowpayments: Boolean(offerNowpayments),
-    payphone: Boolean(offerPayphone),
+    card: offerCard !== false,
     bch_direct: Boolean(offerBch),
     monero: offerMonero !== false,
     platform_tokens: Boolean(offerTokens),
@@ -107,8 +111,6 @@ const ProductPaymentCheckout = ({
   const [bchNetwork, setBchNetwork] = useState(null);
   const [loadingMethods, setLoadingMethods] = useState(false);
   const [method, setMethod] = useState(null);
-  const [payphoneBusy, setPayphoneBusy] = useState(false);
-  const [payphoneError, setPayphoneError] = useState('');
   const [bchOrder, setBchOrder] = useState(null);
   const [bchBusy, setBchBusy] = useState(false);
   const [bchError, setBchError] = useState(null);
@@ -148,8 +150,6 @@ const ProductPaymentCheckout = ({
       setVerifyTxid('');
       setTokenBusy(false);
       setTokenError('');
-      setPayphoneBusy(false);
-      setPayphoneError('');
       return undefined;
     }
     let cancelled = false;
@@ -165,7 +165,7 @@ const ProductPaymentCheckout = ({
           });
           setMethods({
             nowpayments: resolved.nowpayments,
-            payphone: resolved.payphone,
+            card: resolved.card,
             bch_direct: resolved.bch_direct,
             monero: resolved.monero,
             platform_tokens: resolved.platform_tokens,
@@ -176,8 +176,7 @@ const ProductPaymentCheckout = ({
         setMethods({
           nowpayments: (offerNowpayments !== false)
             && Boolean(data?.methods?.nowpayments ?? data?.enabled),
-          payphone: (offerPayphone !== false)
-            && Boolean(data?.methods?.payphone ?? data?.payphone_enabled),
+          card: offerCard !== false,
           bch_direct: Boolean(offerBch)
             && Boolean(data?.methods?.bch_direct ?? data?.bch_direct_enabled),
           monero: offerMonero !== false,
@@ -196,7 +195,7 @@ const ProductPaymentCheckout = ({
           });
           setMethods({
             nowpayments: false,
-            payphone: false,
+            card: resolved.card,
             bch_direct: false,
             monero: resolved.monero,
             platform_tokens: resolved.platform_tokens,
@@ -206,7 +205,7 @@ const ProductPaymentCheckout = ({
         }
         setMethods({
           nowpayments: Boolean(offerNowpayments),
-          payphone: Boolean(offerPayphone),
+          card: offerCard !== false,
           bch_direct: Boolean(offerBch),
           monero: offerMonero !== false,
           platform_tokens: Boolean(offerTokens),
@@ -224,7 +223,7 @@ const ProductPaymentCheckout = ({
     productKind,
     explicitOffers,
     offerNowpayments,
-    offerPayphone,
+    offerCard,
     offerBch,
     offerMonero,
     offerTokens,
@@ -270,35 +269,6 @@ const ProductPaymentCheckout = ({
       setBchBusy(false);
     }
   };
-
-  const startPayphone = async () => {
-    if (!resolvedPaymentTarget?.kind || resolvedPaymentTarget?.purchaseId == null) {
-      setPayphoneError(t('checkout.noCardProduct'));
-      return;
-    }
-    if (payphoneBusy) return;
-    setPayphoneBusy(true);
-    setPayphoneError('');
-    try {
-      const order = await createPayphonePayment({
-        kind: resolvedPaymentTarget.kind,
-        purchaseId: resolvedPaymentTarget.purchaseId,
-      });
-      const url = order.pay_with_card_url || order.pay_with_payphone_url;
-      if (!url) {
-        throw new Error(t('checkout.noPayphoneLink'));
-      }
-      setMethod('payphone');
-      // Full-page redirect required by Payphone (no iframe) so the Referer matches
-      // the WEB app domain registered in Payphone Developers.
-      window.location.assign(url);
-    } catch (err) {
-      setMethod(null);
-      setPayphoneError(formatApiError(err, t('checkout.cardStartError')));
-      setPayphoneBusy(false);
-    }
-  };
-
 
   const applyPaidResult = (data, { fromTokens = false } = {}) => {
     setPaid(true);
@@ -374,14 +344,14 @@ const ProductPaymentCheckout = ({
   const canPayTokens = Number(localTokenBalance) >= Number(localPriceTokens);
   const showChooser = open && method === null && !paid;
   const showNowpayments = open && method === 'nowpayments';
-  const showPayphone = open && method === 'payphone';
+  const showCard = open && method === 'card';
   const showBch = open && method === 'bch' && !supportOpen;
   const showMonero = open && method === 'monero';
   const showTokens = open && method === 'tokens';
   const showSupport = open && supportOpen;
 
   const hasAnyMethod = methods.nowpayments
-    || methods.payphone
+    || methods.card
     || methods.bch_direct
     || methods.monero
     || methods.platform_tokens;
@@ -389,9 +359,9 @@ const ProductPaymentCheckout = ({
   const catalogAllowsNow = catalog
     ? catalog.methods.nowpayments !== false
     : offerNowpayments !== false;
-  const catalogAllowsPayphone = catalog
-    ? catalog.methods.payphone !== false
-    : offerPayphone !== false;
+  const catalogAllowsCard = catalog
+    ? catalog.methods.card !== false
+    : offerCard !== false;
   const catalogAllowsBch = catalog
     ? catalog.methods.bch !== false
     : Boolean(offerBch);
@@ -450,18 +420,15 @@ const ProductPaymentCheckout = ({
                   {t('checkout.needTokens', { count: localPriceTokens })}
                 </Typography>
               )}
-              {catalogAllowsPayphone && (
+              {catalogAllowsCard && (
                 <Button
                   variant={catalogAllowsTokens ? 'outlined' : 'contained'}
                   size="large"
-                  disabled={!methods.payphone || payphoneBusy}
-                  onClick={startPayphone}
+                  disabled={!methods.card}
+                  onClick={() => setMethod('card')}
                 >
-                  {payphoneBusy ? t('checkout.openingPayphone') : t('checkout.card')}
+                  {t('checkout.card')}
                 </Button>
-              )}
-              {catalogAllowsPayphone && payphoneError && method === null && (
-                <Alert severity="error">{payphoneError}</Alert>
               )}
               {catalogAllowsNow && (
                 <Button
@@ -505,33 +472,6 @@ const ProductPaymentCheckout = ({
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>{t('cancel')}</Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={showPayphone} onClose={onClose} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ pr: 6 }}>
-          {t('checkout.cardTitle')}
-          <IconButton
-            aria-label={t('close')}
-            onClick={onClose}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Stack alignItems="center" spacing={2} sx={{ py: 3 }}>
-            <CircularProgress size={28} />
-            <Typography variant="body2" color="text.secondary" textAlign="center">
-              {t('checkout.cardRedirect')}
-            </Typography>
-            {payphoneError && <Alert severity="error">{payphoneError}</Alert>}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setMethod(null); setPayphoneBusy(false); }}>
-            {t('back')}
-          </Button>
         </DialogActions>
       </Dialog>
 
@@ -613,6 +553,18 @@ const ProductPaymentCheckout = ({
           </Stack>
         </DialogActions>
       </Dialog>
+
+      <MoneroPaymentModal
+        open={showCard}
+        onClose={onClose}
+        onBackToMethods={() => setMethod(null)}
+        title={title}
+        priceUsd={priceUsd}
+        productLabel={productLabel}
+        copyKey="card"
+        buildMessage={buildCardPaymentMessage}
+        contactUserId={CARD_CONTACT_USER_ID}
+      />
 
       <MoneroPaymentModal
         open={showMonero}
