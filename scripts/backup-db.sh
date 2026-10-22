@@ -14,12 +14,12 @@
 # Run from the project root (directory that contains docker-compose.prod.yml).
 # Reads DB/AWS/BACKUP_* settings from acbc_app/.env (or the environment).
 #
-# Example:
-#   BACKUP_DIR=/opt/backups ./scripts/backup-db.sh
+# Example (BACKUP_DIR can also live in acbc_app/.env):
+#   ./scripts/backup-db.sh
 #
 # Cron (set PATH so docker/aws are found):
 #   0 2 * * * cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin \
-#     BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1
+#     ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1
 
 set -euo pipefail
 
@@ -31,7 +31,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 # Shell-exported values win; otherwise load_config() fills from acbc_app/.env, then defaults.
-BACKUP_DIR="${BACKUP_DIR:-./backups}"
+BACKUP_DIR="${BACKUP_DIR:-}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-}"
 BACKUP_S3_RETENTION_DAYS="${BACKUP_S3_RETENTION_DAYS:-}"
 BACKUP_S3_PREFIX="${BACKUP_S3_PREFIX:-}"
@@ -43,7 +43,7 @@ COMPOSE_FILE="docker-compose.prod.yml"
 ENV_FILE="acbc_app/.env"
 
 DATE="$(date +%Y%m%d_%H%M%S)"
-BACKUP_FILE="$BACKUP_DIR/backup_$DATE.sql.gz"
+BACKUP_FILE=""
 
 read_env_key() {
     local file="$1"
@@ -81,6 +81,7 @@ load_config() {
         BACKUP_AWS_ACCESS_KEY_ID="${BACKUP_AWS_ACCESS_KEY_ID:-$(read_env_key "$ENV_FILE" "BACKUP_AWS_ACCESS_KEY_ID")}"
         BACKUP_AWS_SECRET_ACCESS_KEY="${BACKUP_AWS_SECRET_ACCESS_KEY:-$(read_env_key "$ENV_FILE" "BACKUP_AWS_SECRET_ACCESS_KEY")}"
 
+        BACKUP_DIR="${BACKUP_DIR:-$(read_env_key "$ENV_FILE" "BACKUP_DIR")}"
         BACKUP_S3_BUCKET="${BACKUP_S3_BUCKET:-$(read_env_key "$ENV_FILE" "BACKUP_S3_BUCKET")}"
         BACKUP_S3_PREFIX="${BACKUP_S3_PREFIX:-$(read_env_key "$ENV_FILE" "BACKUP_S3_PREFIX")}"
         BACKUP_S3_UPLOAD="${BACKUP_S3_UPLOAD:-$(read_env_key "$ENV_FILE" "BACKUP_S3_UPLOAD")}"
@@ -92,11 +93,13 @@ load_config() {
     DB_NAME="${DB_NAME:-academiablockchain_prod}"
     DB_USER="${DB_USER:-postgres}"
     AWS_S3_REGION_NAME="${AWS_S3_REGION_NAME:-us-west-2}"
+    BACKUP_DIR="${BACKUP_DIR:-./backups}"
     BACKUP_S3_PREFIX="${BACKUP_S3_PREFIX:-db-backups}"
     BACKUP_S3_UPLOAD="${BACKUP_S3_UPLOAD:-auto}"
     BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
     BACKUP_S3_RETENTION_DAYS="${BACKUP_S3_RETENTION_DAYS:-$BACKUP_RETENTION_DAYS}"
     BACKUP_MIN_BYTES="${BACKUP_MIN_BYTES:-1024}"
+    BACKUP_FILE="$BACKUP_DIR/backup_$DATE.sql.gz"
 
     # Prefer dedicated backup IAM keys when set; otherwise fall back to AWS_*.
     if [ -n "${BACKUP_AWS_ACCESS_KEY_ID:-}" ]; then
@@ -143,7 +146,9 @@ should_upload_to_s3() {
 
     if ! command -v aws >/dev/null 2>&1; then
         echo "❌ S3 upload enabled but AWS CLI is not installed."
-        echo "   Install with: sudo apt install -y awscli"
+        echo "   Ubuntu 24.04+: install AWS CLI v2 (apt has no awscli package):"
+        echo "     curl -fsSL 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip' -o /tmp/awscliv2.zip"
+        echo "     sudo apt-get install -y unzip && unzip -q /tmp/awscliv2.zip -d /tmp && sudo /tmp/aws/install"
         exit 1
     fi
 

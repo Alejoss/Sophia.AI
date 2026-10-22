@@ -171,7 +171,7 @@ curl -I http://localhost/
 2. **Backups automáticos**
    - Script: `scripts/backup-db.sh`. Ejecutar desde la raíz del proyecto; usa `docker-compose.prod.yml`.
    - Bucket privado dedicado (`BACKUP_S3_BUCKET`) + IAM de backups; no usar el bucket de media.
-   - Cron: `0 2 * * * cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin BACKUP_DIR=/opt/backups ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1` (ver [scripts/README](../../scripts/README.md#backup-dbsh)).
+   - Cron (weekly Sunday 23:00 UTC): `0 23 * * 0 cd /opt/acbc-app && PATH=/usr/local/bin:/usr/bin:/bin ./scripts/backup-db.sh >> /var/log/acbc-backup.log 2>&1` (ver [scripts/README](../../scripts/README.md#backup-dbsh)).
 
 3. **Monitoreo**
    - Alertas básicas y monitoreo de recursos (CPU, RAM, disco). Health: `GET /health/` (backend), `GET /health` (nginx).
