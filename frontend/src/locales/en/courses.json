@@ -68,7 +68,7 @@
     "meetingLabel": "Session {{id}}",
     "meetingDate": "Date {{n}} — {{date}}",
     "windowLabel": "Window:",
-    "windowBody": "each session is offered twice, from November 23, 2026 to January 30, 2027.",
+    "windowBody": "each session is offered twice, from November 23, 2026 to January 13, 2027.",
     "indexFit": "07 / Fit",
     "fitTitle": "Who it is for — and who it is not",
     "fitYes": "It may be for you if…",
@@ -176,7 +176,7 @@
     "m3": {
       "topic": "The war beyond Bitcoin",
       "date1": "Monday 11 January 2027",
-      "date2": "Saturday 30 January 2027"
+      "date2": "Wednesday 13 January 2027"
     }
   }
 }
