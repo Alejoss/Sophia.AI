@@ -68,7 +68,7 @@
     "meetingLabel": "Encuentro {{id}}",
     "meetingDate": "Fecha {{n}} — {{date}}",
     "windowLabel": "Ventana:",
-    "windowBody": "cada encuentro se ofrece dos veces, en lunes sucesivos, del 9 de Noviembre al 15 de Diciembre de 2026.",
+    "windowBody": "cada encuentro se ofrece dos veces, del 23 de Noviembre de 2026 al 13 de Enero de 2027.",
     "indexFit": "07 / Encaje",
     "fitTitle": "Para quién es — y para quién no",
     "fitYes": "Puede ser para ti si…",
@@ -165,18 +165,18 @@
   "meetings": {
     "m1": {
       "topic": "¿Qué planteó Bitcoin?",
-      "date1": "Lunes 9 Noviembre 2026",
-      "date2": "Lunes 23 Noviembre 2026"
+      "date1": "Lunes 23 Noviembre 2026",
+      "date2": "Lunes 30 Noviembre 2026"
     },
     "m2": {
       "topic": "La guerra por Bitcoin",
-      "date1": "Lunes 23 Noviembre 2026",
-      "date2": "Lunes 8 Diciembre 2026"
+      "date1": "Miércoles 9 Diciembre 2026",
+      "date2": "Lunes 14 Diciembre 2026"
     },
     "m3": {
       "topic": "La guerra más allá de Bitcoin",
-      "date1": "Lunes 8 Diciembre 2026",
-      "date2": "Lunes 15 Diciembre 2026"
+      "date1": "Lunes 11 Enero 2027",
+      "date2": "Miércoles 13 Enero 2027"
     }
   }
 }
