@@ -68,7 +68,7 @@
     "meetingLabel": "Session {{id}}",
     "meetingDate": "Date {{n}} — {{date}}",
     "windowLabel": "Window:",
-    "windowBody": "each session is offered twice, on successive Mondays, from November 23 to December 14, 2026.",
+    "windowBody": "each session is offered twice, from November 23, 2026 to January 30, 2027.",
     "indexFit": "07 / Fit",
     "fitTitle": "Who it is for — and who it is not",
     "fitYes": "It may be for you if…",
@@ -170,13 +170,13 @@
     },
     "m2": {
       "topic": "The war for Bitcoin",
-      "date1": "Monday 30 November 2026",
-      "date2": "Monday 7 December 2026"
+      "date1": "Wednesday 9 December 2026",
+      "date2": "Monday 14 December 2026"
     },
     "m3": {
       "topic": "The war beyond Bitcoin",
-      "date1": "Monday 7 December 2026",
-      "date2": "Monday 14 December 2026"
+      "date1": "Monday 11 January 2027",
+      "date2": "Saturday 30 January 2027"
     }
   }
 }
