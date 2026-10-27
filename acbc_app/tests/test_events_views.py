@@ -145,6 +145,26 @@ class EventListAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertFalse(response.data['is_visible'])
 
+    def test_create_event_without_clock_time(self):
+        """Multipart create accepts a date and leaves the time blank."""
+        event_data = {
+            'title': 'Curso sin hora',
+            'description': 'Las sesiones se anuncian en la descripción',
+            'event_type': 'LIVE_COURSE',
+            'date_start': '2026-11-16',
+            'date_end': '2027-01-11',
+        }
+
+        response = self.client.post(self.url, event_data, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertFalse(response.data['date_start_has_time'])
+        self.assertFalse(response.data['date_end_has_time'])
+        self.assertTrue(response.data['date_start'].startswith('2026-11-16'))
+        event = Event.objects.get(pk=response.data['id'])
+        self.assertFalse(event.date_start_has_time)
+        self.assertEqual(event.date_start.date().isoformat(), '2026-11-16')
+
 
 class EventDetailAPITest(TestCase):
     """Test cases for EventDetail API endpoint."""
@@ -222,6 +242,25 @@ class EventDetailAPITest(TestCase):
         # Verify database was updated
         self.event.refresh_from_db()
         self.assertEqual(self.event.title, 'Updated Title')
+
+    def test_update_event_can_clear_clock_time(self):
+        """Saving a date without a time removes the clock time on edit."""
+        update_data = {
+            'title': self.event.title,
+            'description': self.event.description,
+            'event_type': self.event.event_type,
+            'date_start': '2026-11-16',
+            'date_end': '2026-11-16',
+        }
+
+        response = self.client.put(self.url, update_data, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertFalse(response.data['date_start_has_time'])
+        self.assertFalse(response.data['date_end_has_time'])
+        self.event.refresh_from_db()
+        self.assertFalse(self.event.date_start_has_time)
+        self.assertEqual(self.event.date_start.date().isoformat(), '2026-11-16')
 
     def test_update_event_validation_error(self):
         """Test PUT request with validation errors."""

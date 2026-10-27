@@ -78,7 +78,8 @@
     "schedulePlaceholder": "ej., Todos los martes durante 5 semanas",
     "date": "Fecha",
     "timeOptional": "Hora (opcional)",
-    "defaultTimeHelper": "12:00 pm por defecto si no se indica hora"
+    "timeOptionalHelper": "Déjala en blanco si no quieres indicar una hora",
+    "clearTime": "Quitar hora"
   },
   "visibilityHint": "Los eventos privados no aparecen en el listado público ni en búsquedas, pero pueden compartirse con un enlace directo.",
   "validation": {

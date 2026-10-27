@@ -12,7 +12,7 @@ import {
 import bookClubsApi from '../api/bookClubsApi';
 import { resolveMediaUrl } from '../utils/fileUtils';
 import { useBookClub } from './BookClubLayout';
-import { CLUB_ACCENT, formatClubDate } from './clubTheme';
+import { CLUB_ACCENT, formatClubEventDate } from './clubTheme';
 
 const BookClubMeetings = () => {
   const { t } = useTranslation('bookClubs');
@@ -83,7 +83,7 @@ const BookClubMeetings = () => {
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 600 }}>{ev.title}</Typography>
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.65)', mt: 0.5 }}>
-                    {formatClubDate(ev.date_start, { dateStyle: 'full', timeStyle: 'short' }) ||
+                    {formatClubEventDate(ev.date_start, ev.date_start_has_time, { dateStyle: 'full', timeStyle: 'short' }) ||
                       t('dates.unconfirmed')}
                   </Typography>
                   {ev.schedule_description && (

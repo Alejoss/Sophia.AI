@@ -686,7 +686,7 @@ class EventCertificateGenerationView(APIView):
                 )
             
             # Validate that the event has ended
-            if event.date_end and event.date_end > timezone.now():
+            if event.date_end and not event.has_ended():
                 logger.warning(f"Certificate generation attempted for ongoing event - Event end date: {event.date_end}")
                 return Response(
                     {'error': 'Cannot generate certificates for events that have not ended'},

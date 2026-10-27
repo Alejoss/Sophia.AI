@@ -620,9 +620,15 @@ class BookClubHubView(APIView):
                 }
 
         now = timezone.now()
+        today = now.date()
+        upcoming_start = (
+            Q(event__date_start__isnull=True)
+            | Q(event__date_start_has_time=False, event__date_start__date__gte=today)
+            | Q(event__date_start_has_time=True, event__date_start__gte=now)
+        )
         next_link = (
             BookClubEvent.objects.filter(book_club=club, event__deleted=False)
-            .filter(Q(event__date_start__gte=now) | Q(event__date_start__isnull=True))
+            .filter(upcoming_start)
             .select_related('event')
             .order_by('event__date_start')
             .first()
@@ -641,9 +647,7 @@ class BookClubHubView(APIView):
                 next_event_data['is_past'] = True
         else:
             next_event_data = BookClubEventSerializer(next_link).data
-            next_event_data['is_past'] = bool(
-                next_link.event.date_start and next_link.event.date_start < now
-            )
+            next_event_data['is_past'] = next_link.event.has_started(now)
 
         questions = list(
             DiscussionQuestion.objects.filter(book_club=club)

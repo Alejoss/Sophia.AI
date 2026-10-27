@@ -9,7 +9,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useBookClub } from './BookClubLayout';
-import { CLUB_ACCENT, CLUB_ACCENT_HOVER, formatClubDate } from './clubTheme';
+import { CLUB_ACCENT, CLUB_ACCENT_HOVER, formatClubDate, formatClubEventDate } from './clubTheme';
 import {
   daysUntil,
   resolveExperiencePhase,
@@ -411,7 +411,7 @@ const BookClubOverview = () => {
               {hub.next_event.title}
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.65)', mt: 0.5 }}>
-              {formatClubDate(hub.next_event.date_start, {
+              {formatClubEventDate(hub.next_event.date_start, hub.next_event.date_start_has_time, {
                 weekday: 'long',
                 day: 'numeric',
                 month: 'long',

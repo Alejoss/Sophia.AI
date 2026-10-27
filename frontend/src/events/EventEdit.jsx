@@ -33,7 +33,7 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EventDateTimeField from './EventDateTimeField';
-import { formatDateTimeForInput } from '../utils/dateUtils';
+import { eventDatesAreOrdered, formatDateTimeForInput } from '../utils/dateUtils';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
 
@@ -85,8 +85,7 @@ const schema = yup.object({
       () => i18n.t('events:validation.endAfterStart'),
       function afterStart(value) {
         const { date_start: dateStart } = this.parent;
-        if (!value || !dateStart) return true;
-        return new Date(value) > new Date(dateStart);
+        return eventDatesAreOrdered(dateStart, value);
       },
     ),
   schedule_description: yup.string().default(''),
@@ -150,8 +149,14 @@ const EventEdit = () => {
           platform: eventData.platform || '',
           other_platform: eventData.other_platform || '',
           reference_price: eventData.reference_price ? eventData.reference_price.toString() : '',
-          date_start: formatDateTimeForInput(eventData.date_start),
-          date_end: formatDateTimeForInput(eventData.date_end),
+          date_start: formatDateTimeForInput(
+            eventData.date_start,
+            eventData.date_start_has_time !== false,
+          ),
+          date_end: formatDateTimeForInput(
+            eventData.date_end,
+            eventData.date_end_has_time !== false,
+          ),
           schedule_description: eventData.schedule_description || '',
         });
         setIsVisible(Boolean(eventData.is_visible));

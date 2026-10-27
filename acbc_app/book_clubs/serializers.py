@@ -366,6 +366,8 @@ class BookClubEventSerializer(serializers.ModelSerializer):
     description = serializers.CharField(source='event.description', read_only=True)
     date_start = serializers.DateTimeField(source='event.date_start', read_only=True)
     date_end = serializers.DateTimeField(source='event.date_end', read_only=True)
+    date_start_has_time = serializers.BooleanField(source='event.date_start_has_time', read_only=True)
+    date_end_has_time = serializers.BooleanField(source='event.date_end_has_time', read_only=True)
     platform = serializers.CharField(source='event.platform', read_only=True)
     schedule_description = serializers.CharField(
         source='event.schedule_description', read_only=True
@@ -382,6 +384,8 @@ class BookClubEventSerializer(serializers.ModelSerializer):
             'description',
             'date_start',
             'date_end',
+            'date_start_has_time',
+            'date_end_has_time',
             'platform',
             'schedule_description',
             'is_visible',
