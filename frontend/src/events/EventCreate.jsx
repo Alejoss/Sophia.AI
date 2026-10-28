@@ -30,6 +30,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EventDateTimeField from './EventDateTimeField';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import { eventDatesAreOrdered, eventStartIsUpcoming } from '../utils/dateUtils';
 
 const PLATFORM_CHOICES = [
   { value: 'google_meet', label: 'Google Meet' },
@@ -76,11 +77,7 @@ const schema = yup.object({
     .test(
       'min-hour',
       () => i18n.t('events:validation.startMinHour'),
-      (value) => {
-        if (!value) return true;
-        const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
-        return new Date(value) >= oneHourFromNow;
-      },
+      (value) => eventStartIsUpcoming(value),
     ),
   date_end: yup
     .string()
@@ -90,8 +87,7 @@ const schema = yup.object({
       () => i18n.t('events:validation.endAfterStart'),
       function afterStart(value) {
         const { date_start: dateStart } = this.parent;
-        if (!value || !dateStart) return true;
-        return new Date(value) > new Date(dateStart);
+        return eventDatesAreOrdered(dateStart, value);
       },
     ),
   schedule_description: yup.string().default(''),

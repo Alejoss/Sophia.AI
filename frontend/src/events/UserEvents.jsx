@@ -25,6 +25,7 @@ import {
   getUserCreatedEvents,
   getUserCreatedEventsById
 } from '../api/eventsApi';
+import { formatEventWhen } from '../utils/dateUtils';
 
 const UserEvents = ({ isOwnProfile = false, userId = null }) => {
   const { t } = useTranslation('events');
@@ -77,15 +78,9 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
     loadUserEvents();
   }, [isOwnProfile, userId]);
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString, hasTime = true) => {
     if (!dateString) return t('toBeDetermined');
-    return new Date(dateString).toLocaleDateString(intl, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatEventWhen(dateString, hasTime, intl, { month: 'short' });
   };
 
   const getEventTypeLabel = (eventType) => t(`eventTypes.${eventType}`, { defaultValue: eventType });
@@ -197,7 +192,7 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
                         <Chip size="small" label={getPaymentStatusLabel(registration.payment_status)} color="success" variant="outlined" />
                       </Stack>
                     </Box>
-                    <Typography variant="body2"><strong>{t('userEvents.eventDate')}</strong> {formatDate(registration.event_date)}</Typography>
+                    <Typography variant="body2"><strong>{t('userEvents.eventDate')}</strong> {formatDate(registration.event_date, registration.event_date_has_time)}</Typography>
                     <Typography variant="body2"><strong>{t('userEvents.registeredAt')}</strong> {formatDate(registration.registered_at)}</Typography>
                   </CardContent>
                   <CardActions>
@@ -264,11 +259,11 @@ const UserEvents = ({ isOwnProfile = false, userId = null }) => {
 
                     <Stack spacing={0.6}>
                       <Typography variant="body2">
-                        <strong>{t('card.start')}</strong> {formatDate(event.date_start)}
+                        <strong>{t('card.start')}</strong> {formatDate(event.date_start, event.date_start_has_time)}
                       </Typography>
                       {event.date_end && (
                         <Typography variant="body2">
-                          <strong>{t('card.end')}</strong> {formatDate(event.date_end)}
+                          <strong>{t('card.end')}</strong> {formatDate(event.date_end, event.date_end_has_time)}
                         </Typography>
                       )}
                       {event.reference_price > 0 && (

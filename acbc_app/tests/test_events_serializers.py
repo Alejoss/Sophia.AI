@@ -76,6 +76,48 @@ class EventSerializerTest(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn('date_end', serializer.errors)
 
+    def test_event_serializer_accepts_date_without_time(self):
+        """A calendar date is stored without treating noon as a chosen clock time."""
+        self.event_data['date_start'] = '2026-11-16'
+        self.event_data['date_end'] = '2026-11-16'
+
+        serializer = EventSerializer(data=self.event_data, context={'request': self.request})
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        event = serializer.save()
+
+        self.assertFalse(event.date_start_has_time)
+        self.assertFalse(event.date_end_has_time)
+        self.assertEqual(event.date_start.date().isoformat(), '2026-11-16')
+        self.assertEqual(event.date_end.date().isoformat(), '2026-11-16')
+        self.assertEqual(event.date_start.hour, 12)
+        self.assertEqual(serializer.data['date_start_has_time'], False)
+
+    def test_event_serializer_blank_date_clears_the_field(self):
+        self.event_data['date_start'] = ''
+        self.event_data['date_end'] = ''
+
+        serializer = EventSerializer(data=self.event_data, context={'request': self.request})
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        event = serializer.save()
+
+        self.assertIsNone(event.date_start)
+        self.assertIsNone(event.date_end)
+        self.assertFalse(event.date_start_has_time)
+        self.assertFalse(event.date_end_has_time)
+
+    def test_event_serializer_keeps_an_explicit_time(self):
+        self.event_data['date_start'] = '2026-11-16T15:30:00Z'
+        self.event_data['date_end'] = '2026-11-16T17:00:00Z'
+
+        serializer = EventSerializer(data=self.event_data, context={'request': self.request})
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        event = serializer.save()
+
+        self.assertTrue(event.date_start_has_time)
+        self.assertTrue(event.date_end_has_time)
+        self.assertEqual(event.date_start.hour, 15)
+        self.assertEqual(event.date_start.minute, 30)
+
     def test_event_serializer_validation_date_end_equals_start(self):
         """Test validation when end date equals start date."""
         start_time = timezone.now() + timezone.timedelta(days=7)
