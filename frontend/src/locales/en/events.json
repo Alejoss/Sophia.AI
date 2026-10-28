@@ -272,5 +272,22 @@
       "refunded": "Refunded",
       "expired": "Expired"
     }
+  },
+  "banner": {
+    "kicker": "Upcoming event"
+  },
+  "feature": {
+    "title": "Banner on Library, Paths, and Topics",
+    "helper": "Upload a wide image, about 1600 × 280 px. It sits just under the menu on those three pages and opens this event.",
+    "active": "Show this event",
+    "chooseImage": "Choose image",
+    "changeImage": "Change image",
+    "save": "Save banner",
+    "saving": "Saving banner...",
+    "saved": "The banner is saved.",
+    "needImage": "Choose a wide image to publish the banner.",
+    "visibilityNote": "The banner appears when the event is public and has not ended.",
+    "loadError": "Could not load the banner.",
+    "saveError": "Could not save the banner."
   }
 }

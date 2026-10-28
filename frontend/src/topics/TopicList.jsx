@@ -16,6 +16,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { isAuthenticated } from '../context/localStorageUtils';
+import FeaturedEventBanner from '../events/FeaturedEventBanner';
 
 const TopicList = () => {
     const { t } = useTranslation('topics');
@@ -39,20 +40,16 @@ const TopicList = () => {
         fetchTopics();
     }, [t]);
 
-    if (loading) return (
+    const body = loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', pt: { xs: 2, md: 4 } }}>
             <CircularProgress />
         </Box>
-    );
-
-    if (error) return (
+    ) : error ? (
         <Box sx={{ pt: { xs: 2, md: 4 }, px: 3 }}>
             <Alert severity="error">{error}</Alert>
         </Box>
-    );
-
-    return (
-        <Box sx={{ pt: { xs: 2, md: 4 }, px: { xs: 1, md: 3 }, color: "text.primary" }}>
+    ) : (
+        <Box sx={{ color: "text.primary" }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
                 <Typography 
                     variant="h4" 
@@ -111,6 +108,13 @@ const TopicList = () => {
                     </Grid>
                 ))}
             </Grid>
+        </Box>
+    );
+
+    return (
+        <Box sx={{ pt: { xs: 2, md: 3 }, px: { xs: 1, md: 3 } }}>
+            <FeaturedEventBanner />
+            {body}
         </Box>
     );
 };

@@ -14,6 +14,17 @@ def upload_event_picture(instance, filename):
     # TODO utilizar django timezone module
 
 
+def upload_featured_event_banner(instance, filename):
+    """Wide ad creative. Kept apart from the event card image."""
+    extension = 'jpg'
+    if '.' in filename:
+        extension = filename.rsplit('.', 1)[-1].lower()
+    if extension not in {'jpg', 'jpeg', 'png', 'webp', 'gif'}:
+        extension = 'jpg'
+    stamp = timezone.now().strftime('%Y%m%d%H%M%S')
+    return f'featured_events/event_{instance.event_id}_{stamp}.{extension}'
+
+
 class Event(models.Model):    
     """
     It can be a Recorded Course, a Live Course, a Conference, etc.
@@ -110,6 +121,55 @@ class Event(models.Model):
     def __str__(self):
         owner_name = self.owner.username if self.owner else "Unknown"
         return f"{self.title} - {owner_name}"
+
+
+class FeaturedEvent(models.Model):
+    """Site banner that advertises one event under the main navigation.
+
+    The wide image belongs to this placement. The event keeps its own card image.
+    Only one placement stays active: saving an active banner clears the others.
+    """
+
+    event = models.OneToOneField(
+        Event,
+        on_delete=models.CASCADE,
+        related_name='feature_placement',
+    )
+    image = models.ImageField(
+        upload_to=upload_featured_event_banner,
+        help_text='Wide banner, about 1600×280 pixels. Shown under the nav on Biblioteca, Caminos, and Temas.',
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='The active banner is the one visitors see. Turning this on hides any other banner.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'{self.event.title} banner'
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_active:
+            FeaturedEvent.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+
+    @classmethod
+    def live(cls):
+        """The banner visitors should see, or None."""
+        placement = (
+            cls.objects
+            .select_related('event')
+            .filter(is_active=True, event__deleted=False, event__is_visible=True)
+            .order_by('-updated_at')
+            .first()
+        )
+        if placement is None or placement.event.has_ended():
+            return None
+        return placement
 
 
 class EventRegistration(models.Model):

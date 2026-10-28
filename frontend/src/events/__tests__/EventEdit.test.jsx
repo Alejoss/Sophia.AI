@@ -8,6 +8,8 @@ const mockNavigate = vi.fn();
 const mockFetchEventById = vi.fn();
 const mockUpdateEvent = vi.fn();
 const mockDeleteEvent = vi.fn();
+const mockFetchEventFeature = vi.fn();
+const mockSaveEventFeature = vi.fn();
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
@@ -22,6 +24,8 @@ vi.mock('../../api/eventsApi', () => ({
   fetchEventById: (...args) => mockFetchEventById(...args),
   updateEvent: (...args) => mockUpdateEvent(...args),
   deleteEvent: (...args) => mockDeleteEvent(...args),
+  fetchEventFeature: (...args) => mockFetchEventFeature(...args),
+  saveEventFeature: (...args) => mockSaveEventFeature(...args),
 }));
 
 vi.mock('../EventDateTimeField', () => ({
@@ -31,6 +35,7 @@ vi.mock('../EventDateTimeField', () => ({
 describe('EventEdit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetchEventFeature.mockResolvedValue(null);
     mockFetchEventById.mockResolvedValue({
       id: 12,
       title: 'Evento original',
@@ -126,5 +131,17 @@ describe('EventEdit', () => {
     await user.click(screen.getByRole('button', { name: /actualizar evento/i }));
 
     expect(await screen.findByText(/no se pudo actualizar el evento/i)).toBeInTheDocument();
+  });
+
+  it('asks for a wide image before publishing the banner', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<EventEdit />);
+
+    await screen.findByRole('heading', { name: /anuncio en biblioteca/i });
+    await user.click(screen.getByRole('checkbox', { name: /mostrar este evento/i }));
+    await user.click(screen.getByRole('button', { name: /guardar anuncio/i }));
+
+    expect(await screen.findByText(/elige una imagen ancha/i)).toBeInTheDocument();
+    expect(mockSaveEventFeature).not.toHaveBeenCalled();
   });
 });

@@ -161,6 +161,34 @@ export const getUserCreatedEventsById = async (userId) => {
   }
 };
 
+export const fetchCurrentFeaturedEvent = async () => {
+  const response = await axiosInstance.get('/events/featured/');
+  return response.data;
+};
+
+export const fetchEventFeature = async (eventId) => {
+  try {
+    const response = await axiosInstance.get(`/events/${eventId}/feature/`);
+    return response.data;
+  } catch (error) {
+    fail(error, 'Error fetching event banner');
+  }
+};
+
+export const saveEventFeature = async (eventId, { imageFile, isActive }) => {
+  try {
+    const formData = new FormData();
+    formData.append('is_active', String(Boolean(isActive)));
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+    const response = await axiosInstance.put(`/events/${eventId}/feature/`, formData);
+    return response.data;
+  } catch (error) {
+    fail(error, 'Error saving event banner');
+  }
+};
+
 export const updateParticipantStatus = async (eventId, registrationId, action) => {
   try {
     const response = await axiosInstance.patch(`/events/${eventId}/participants/${registrationId}/status/`, {
