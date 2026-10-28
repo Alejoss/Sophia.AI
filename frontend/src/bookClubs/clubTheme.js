@@ -86,6 +86,20 @@ export const formatClubDate = (value, opts = { dateStyle: 'medium', timeStyle: '
   }
 };
 
+/** Event dates omit the clock when the organizer left the time blank. */
+export const formatClubEventDate = (value, hasTime, opts) => {
+  if (hasTime !== false) {
+    return formatClubDate(value, opts);
+  }
+  const source = { ...(opts || { dateStyle: 'medium' }) };
+  delete source.timeStyle;
+  delete source.hour;
+  delete source.minute;
+  delete source.second;
+  const dateOpts = Object.keys(source).length ? source : { dateStyle: 'medium' };
+  return formatClubDate(value, dateOpts);
+};
+
 /** Format an ISO datetime for <input type="datetime-local" /> (local wall time). */
 export const toDatetimeLocal = (iso) => {
   if (!iso) return '';

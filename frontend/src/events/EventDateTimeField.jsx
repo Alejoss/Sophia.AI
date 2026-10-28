@@ -1,11 +1,11 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Stack, Typography } from '@mui/material';
+import { Button, Stack, Typography } from '@mui/material';
 import { DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-import { combineEventDateTime, DEFAULT_EVENT_TIME, splitEventDateTime } from '../utils/dateUtils';
+import { combineEventDateTime, splitEventDateTime } from '../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import { useDateLocales } from '../hooks/useDateLocales';
 
@@ -22,8 +22,8 @@ const EventDateTimeField = ({
   const { dayjs: dayjsLocale } = useDateLocales();
   const { date, time } = splitEventDateTime(value);
   const dateValue = date ? dayjs(date) : null;
-  const timeValue = date
-    ? dayjs(`${date} ${time || DEFAULT_EVENT_TIME}`, 'YYYY-MM-DD HH:mm')
+  const timeValue = date && time
+    ? dayjs(`${date} ${time}`, 'YYYY-MM-DD HH:mm')
     : null;
 
   const handleDateChange = (newDate) => {
@@ -73,11 +73,21 @@ const EventDateTimeField = ({
             textField: {
               fullWidth: true,
               error: Boolean(error),
-              helperText: t('fields.defaultTimeHelper'),
+              helperText: t('fields.timeOptionalHelper'),
             },
             field: { clearable: true },
           }}
         />
+        {time && (
+          <Button
+            type="button"
+            size="small"
+            onClick={() => onChange(combineEventDateTime(date, ''))}
+            sx={{ alignSelf: 'flex-start', px: 0 }}
+          >
+            {t('fields.clearTime')}
+          </Button>
+        )}
         {error && (
           <Typography variant="caption" color="error">
             {error}

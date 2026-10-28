@@ -1,10 +1,14 @@
 from rest_framework import serializers
-from django.utils import timezone
 
 from comments.models import Comment
 from certificates.models import Certificate, CertificateRequest
 from content.utils import build_media_url
 from events.models import Event, EventRegistration
+from events.scheduling import (
+    _mapping_copy,
+    event_range_is_invalid,
+    normalize_optional_event_datetime,
+)
 from profiles.serializers import UserSerializer, AcceptedCryptoSerializer
 from profiles.models import AcceptedCrypto
 
@@ -41,6 +45,24 @@ class EventSerializer(serializers.ModelSerializer):
             data['image'] = build_media_url(instance.image, self.context.get('request'))
         return data
 
+    def to_internal_value(self, data):
+        """Accept a calendar date with no clock time.
+
+        ``YYYY-MM-DD`` is stored at noon UTC and ``date_*_has_time`` is False.
+        A blank date clears the field. A value that includes a time keeps it.
+        """
+        mutable = _mapping_copy(data)
+        for field_name, flag_name in (
+            ('date_start', 'date_start_has_time'),
+            ('date_end', 'date_end_has_time'),
+        ):
+            if field_name not in mutable:
+                continue
+            normalized, has_time = normalize_optional_event_datetime(mutable.get(field_name))
+            mutable[field_name] = normalized
+            mutable[flag_name] = has_time
+        return super().to_internal_value(mutable)
+
     def validate(self, data):
         if 'is_visible' in self.initial_data:
             data['is_visible'] = _parse_bool(self.initial_data.get('is_visible'))
@@ -62,8 +84,19 @@ class EventSerializer(serializers.ModelSerializer):
                 'other_platform': 'El nombre de otra plataforma es requerido cuando la plataforma es "Otra"'
             })
         
-        # Validate end date is after start date
-        if data.get('date_end') and data.get('date_start') and data['date_end'] <= data['date_start']:
+        start = data['date_start'] if 'date_start' in data else (
+            self.instance.date_start if self.instance else None
+        )
+        end = data['date_end'] if 'date_end' in data else (
+            self.instance.date_end if self.instance else None
+        )
+        start_has_time = data['date_start_has_time'] if 'date_start_has_time' in data else (
+            self.instance.date_start_has_time if self.instance else True
+        )
+        end_has_time = data['date_end_has_time'] if 'date_end_has_time' in data else (
+            self.instance.date_end_has_time if self.instance else True
+        )
+        if event_range_is_invalid(start, end, start_has_time, end_has_time):
             raise serializers.ValidationError({
                 'date_end': 'La fecha de finalización debe ser posterior a la fecha de inicio'
             })
@@ -151,8 +184,7 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
         if user == event.owner:
             raise serializers.ValidationError("Los creadores de eventos no pueden registrarse en sus propios eventos")
         
-        # Check if event has already started
-        if event.date_start and event.date_start < timezone.now():
+        if event.has_started():
             raise serializers.ValidationError("No se puede registrar para eventos que ya han comenzado")
 
         return data
@@ -175,11 +207,12 @@ class EventRegistrationListSerializer(serializers.ModelSerializer):
     event = serializers.PrimaryKeyRelatedField(read_only=True)
     event_title = serializers.CharField(source='event.title', read_only=True)
     event_date = serializers.DateTimeField(source='event.date_start', read_only=True)
+    event_date_has_time = serializers.BooleanField(source='event.date_start_has_time', read_only=True)
     has_certificate = serializers.SerializerMethodField()
     
     class Meta:
         model = EventRegistration
-        fields = ['id', 'user', 'user_email', 'event', 'event_title', 'event_date', 'registered_at', 'registration_status', 'payment_status', 'has_certificate']
+        fields = ['id', 'user', 'user_email', 'event', 'event_title', 'event_date', 'event_date_has_time', 'registered_at', 'registration_status', 'payment_status', 'has_certificate']
     
     def get_has_certificate(self, obj):
         """Check if a certificate exists for this user and event"""

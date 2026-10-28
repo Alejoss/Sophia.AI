@@ -1,3 +1,5 @@
+from datetime import datetime, time, timezone as dt_timezone
+
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -89,6 +91,43 @@ class EventModelTest(TestCase):
         event = Event(**self.event_data)
         event.full_clean()  # Should not raise ValidationError
 
+    def test_date_only_same_day_is_valid(self):
+        """A start and end on the same calendar day are valid when no clock time is set."""
+        day = (timezone.now() + timezone.timedelta(days=7)).replace(
+            hour=12, minute=0, second=0, microsecond=0
+        )
+        self.event_data['date_start'] = day
+        self.event_data['date_end'] = day
+        self.event_data['date_start_has_time'] = False
+        self.event_data['date_end_has_time'] = False
+
+        event = Event(**self.event_data)
+        event.full_clean()
+
+    def test_date_only_event_stays_open_on_its_calendar_day(self):
+        today = timezone.now().date()
+        start = datetime.combine(today, time(12, 0), tzinfo=dt_timezone.utc)
+        event = Event(
+            date_start=start,
+            date_end=start,
+            date_start_has_time=False,
+            date_end_has_time=False,
+        )
+        self.assertFalse(event.has_started())
+        self.assertFalse(event.has_ended())
+
+    def test_date_only_event_has_started_after_its_calendar_day(self):
+        yesterday = timezone.now().date() - timezone.timedelta(days=1)
+        start = datetime.combine(yesterday, time(12, 0), tzinfo=dt_timezone.utc)
+        event = Event(
+            date_start=start,
+            date_end=start,
+            date_start_has_time=False,
+            date_end_has_time=False,
+        )
+        self.assertTrue(event.has_started())
+        self.assertTrue(event.has_ended())
+
     def test_event_without_dates(self):
         """Test event creation without start/end dates."""
         self.event_data.pop('date_start', None)
@@ -147,6 +186,20 @@ class EventRegistrationModelTest(TestCase):
                 event=self.event
             )
             registration.full_clean()
+
+    def test_date_only_registration_allowed_on_start_day(self):
+        """A calendar-day event can still be joined on that day."""
+        today = timezone.now().date()
+        start = datetime.combine(today, time(12, 0), tzinfo=dt_timezone.utc)
+        event = EventFactory(
+            owner=self.event_owner,
+            date_start=start,
+            date_end=start,
+            date_start_has_time=False,
+            date_end_has_time=False,
+        )
+        registration = EventRegistration(user=self.user, event=event)
+        registration.full_clean()
 
     def test_past_event_registration_prevention(self):
         """Test that users cannot register for events that have already started."""

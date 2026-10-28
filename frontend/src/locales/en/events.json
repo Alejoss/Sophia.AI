@@ -78,7 +78,8 @@
     "schedulePlaceholder": "e.g., Every Tuesday for 5 weeks",
     "date": "Date",
     "timeOptional": "Time (optional)",
-    "defaultTimeHelper": "12:00 pm by default if no time is set"
+    "timeOptionalHelper": "Leave it blank if you don't want to set a time",
+    "clearTime": "Remove time"
   },
   "visibilityHint": "Private events do not appear in the public listing or in search, but they can be shared with a direct link.",
   "validation": {

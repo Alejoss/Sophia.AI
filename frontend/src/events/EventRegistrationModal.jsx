@@ -74,7 +74,7 @@ const EventRegistrationModal = ({
             </Stack>
             <Stack direction="row" justifyContent="space-between">
               <Typography variant="body2" color="text.secondary">{t('card.startLabel')}</Typography>
-              <Typography variant="body2" fontWeight={600}>{formatDate(event?.date_start)}</Typography>
+              <Typography variant="body2" fontWeight={600}>{formatDate(event?.date_start, { includeTime: event?.date_start_has_time !== false })}</Typography>
             </Stack>
             <Divider />
             <Stack direction="row" justifyContent="space-between" alignItems="center">

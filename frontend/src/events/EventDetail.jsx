@@ -17,6 +17,7 @@ import {
 } from '../api/eventDetailSession';
 import { AuthContext } from '../context/AuthContext';
 import { AUTH_ERROR_STRATEGY, getErrorMessage, handleAuthError } from '../utils/authErrorHandler';
+import { eventHasStarted, formatEventWhen } from '../utils/dateUtils';
 import EventCheckout from '../payments/adapters/EventCheckout';
 import EventRegistrationModal from './EventRegistrationModal';
 import EventPaymentMethods from './EventPaymentMethods';
@@ -218,15 +219,9 @@ const EventDetail = () => {
     setImageError(false);
   }, [event?.image]);
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString, { includeTime = true } = {}) => {
     if (!dateString) return t('toBeDetermined');
-    return new Date(dateString).toLocaleDateString(intl, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatEventWhen(dateString, includeTime, intl, { month: 'long' });
   };
 
   const getEventTypeLabel = (eventType) => t(`eventTypes.${eventType}`, { defaultValue: eventType });
@@ -251,10 +246,7 @@ const EventDetail = () => {
     && authState.user?.id != null
     && Number(event.owner.id) === Number(authState.user.id);
 
-  const isEventStarted = () => {
-    if (!event?.date_start) return false;
-    return new Date(event.date_start) < new Date();
-  };
+  const isEventStarted = () => eventHasStarted(event);
 
   const isPaidEvent = event?.reference_price > 0;
   const needsPayment =
@@ -451,9 +443,9 @@ const EventDetail = () => {
                 </Typography>
               )}
               <Typography variant="body2"><strong>{t('card.created')}</strong> {formatDate(event.date_created)}</Typography>
-              <Typography variant="body2"><strong>{t('card.startDate')}</strong> {formatDate(event.date_start)}</Typography>
+              <Typography variant="body2"><strong>{t('card.startDate')}</strong> {formatDate(event.date_start, { includeTime: event.date_start_has_time !== false })}</Typography>
               {event.date_end && (
-                <Typography variant="body2"><strong>{t('card.endDate')}</strong> {formatDate(event.date_end)}</Typography>
+                <Typography variant="body2"><strong>{t('card.endDate')}</strong> {formatDate(event.date_end, { includeTime: event.date_end_has_time !== false })}</Typography>
               )}
               {event.schedule_description && (
                 <Typography variant="body2"><strong>{t('card.schedule')}</strong> {event.schedule_description}</Typography>

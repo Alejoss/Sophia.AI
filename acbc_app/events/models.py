@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from events.scheduling import event_range_is_invalid
 from profiles.models import AcceptedCrypto, Profile
 
 
@@ -44,7 +45,15 @@ class Event(models.Model):
 
     date_created = models.DateTimeField(auto_now_add=True)
     date_start = models.DateTimeField(null=True, blank=True)
+    date_start_has_time = models.BooleanField(
+        default=True,
+        help_text="False when date_start is a calendar day with no clock time.",
+    )
     date_end = models.DateTimeField(null=True, blank=True)
+    date_end_has_time = models.BooleanField(
+        default=True,
+        help_text="False when date_end is a calendar day with no clock time.",
+    )
     date_recorded = models.DateTimeField(null=True, blank=True)
     schedule_description = models.CharField(max_length=1000, blank=True)
     is_visible = models.BooleanField(
@@ -62,8 +71,37 @@ class Event(models.Model):
         if self.platform == 'other' and not self.other_platform:
             raise ValidationError("Other platform name is required when platform is 'Other'")
         
-        if self.date_end and self.date_start and self.date_end <= self.date_start:
+        if event_range_is_invalid(
+            self.date_start,
+            self.date_end,
+            self.date_start_has_time,
+            self.date_end_has_time,
+        ):
             raise ValidationError("End date must be after start date")
+
+    def has_started(self, now=None):
+        """Whether registration and 'already started' checks should close.
+
+        A date with no clock time stays open through that UTC calendar day.
+        """
+        if not self.date_start:
+            return False
+        now = now or timezone.now()
+        if not self.date_start_has_time:
+            return self.date_start.date() < now.date()
+        return self.date_start < now
+
+    def has_ended(self, now=None):
+        """Whether the event is over.
+
+        A date with no clock time is still in progress on that UTC calendar day.
+        """
+        if not self.date_end:
+            return False
+        now = now or timezone.now()
+        if not self.date_end_has_time:
+            return self.date_end.date() < now.date()
+        return self.date_end <= now
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -109,8 +147,7 @@ class EventRegistration(models.Model):
         if self.user == self.event.owner:
             raise ValidationError("Event creators cannot register for their own events")
         
-        # Check if event is in the past
-        if self.event.date_start and self.event.date_start < timezone.now():
+        if self.event.has_started():
             raise ValidationError("Cannot register for events that have already started")
     
     def save(self, *args, **kwargs):

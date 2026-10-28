@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import bookClubsApi from '../../api/bookClubsApi';
 import { getUserCreatedEvents } from '../../api/eventsApi';
-import { extractApiError, formatClubDate } from '../clubTheme';
+import { extractApiError, formatClubEventDate } from '../clubTheme';
 
 const BookClubAdminMeetings = () => {
   const { t } = useTranslation('bookClubs');
@@ -161,7 +161,7 @@ const BookClubAdminMeetings = () => {
               <Box>
                 <Typography fontWeight={600}>{ev.title}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {formatClubDate(ev.date_start) || t('dates.none')}
+                  {formatClubEventDate(ev.date_start, ev.date_start_has_time) || t('dates.none')}
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1}>

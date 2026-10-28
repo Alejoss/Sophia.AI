@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDateLocales } from '../hooks/useDateLocales';
 import { fetchEvents } from '../api/eventsApi';
+import { formatEventWhen } from '../utils/dateUtils';
 import {
   Alert,
   Box,
@@ -49,16 +50,10 @@ const EventsList = () => {
     loadEvents();
   }, []);
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString, hasTime = true) => {
     if (!dateString) return t('tbd');
     try {
-      return new Date(dateString).toLocaleDateString(intl, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      return formatEventWhen(dateString, hasTime, intl, { month: 'short' });
     } catch (error) {
       return t('invalidDate');
     }
@@ -181,12 +176,12 @@ const EventsList = () => {
                   )}
                   
                   <Typography variant="body2">
-                    <strong>{t('card.start')}</strong> {formatDate(event.date_start)}
+                    <strong>{t('card.start')}</strong> {formatDate(event.date_start, event.date_start_has_time)}
                   </Typography>
                   
                   {event.date_end && (
                     <Typography variant="body2">
-                      <strong>{t('card.end')}</strong> {formatDate(event.date_end)}
+                      <strong>{t('card.end')}</strong> {formatDate(event.date_end, event.date_end_has_time)}
                     </Typography>
                   )}
                 </Stack>

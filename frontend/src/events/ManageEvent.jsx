@@ -31,6 +31,7 @@ import {
 } from '@mui/material';
 import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import { eventHasEnded, formatEventWhen } from '../utils/dateUtils';
 
 const certificateSchema = yup.object({
   certificateNote: yup.string().trim().default(''),
@@ -101,15 +102,9 @@ const ManageEvent = () => {
     }
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString, hasTime = true) => {
     if (!dateString) return t('notSpecified');
-      return new Date(dateString).toLocaleDateString(intl, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatEventWhen(dateString, hasTime, intl, { month: 'long' });
   };
 
   const getPaymentStatusLabel = (paymentStatus) => (
@@ -126,8 +121,7 @@ const ManageEvent = () => {
       return false;
     }
     
-    // Event must have ended
-    if (!event.date_end || new Date(event.date_end) >= new Date()) {
+    if (!eventHasEnded(event)) {
       return false;
     }
     
@@ -145,9 +139,7 @@ const ManageEvent = () => {
     return registration.has_certificate === true;
   };
 
-  const hasEventEnded = () => {
-    return event.date_end && new Date(event.date_end) <= new Date();
-  };
+  const hasEventEnded = () => eventHasEnded(event);
 
   const handleMessageUser = (userId) => {
     window.open(`/messages/thread/${userId}`, '_blank');
@@ -351,8 +343,8 @@ const ManageEvent = () => {
           </Typography>
           <Box sx={{ display: 'grid', gap: 1.2, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' } }}>
             <Typography variant="body2"><strong>{t('manage.type')}</strong> {t(`eventTypes.${event.event_type}`, { defaultValue: event.event_type })}</Typography>
-            <Typography variant="body2"><strong>{t('card.startDate')}</strong> {formatDate(event.date_start)}</Typography>
-            <Typography variant="body2"><strong>{t('card.endDate')}</strong> {formatDate(event.date_end)}</Typography>
+            <Typography variant="body2"><strong>{t('card.startDate')}</strong> {formatDate(event.date_start, event.date_start_has_time)}</Typography>
+            <Typography variant="body2"><strong>{t('card.endDate')}</strong> {formatDate(event.date_end, event.date_end_has_time)}</Typography>
             <Typography variant="body2"><strong>{t('card.platform')}</strong> {event.platform || t('notSpecified')}</Typography>
             <Typography variant="body2"><strong>{t('manage.price')}</strong> {event.reference_price > 0 ? `$${event.reference_price}` : t('free')}</Typography>
             <Typography variant="body2"><strong>{t('manage.participants')}</strong> {participants.length}</Typography>

@@ -79,6 +79,39 @@ describe('EventEdit', () => {
     expect(await screen.findByText(/evento actualizado exitosamente/i)).toBeInTheDocument();
   });
 
+  it('submits a calendar date when the event has no clock time', async () => {
+    const user = userEvent.setup();
+    mockFetchEventById.mockResolvedValue({
+      id: 12,
+      title: 'Evento original',
+      description: 'Descripción original',
+      event_type: 'LIVE_COURSE',
+      platform: '',
+      other_platform: '',
+      reference_price: '0',
+      date_start: '2026-11-16T12:00:00Z',
+      date_end: '2027-01-11T12:00:00Z',
+      date_start_has_time: false,
+      date_end_has_time: false,
+      schedule_description: '',
+      is_visible: true,
+      image: null,
+    });
+    mockUpdateEvent.mockResolvedValue({ id: 12 });
+
+    renderWithProviders(<EventEdit />);
+
+    await screen.findByDisplayValue('Evento original');
+    await user.click(screen.getByRole('button', { name: /actualizar evento/i }));
+
+    await waitFor(() => {
+      expect(mockUpdateEvent).toHaveBeenCalledTimes(1);
+    });
+    const formData = mockUpdateEvent.mock.calls[0][1];
+    expect(formData.get('date_start')).toBe('2026-11-16');
+    expect(formData.get('date_end')).toBe('2027-01-11');
+  });
+
   it('shows a Spanish alert when the API call fails', async () => {
     const user = userEvent.setup();
     mockUpdateEvent.mockRejectedValue({
