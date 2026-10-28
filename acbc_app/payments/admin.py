@@ -84,8 +84,8 @@ class CourseEventInline(admin.TabularInline):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ('code', 'title', 'price_usd', 'sales_enabled', 'knowledge_path', 'updated_at')
-    list_editable = ('price_usd', 'sales_enabled')
+    list_display = ('code', 'title', 'price_usd', 'sales_enabled', 'public_landing', 'knowledge_path', 'updated_at')
+    list_editable = ('price_usd', 'sales_enabled', 'public_landing')
     search_fields = ('code', 'title')
     raw_id_fields = ('knowledge_path',)
     readonly_fields = ('created_at', 'updated_at')

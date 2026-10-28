@@ -450,6 +450,14 @@ const EventDetail = () => {
               {event.schedule_description && (
                 <Typography variant="body2"><strong>{t('card.schedule')}</strong> {event.schedule_description}</Typography>
               )}
+              {event.landing_page?.path && (
+                <Typography variant="body2">
+                  <strong>{t('card.landing')}</strong>{' '}
+                  <MuiLink component={Link} to={event.landing_page.path} underline="hover">
+                    {event.landing_page.title}
+                  </MuiLink>
+                </Typography>
+              )}
             </Stack>
           </CardContent>
         </Card>

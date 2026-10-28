@@ -70,6 +70,10 @@
     "otherPlatform": "Other Platform *",
     "otherPlatformPlaceholder": "Enter the platform name",
     "referencePrice": "Reference Price in USD",
+    "landingPage": "Course page",
+    "landingNone": "No page",
+    "landingHelper": "This event is attached to {{path}}. It appears there when the event is public.",
+    "landingHelperEmpty": "Optional. Choose the course page this event belongs to.",
     "start": "Start Date/Time",
     "end": "End Date/Time",
     "startHelper": "Select the start date",
@@ -129,6 +133,7 @@
     "startDate": "Start Date:",
     "endDate": "End Date:",
     "schedule": "Schedule:",
+    "landing": "Course page:",
     "eventPrice": "Event price"
   },
   "registration": {

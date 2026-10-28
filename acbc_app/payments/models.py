@@ -182,6 +182,13 @@ class Course(models.Model):
         default=True,
         help_text='Permite cobrar este curso cuando tiene precio.',
     )
+    public_landing = models.BooleanField(
+        default=False,
+        help_text=(
+            'This course has a public page at /cursos/{code}. '
+            'Event creators can attach a live event to that page.'
+        ),
+    )
     knowledge_path = models.ForeignKey(
         'knowledge_paths.KnowledgePath',
         on_delete=models.PROTECT,
@@ -202,6 +209,13 @@ class Course(models.Model):
     @property
     def is_for_sale(self):
         return bool(self.sales_enabled and self.price_usd and self.price_usd > 0)
+
+    @property
+    def landing_path(self):
+        """Public URL of this course page. Empty until the page is published."""
+        if not self.public_landing:
+            return ''
+        return f'/cursos/{self.code}'
 
 
 class CourseEvent(models.Model):

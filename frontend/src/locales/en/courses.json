@@ -67,6 +67,7 @@
     "calendarAria": "Session calendar",
     "meetingLabel": "Session {{id}}",
     "meetingDate": "Date {{n}} — {{date}}",
+    "linkedEventsAria": "Events for this course",
     "windowLabel": "Window:",
     "windowBody": "each session is offered twice, from November 23, 2026 to January 13, 2027.",
     "indexFit": "07 / Fit",

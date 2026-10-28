@@ -257,24 +257,38 @@ class EventRegistrationPaymentView(APIView):
 
 def _course_payload(course: Course) -> dict:
     path = course.knowledge_path
-    events = [
-        {
-            'id': link.event_id,
-            'title': link.event.title,
-            'date_start': link.event.date_start,
-            'date_end': link.event.date_end,
-        }
-        for link in course.course_events.all()
-    ]
+    events = []
+    for link in course.course_events.all():
+        event = link.event
+        if event.deleted or not event.is_visible:
+            continue
+        events.append({
+            'id': event.id,
+            'title': event.title,
+            'date_start': event.date_start,
+            'date_end': event.date_end,
+            'date_start_has_time': event.date_start_has_time,
+            'date_end_has_time': event.date_end_has_time,
+        })
     return {
         'code': course.code,
         'title': course.title,
         'price_usd': course.price_usd,
         'sales_enabled': course.sales_enabled,
         'is_for_sale': course.is_for_sale,
+        'public_landing': course.public_landing,
+        'landing_path': course.landing_path,
         'knowledge_path_id': path.id if path else None,
         'knowledge_path_title': path.title if path else None,
         'events': events,
+    }
+
+
+def _public_course_choice(course: Course) -> dict:
+    return {
+        'code': course.code,
+        'title': course.title,
+        'path': course.landing_path,
     }
 
 
@@ -288,6 +302,16 @@ def _course_purchase_payload(purchase: CoursePurchase) -> dict:
         'payment_status': purchase.payment_status,
         'is_paid': purchase.is_paid,
     }
+
+
+class PublicCourseListView(APIView):
+    """Courses whose page an event creator can attach a live event to."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        courses = Course.objects.filter(public_landing=True).order_by('title')
+        return Response([_public_course_choice(course) for course in courses])
 
 
 class CourseDetailView(APIView):

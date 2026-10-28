@@ -67,6 +67,7 @@
     "calendarAria": "Calendario de encuentros",
     "meetingLabel": "Encuentro {{id}}",
     "meetingDate": "Fecha {{n}} — {{date}}",
+    "linkedEventsAria": "Eventos de este curso",
     "windowLabel": "Ventana:",
     "windowBody": "cada encuentro se ofrece dos veces, del 23 de Noviembre de 2026 al 13 de Enero de 2027.",
     "indexFit": "07 / Encaje",
