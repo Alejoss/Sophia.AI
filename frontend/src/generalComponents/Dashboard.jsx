@@ -18,6 +18,7 @@ const showDashboardTabs = (pathname) =>
   || pathname === '/dashboard/'
   || pathname.startsWith('/dashboard/consultas')
   || pathname.startsWith('/dashboard/libros-destacados')
+  || pathname.startsWith('/dashboard/evento-destacado')
   || pathname.startsWith('/dashboard/pagos-bch')
   || pathname.startsWith('/dashboard/snapshots')
   || pathname.startsWith('/dashboard/certificados')
@@ -26,6 +27,7 @@ const showDashboardTabs = (pathname) =>
 const dashboardTabValue = (pathname) => {
   if (pathname.startsWith('/dashboard/consultas')) return 'consultations';
   if (pathname.startsWith('/dashboard/libros-destacados')) return 'featured-books';
+  if (pathname.startsWith('/dashboard/evento-destacado')) return 'featured-event';
   if (pathname.startsWith('/dashboard/pagos-bch')) return 'bch-payments';
   if (pathname.startsWith('/dashboard/snapshots')) return 'snapshots';
   if (pathname.startsWith('/dashboard/certificados') || pathname.startsWith('/dashboard/credenciales')) {
@@ -90,6 +92,12 @@ const Dashboard = () => {
               value="featured-books"
               component={RouterLink}
               to="/dashboard/libros-destacados"
+            />
+            <Tab
+              label={t('dashboard.featuredEvent')}
+              value="featured-event"
+              component={RouterLink}
+              to="/dashboard/evento-destacado"
             />
             <Tab
               label={t('dashboard.bchPayments')}

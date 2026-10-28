@@ -14,6 +14,25 @@ def upload_event_picture(instance, filename):
     # TODO utilizar django timezone module
 
 
+def _featured_banner_path(instance, filename, variant):
+    extension = 'jpg'
+    if '.' in filename:
+        extension = filename.rsplit('.', 1)[-1].lower()
+    if extension not in {'jpg', 'jpeg', 'png', 'webp', 'gif'}:
+        extension = 'jpg'
+    stamp = timezone.now().strftime('%Y%m%d%H%M%S')
+    return f'featured_events/event_{instance.event_id}_{variant}_{stamp}.{extension}'
+
+
+def upload_featured_event_banner(instance, filename):
+    """Desktop ad creative. Kept apart from the event card image."""
+    return _featured_banner_path(instance, filename, 'desktop')
+
+
+def upload_featured_event_mobile_banner(instance, filename):
+    return _featured_banner_path(instance, filename, 'mobile')
+
+
 class Event(models.Model):    
     """
     It can be a Recorded Course, a Live Course, a Conference, etc.
@@ -110,6 +129,85 @@ class Event(models.Model):
     def __str__(self):
         owner_name = self.owner.username if self.owner else "Unknown"
         return f"{self.title} - {owner_name}"
+
+
+class FeaturedEvent(models.Model):
+    """Site banner that advertises one event under the main navigation.
+
+    Staff manage it from the dashboard. It has one image for desktop and one for
+    mobile; the event keeps its own card image. Only one placement stays active:
+    saving an active banner clears the others.
+    """
+
+    event = models.OneToOneField(
+        Event,
+        on_delete=models.CASCADE,
+        related_name='feature_placement',
+    )
+    desktop_image = models.ImageField(
+        upload_to=upload_featured_event_banner,
+        help_text='Desktop banner, about 1600×280 pixels. Shown under the nav on Biblioteca, Caminos, and Temas.',
+    )
+    mobile_image = models.ImageField(
+        upload_to=upload_featured_event_mobile_banner,
+        blank=True,
+        help_text='Mobile banner, about 1200×500 pixels. Shown on screens narrower than 900 pixels.',
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='The active banner is the one visitors see. Turning this on hides any other banner.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'{self.event.title} banner'
+
+    @property
+    def has_both_images(self):
+        return bool(self.desktop_image) and bool(self.mobile_image)
+
+    def clean(self):
+        if self.is_active and not self.has_both_images:
+            raise ValidationError('An active banner needs both a desktop and a mobile image.')
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_active:
+            FeaturedEvent.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
+
+    @classmethod
+    def live(cls):
+        """The banner visitors should see, or None."""
+        placement = (
+            cls.objects
+            .select_related('event')
+            .filter(is_active=True, event__deleted=False, event__is_visible=True)
+            .exclude(desktop_image='')
+            .exclude(mobile_image='')
+            .order_by('-updated_at')
+            .first()
+        )
+        if placement is None or cls.event_is_over(placement.event):
+            return None
+        return placement
+
+    @staticmethod
+    def event_is_over(event, now=None):
+        """Whether the banner for this event should stop showing.
+
+        A started event keeps its banner until it ends. An event with a start
+        but no end is over once its start's UTC calendar day has passed.
+        """
+        if event.date_end:
+            return event.has_ended(now)
+        if event.date_start:
+            now = now or timezone.now()
+            return event.date_start.date() < now.date()
+        return False
 
 
 class EventRegistration(models.Model):

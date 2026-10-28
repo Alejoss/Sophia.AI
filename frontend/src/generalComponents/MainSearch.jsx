@@ -25,6 +25,7 @@ import {
 import generalApi from '../api/generalApi';
 import contentApi from '../api/contentApi';
 import ContentDisplay from '../content/ContentDisplay';
+import FeaturedEventBanner from '../events/FeaturedEventBanner';
 
 import TopicIcon from '@mui/icons-material/Label';
 import KnowledgePathIcon from '@mui/icons-material/AccountTree';
@@ -265,6 +266,7 @@ const MainSearch = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
+      <FeaturedEventBanner />
       <Typography variant="h4" sx={{ fontWeight: 600, mb: 2 }}>
         {t('search.title')}
       </Typography>

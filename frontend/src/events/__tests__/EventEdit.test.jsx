@@ -127,4 +127,11 @@ describe('EventEdit', () => {
 
     expect(await screen.findByText(/no se pudo actualizar el evento/i)).toBeInTheDocument();
   });
+
+  it('does not offer the site banner to the event creator', async () => {
+    renderWithProviders(<EventEdit />);
+
+    await screen.findByDisplayValue('Evento original');
+    expect(screen.queryByText(/anuncio en biblioteca/i)).not.toBeInTheDocument();
+  });
 });

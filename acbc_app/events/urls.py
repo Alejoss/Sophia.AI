@@ -2,7 +2,7 @@ from django.urls import path
 
 from content.views_social_preview import EventSocialPreviewView
 
-from events import views
+from events import featured, views
 
 app_name = "events"
 
@@ -11,6 +11,18 @@ urlpatterns = [
         'social-preview/<int:pk>/',
         EventSocialPreviewView.as_view(),
         name='event-social-preview',
+    ),
+    path('featured/', featured.CurrentFeaturedEventView.as_view(), name='event-featured-current'),
+    path('admin/featured/', featured.AdminFeaturedEventListView.as_view(), name='admin-featured-events'),
+    path(
+        'admin/featured/events/',
+        featured.AdminFeaturedEventChoicesView.as_view(),
+        name='admin-featured-event-choices',
+    ),
+    path(
+        'admin/featured/<int:event_id>/',
+        featured.AdminFeaturedEventDetailView.as_view(),
+        name='admin-featured-event-detail',
     ),
     path('', views.EventList.as_view(), name='event-list'),
     path('<int:pk>/', views.EventDetail.as_view(), name='event-detail'),
