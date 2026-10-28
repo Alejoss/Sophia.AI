@@ -33,7 +33,6 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EventDateTimeField from './EventDateTimeField';
-import FeaturedEventEditor from './FeaturedEventEditor';
 import { eventDatesAreOrdered, formatDateTimeForInput } from '../utils/dateUtils';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
@@ -498,8 +497,6 @@ const EventEdit = () => {
           </Box>
         </CardContent>
       </Card>
-
-      <FeaturedEventEditor eventId={eventId} />
 
       <Paper variant="outlined" sx={{ mt: 2.5, p: 2.5, borderColor: 'error.light' }}>
         <Typography variant="h6" color="error" sx={{ mb: 1 }}>

@@ -166,26 +166,46 @@ export const fetchCurrentFeaturedEvent = async () => {
   return response.data;
 };
 
-export const fetchEventFeature = async (eventId) => {
+export const fetchAdminFeaturedEvents = async () => {
   try {
-    const response = await axiosInstance.get(`/events/${eventId}/feature/`);
-    return response.data;
+    const response = await axiosInstance.get('/events/admin/featured/');
+    return response.data?.results ?? [];
   } catch (error) {
-    fail(error, 'Error fetching event banner');
+    fail(error, 'Error fetching event banners');
   }
 };
 
-export const saveEventFeature = async (eventId, { imageFile, isActive }) => {
+export const fetchFeaturedEventChoices = async () => {
+  try {
+    const response = await axiosInstance.get('/events/admin/featured/events/');
+    return response.data?.results ?? [];
+  } catch (error) {
+    fail(error, 'Error fetching events for a banner');
+  }
+};
+
+export const saveFeaturedEvent = async (eventId, { desktopFile, mobileFile, isActive }) => {
   try {
     const formData = new FormData();
     formData.append('is_active', String(Boolean(isActive)));
-    if (imageFile) {
-      formData.append('image', imageFile);
+    if (desktopFile) {
+      formData.append('desktop_image', desktopFile);
     }
-    const response = await axiosInstance.put(`/events/${eventId}/feature/`, formData);
+    if (mobileFile) {
+      formData.append('mobile_image', mobileFile);
+    }
+    const response = await axiosInstance.put(`/events/admin/featured/${eventId}/`, formData);
     return response.data;
   } catch (error) {
     fail(error, 'Error saving event banner');
+  }
+};
+
+export const deleteFeaturedEvent = async (eventId) => {
+  try {
+    await axiosInstance.delete(`/events/admin/featured/${eventId}/`);
+  } catch (error) {
+    fail(error, 'Error deleting event banner');
   }
 };
 
