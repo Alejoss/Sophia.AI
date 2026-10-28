@@ -272,5 +272,22 @@
       "refunded": "Reembolsado",
       "expired": "Expirado"
     }
+  },
+  "banner": {
+    "kicker": "Próximo evento"
+  },
+  "feature": {
+    "title": "Anuncio en Biblioteca, Caminos y Temas",
+    "helper": "Sube una imagen ancha, de unos 1600 × 280 px. Se muestra justo debajo del menú en esas tres páginas y abre este evento.",
+    "active": "Mostrar este evento",
+    "chooseImage": "Elegir imagen",
+    "changeImage": "Cambiar imagen",
+    "save": "Guardar anuncio",
+    "saving": "Guardando anuncio...",
+    "saved": "El anuncio quedó guardado.",
+    "needImage": "Elige una imagen ancha para publicar el anuncio.",
+    "visibilityNote": "El anuncio se ve cuando el evento es público y todavía no ha terminado.",
+    "loadError": "No se pudo cargar el anuncio.",
+    "saveError": "No se pudo guardar el anuncio."
   }
 }

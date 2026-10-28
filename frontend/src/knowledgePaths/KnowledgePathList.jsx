@@ -16,6 +16,7 @@ import {
   Stack } from
 '@mui/material';
 import knowledgePathsApi from '../api/knowledgePathsApi';
+import FeaturedEventBanner from '../events/FeaturedEventBanner';
 import VoteComponent from '../votes/VoteComponent';
 import { AuthContext } from '../context/AuthContext';
 import { useDateLocales } from '../hooks/useDateLocales';
@@ -80,26 +81,16 @@ const KnowledgePathList = () => {
     window.scrollTo(0, 0);
   };
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress />
-      </Box>);
-
-  }
-
-  if (error) {
-    return (
-      <Container>
-        <Alert severity="error" sx={{ mt: 2 }}>
-          {error}
-        </Alert>
-      </Container>);
-
-  }
-
-  return (
-    <Container sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
+  const body = loading ? (
+    <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+      <CircularProgress />
+    </Box>
+  ) : error ? (
+    <Alert severity="error" sx={{ mt: 2 }}>
+      {error}
+    </Alert>
+  ) : (
+    <>
       <Box
         sx={{
           display: 'flex',
@@ -334,8 +325,15 @@ const KnowledgePathList = () => {
           </Button>
         </Box>
       }
-    </Container>);
+    </>
+  );
 
+  return (
+    <Container sx={{ py: { xs: 2, md: 3 }, px: { xs: 1, md: 3 } }}>
+      <FeaturedEventBanner />
+      {body}
+    </Container>
+  );
 };
 
 export default KnowledgePathList;
