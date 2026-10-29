@@ -103,6 +103,7 @@ class OpenAIClient:
         model: Optional[str] = None,
         temperature: float = 0.2,
         max_tokens: Optional[int] = None,
+        require_complete: bool = False,
     ) -> str:
         model_name = (
             model
@@ -120,6 +121,8 @@ class OpenAIClient:
         choices = (data or {}).get('choices') or []
         if not choices:
             raise OpenAIClientError('OpenAI chat no devolvió choices.')
+        if require_complete and choices[0].get('finish_reason') != 'stop':
+            raise OpenAIClientError('OpenAI no completó la respuesta del resumen.')
         message = (choices[0].get('message') or {})
         content = (message.get('content') or '').strip()
         if not content:

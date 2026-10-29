@@ -2,7 +2,9 @@
 
 Authenticated users ask **independent** questions about a topic. Sophia:
 
-1. Embeds the question with OpenAI (`text-embedding-3-large`).
+1. Routes document-wide requests (summaries, main ideas, outlines, or explanations
+   of the selected text) to the full-text flow described below. For factual
+   questions, embeds the question with OpenAI (`text-embedding-3-large`).
 2. Searches Qdrant filtered by `topic_id`.
 3. Asks an OpenAI chat model to answer **only** from those transcript chunks.
 4. Persists the consultation (`TopicChatQuery`: question, answer, sources).
@@ -202,9 +204,52 @@ Also requires `QDRANT_URL`, `QDRANT_API_KEY`, and an indexed collection.
 
 ---
 
+## Full-document consultations
+
+Requests such as `Puedes resumir el texto?`, `Resume el documento`,
+`What are the main ideas?`, and `Explain this document` use the complete stored
+transcript text rather than embedding the instruction and ranking chunks.
+No re-embedding or Qdrant data changes are required.
+
+- Select the intended document with the existing checklist. Multiple explicitly
+  selected documents are supported and all receive coverage. If selection is
+  omitted, the backend resolves a single available indexed transcript; ambiguous
+  requests return **400** asking the user to select a file.
+- Only indexed VIDEO/AUDIO/TEXT in the current topic are eligible. Existing
+  authentication, topic access, payment, and daily quota checks still apply.
+- Text comes from the existing canonical search/hash source resolver in Django
+  (processed text, parsed text, then Obsidian body). Coverage is of this stored
+  text, which may differ from the original recording.
+- Full text is divided in order into sections of at most 8,000 characters
+  (smaller when `TOPIC_CHAT_MAX_CONTEXT_CHARS` requires it). Short documents use
+  one generation. Longer ones use section notes followed by bounded hierarchical
+  synthesis, preserving original section references and short quotations.
+- At most **32 sections** are processed per consultation (up to 256,000 characters
+  with the default context budget). Oversized or unavailable text returns an
+  explicit **400** before generation and is not saved or counted against quota.
+  A failed generation or synthesis returns **502** without saving a partial answer.
+- Sources retain the existing response format and excerpt links. Summary sources
+  add `retrieval=document_section` and `section_index`; `chunk_index` and `score`
+  are null because these are ordered text sections, not Qdrant search hits.
+  `retrieved_chunk_count` and `used_chunk_count` count those sections.
+- The summary prompt requires grounded citations, distinguishes selected
+  documents, treats source text as reference material, and states stored-text
+  coverage in the user's language. Summary quality and citation accuracy still
+  require a live model review after deployment.
+- Factual questions retain dense search, relevance filtering, and keyword
+  fallback. Common instruction words such as `Puedes` and `Resume` are excluded
+  from the entity heuristic.
+
+Deployment verification: select content 5525 in topic 17 and submit
+`Puedes resumir el texto?`. Check that the answer covers beginning and ending
+ideas and that sources use `document_section`. Then ask a specific factual
+question and verify ordinary semantic sources and citations. Local tests mock
+upstream models; they verify routing, text coverage, and persistence, not the
+semantic quality of a real generated summary.
+
 ## Behaviour notes
 
-- Retrieval is scoped to one `topic_id`, and optionally to a subset of
+- For factual questions, retrieval is scoped to one `topic_id`, and optionally to a subset of
   `content_ids` chosen by the user for that consultation.
 - Default `TOPIC_CHAT_TOP_K=4` (fetch `8`, keep at most two chunks per `content_id`).
 - Dense hits below `TOPIC_CHAT_MIN_SCORE` (default `0.30`) are dropped; if none
