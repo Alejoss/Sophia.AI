@@ -43,12 +43,12 @@ const NewsletterSubscribe = () => {
       setSuccessMessage(t('newsletter.success'));
       reset({ email: '' });
     } catch (err) {
-      const { generalError: parsed } = applyApiErrorsToForm(
+      const { fieldErrors, generalError: parsed } = applyApiErrorsToForm(
         err,
         setError,
         t('newsletter.error'),
       );
-      if (parsed) {
+      if (parsed && !fieldErrors.email) {
         setGeneralError(parsed);
       }
     }

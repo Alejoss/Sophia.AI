@@ -20,6 +20,15 @@ export const getPaymentGatewayStatus = async () => {
   }
 };
 
+export const listPublicCourses = async () => {
+  try {
+    const response = await axiosInstance.get('/payments/courses/');
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo cargar las páginas de los cursos');
+  }
+};
+
 export const getCourse = async (courseCode) => {
   try {
     const response = await axiosInstance.get(`/payments/courses/${courseCode}/`);

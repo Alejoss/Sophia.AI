@@ -32,8 +32,17 @@ import jwt
 import json
 
 from profiles.serializers import UserSerializer, ProfileSerializer, UserRegistrationSerializer, NotificationSerializer, CryptoCurrencySerializer, AcceptedCryptoSerializer, SuggestionSerializer, ChangePasswordSerializer
-from profiles.models import Profile, CryptoCurrency, AcceptedCrypto, Suggestion, NewsletterSubscription
+from profiles.models import Profile, CryptoCurrency, AcceptedCrypto, Suggestion
 from profiles.email_service import EmailService, EmailServiceError
+from profiles.newsletter import (
+    NEWSLETTER_RATE_LIMIT_MESSAGE,
+    NEWSLETTER_SUBSCRIBED_EMAIL_SESSION_KEY,
+    NEWSLETTER_SUCCESS_MESSAGE,
+    consume_newsletter_subscribe_attempt,
+    newsletter_source_label,
+    normalize_newsletter_source,
+    save_newsletter_subscription,
+)
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from dj_rest_auth.registration.views import SocialLoginView
@@ -105,23 +114,15 @@ class NewsletterSubscriptionForm(forms.Form):
     )
 
 
-NEWSLETTER_SOURCE_LABELS = {
-    'club_de_lectura': 'Club de Lectura',
-    'frontend_subscribe': 'Página /unirme',
-    'subscribe_page': 'Página de suscripción',
-}
-
-
 def _notify_admins_newsletter_subscription(email: str, source: str = '') -> None:
     """Notify administrators about a new newsletter subscription."""
-    source_label = NEWSLETTER_SOURCE_LABELS.get(source) or (source or 'No especificada')
     try:
         EmailService.send_to_admins(
             subject='Nueva suscripción a la newsletter',
             template_name='newsletter_subscription',
             context={
                 'subscriber_email': email,
-                'source_label': source_label,
+                'source_label': newsletter_source_label(source),
             },
             tags=['newsletter', 'subscription'],
         )
@@ -133,6 +134,12 @@ def _notify_admins_newsletter_subscription(email: str, source: str = '') -> None
         )
 
 
+def _newsletter_rate_limited_form(request):
+    form = NewsletterSubscriptionForm(request.POST)
+    form.add_error(None, NEWSLETTER_RATE_LIMIT_MESSAGE)
+    return form
+
+
 @require_http_methods(["GET", "POST"])
 def newsletter_subscribe(request):
     """
@@ -140,27 +147,41 @@ def newsletter_subscribe(request):
     Stores the email in the database and notifies the admin by email.
     """
     if request.method == "POST":
+        if not consume_newsletter_subscribe_attempt(request):
+            return render(
+                request,
+                "newsletter/subscribe.html",
+                {"form": _newsletter_rate_limited_form(request)},
+                status=429,
+            )
+
         form = NewsletterSubscriptionForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data["email"].strip().lower()
-
-            subscription, created = NewsletterSubscription.objects.get_or_create(
-                email=email,
-                defaults={"source": "subscribe_page"},
-            )
-
+            created = save_newsletter_subscription(email, source="subscribe_page")
             if created:
                 _notify_admins_newsletter_subscription(email, source='subscribe_page')
 
-            return render(
-                request,
-                "newsletter/subscribe_success.html",
-                {"email": email},
-            )
+            request.session[NEWSLETTER_SUBSCRIBED_EMAIL_SESSION_KEY] = email
+            return redirect("newsletter_subscribe_success")
     else:
         form = NewsletterSubscriptionForm()
 
     return render(request, "newsletter/subscribe.html", {"form": form})
+
+
+@require_http_methods(["GET"])
+def newsletter_subscribe_success(request):
+    """Thank-you page after a signup. Refreshing it does not submit the form again."""
+    email = request.session.pop(NEWSLETTER_SUBSCRIBED_EMAIL_SESSION_KEY, "")
+    return render(
+        request,
+        "newsletter/subscribe_success.html",
+        {
+            "email": email,
+            "frontend_url": settings.FRONTEND_PUBLIC_URL,
+        },
+    )
 
 
 class NewsletterSubscriptionApiView(APIView):
@@ -172,6 +193,12 @@ class NewsletterSubscriptionApiView(APIView):
     authentication_classes = []
 
     def post(self, request):
+        if not consume_newsletter_subscribe_attempt(request):
+            return Response(
+                {"detail": NEWSLETTER_RATE_LIMIT_MESSAGE},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
         email = (request.data.get("email") or "").strip().lower()
         if not email:
             return Response(
@@ -183,30 +210,21 @@ class NewsletterSubscriptionApiView(APIView):
         if not form.is_valid():
             email_errors = form.errors.get('email')
             detail = email_errors[0] if email_errors else 'Email no válido.'
-            logger.warning(
-                'Newsletter subscription rejected for %r: %s',
-                email,
-                detail,
+            logger.warning('Newsletter subscription rejected: %s', detail)
+            return Response(
+                {'detail': detail},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            return Response({'detail': detail, 'email': form.errors.get('email', [])}, status=status.HTTP_400_BAD_REQUEST)
 
-        source = (request.data.get("source") or "frontend_subscribe").strip()[:100]
-
-        subscription, created = NewsletterSubscription.objects.get_or_create(
-            email=email,
-            defaults={"source": source},
-        )
+        source = normalize_newsletter_source(request.data.get("source"))
+        created = save_newsletter_subscription(email, source=source)
 
         if created:
             _notify_admins_newsletter_subscription(email, source=source)
 
         return Response(
-            {
-                "email": email,
-                "created": created,
-                "message": "Suscripción registrada correctamente.",
-            },
-            status=status.HTTP_201_CREATED,
+            {"message": NEWSLETTER_SUCCESS_MESSAGE},
+            status=status.HTTP_200_OK,
         )
 
 

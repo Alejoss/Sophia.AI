@@ -43,7 +43,8 @@ from book_clubs.serializers import (
 )
 from comments.models import Comment
 from knowledge_paths.services.node_user_activity_service import get_knowledge_path_progress
-from profiles.models import NewsletterSubscription, UserNodeCompletion
+from profiles.models import UserNodeCompletion
+from profiles.newsletter import save_newsletter_subscription
 
 
 def _get_club(slug):
@@ -177,10 +178,7 @@ class BookClubGuestAccessView(APIView):
             )
 
         source = f'club_de_lectura:{slug}'[:100]
-        NewsletterSubscription.objects.get_or_create(
-            email=email,
-            defaults={'source': source},
-        )
+        save_newsletter_subscription(email, source)
 
         guest_token = dump_guest_token(email=email, slug=club.slug)
         send_book_club_invite_email(email=email, club=club, token=guest_token)

@@ -2294,6 +2294,25 @@ class CoursePurchasePaymentTests(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_public_course_list_includes_published_landings(self):
+        response = self.client.get(reverse('course-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        bitcoin = next(item for item in response.data if item['code'] == 'real-historia-bitcoin')
+        self.assertEqual(bitcoin['path'], '/cursos/real-historia-bitcoin')
+        self.assertIn('title', bitcoin)
+
+    def test_public_course_hides_private_events(self):
+        course = Course.objects.get(code='real-historia-bitcoin')
+        hidden = EventFactory(owner=self.buyer, title='Oculto', is_visible=False)
+        visible = EventFactory(owner=self.buyer, title='Público', is_visible=True)
+        CourseEvent.objects.create(course=course, event=hidden)
+        CourseEvent.objects.create(course=course, event=visible)
+
+        response = self.client.get(reverse('course-detail', kwargs={'course_code': course.code}))
+        titles = [event['title'] for event in response.data['events']]
+        self.assertIn('Público', titles)
+        self.assertNotIn('Oculto', titles)
+
     def test_public_course_returns_the_stored_price(self):
         course = Course.objects.get(code='real-historia-bitcoin')
         course.price_usd = 40

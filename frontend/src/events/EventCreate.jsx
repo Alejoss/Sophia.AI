@@ -29,6 +29,7 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EventDateTimeField from './EventDateTimeField';
+import EventLandingField from './EventLandingField';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 import { eventDatesAreOrdered, eventStartIsUpcoming } from '../utils/dateUtils';
 
@@ -71,6 +72,7 @@ const schema = yup.object({
       otherwise: (field) => field,
     }),
   reference_price: yup.string().default(''),
+  course_code: yup.string().default(''),
   date_start: yup
     .string()
     .default('')
@@ -100,6 +102,7 @@ const defaultValues = {
   platform: '',
   other_platform: '',
   reference_price: '',
+  course_code: '',
   date_start: '',
   date_end: '',
   schedule_description: '',
@@ -346,6 +349,18 @@ const EventCreate = () => {
                 helperText={errors.reference_price?.message || ''}
                 placeholder="0.00"
                 fullWidth
+              />
+
+              <Controller
+                name="course_code"
+                control={control}
+                render={({ field }) => (
+                  <EventLandingField
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.course_code?.message}
+                  />
+                )}
               />
 
               <Grid container spacing={2}>

@@ -18,6 +18,10 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+vi.mock('../../api/paymentsApi', () => ({
+  listPublicCourses: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock('../../api/eventsApi', () => ({
   fetchEventById: (...args) => mockFetchEventById(...args),
   updateEvent: (...args) => mockUpdateEvent(...args),

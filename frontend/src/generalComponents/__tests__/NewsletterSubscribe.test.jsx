@@ -40,10 +40,10 @@ describe('NewsletterSubscribe form', () => {
     expect(await screen.findByText(/gracias por suscribirte/i)).toBeInTheDocument();
   });
 
-  it('shows a Spanish alert when the API call fails', async () => {
+  it('shows the rate-limit message once when the API returns detail', async () => {
     const user = userEvent.setup();
     mockSubmitNewsletterSubscription.mockRejectedValue({
-      response: { data: { error: 'Ya estás suscrito' } },
+      response: { data: { detail: 'Demasiados intentos. Inténtalo de nuevo más tarde.' } },
     });
 
     renderWithProviders(<NewsletterSubscribe />);
@@ -51,6 +51,23 @@ describe('NewsletterSubscribe form', () => {
     await user.type(screen.getByLabelText(/email/i), 'persona@example.com');
     await user.click(screen.getByRole('button', { name: /quiero suscribirme/i }));
 
-    expect(await screen.findByText(/ya estás suscrito/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/demasiados intentos/i),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a field error once when detail repeats the email message', async () => {
+    const user = userEvent.setup();
+    const message = 'Introduce un email válido.';
+    mockSubmitNewsletterSubscription.mockRejectedValue({
+      response: { data: { detail: message, email: [message] } },
+    });
+
+    renderWithProviders(<NewsletterSubscribe />);
+
+    await user.type(screen.getByLabelText(/email/i), 'persona@example.com');
+    await user.click(screen.getByRole('button', { name: /quiero suscribirme/i }));
+
+    expect(await screen.findAllByText(message)).toHaveLength(1);
   });
 });

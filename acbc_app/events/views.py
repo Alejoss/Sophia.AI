@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 def _filter_events_for_list(request):
     owner_id = request.query_params.get('owner')
-    events = Event.objects.all()
+    events = Event.objects.prefetch_related('course_links__course')
 
     if owner_id:
         events = events.filter(owner_id=owner_id)
@@ -100,7 +100,10 @@ class EventDetail(APIView):
         return [IsAuthenticated()]
     
     def get_object(self, pk):
-        return get_object_or_404(Event, pk=pk)
+        return get_object_or_404(
+            Event.objects.prefetch_related('course_links__course'),
+            pk=pk,
+        )
 
     def get(self, request, pk, format=None):
         logger.info(f"Event detail requested - Event ID: {pk}, User: {request.user.username if request.user.is_authenticated else 'anonymous'}")

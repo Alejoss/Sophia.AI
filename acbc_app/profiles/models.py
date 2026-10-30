@@ -184,3 +184,19 @@ class NewsletterSubscription(models.Model):
 
     def __str__(self):
         return self.email
+
+
+class NewsletterSubscribeRateLimit(models.Model):
+    """
+    Fixed-window counter for public newsletter signup, keyed by client IP.
+
+    Stored in the database so the three Gunicorn workers share one limit.
+    The default cache is process-local and would multiply the allowance.
+    """
+
+    ip_address = models.CharField(max_length=64, unique=True)
+    window_start = models.DateTimeField()
+    request_count = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.ip_address} ({self.request_count})"

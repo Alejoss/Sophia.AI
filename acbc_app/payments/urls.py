@@ -17,6 +17,7 @@ urlpatterns = [
     path('payphone/<int:payment_id>/', views.PayphonePaymentDetailView.as_view(), name='payphone-payment-detail'),
     path('registration/<int:registration_id>/', views.EventRegistrationPaymentView.as_view(), name='registration-payment-create'),
     path('registration/<int:registration_id>/list/', views.RegistrationPaymentsListView.as_view(), name='registration-payments-list'),
+    path('courses/', views.PublicCourseListView.as_view(), name='course-list'),
     path('courses/<slug:course_code>/', views.CourseDetailView.as_view(), name='course-detail'),
     path('course-purchases/', views.CoursePurchaseView.as_view(), name='course-purchase-create'),
     path('course-purchase/<int:purchase_id>/', views.CoursePurchasePaymentView.as_view(), name='course-purchase-payment-create'),
