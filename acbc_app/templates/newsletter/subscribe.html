@@ -44,6 +44,7 @@
             color: #d1d5db;
         }
         input[type="email"] {
+            box-sizing: border-box;
             margin-top: 0.25rem;
             width: 100%;
             padding: 0.6rem 0.75rem;
@@ -113,8 +114,15 @@
                     {% endfor %}
                 </ul>
             {% endif %}
+            {% if form.non_field_errors %}
+                <ul class="errorlist">
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
             <button type="submit">Quiero suscribirme</button>
-            <small>Solo usaremos tu correo para enviarte noticias relevantes. Podrás darte de baja en cualquier momento.</small>
+            <small>Solo usaremos tu correo para enviarte noticias relevantes sobre Academia Blockchain.</small>
         </form>
     </div>
 </body>

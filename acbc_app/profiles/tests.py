@@ -2200,8 +2200,15 @@ class NewsletterSubscriptionApiTests(APITestCase):
         self.client = APIClient()
         self.url = reverse('profiles:newsletter_subscribe_api')
 
+    def _assert_same_success_body(self, response):
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {
+            'message': 'Suscripción registrada correctamente.',
+        })
+
     @patch('profiles.views.EmailService.send_to_admins')
     def test_newsletter_subscription_notifies_admins(self, mock_send_to_admins):
+        from profiles.models import NewsletterSubscription
         mock_send_to_admins.return_value = {'sent': ['admin@example.com'], 'failed': []}
 
         response = self.client.post(
@@ -2210,8 +2217,11 @@ class NewsletterSubscriptionApiTests(APITestCase):
             format='json',
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(response.data['created'])
+        self._assert_same_success_body(response)
+        self.assertEqual(
+            NewsletterSubscription.objects.get(email='nuevo@example.com').source,
+            'club_de_lectura',
+        )
         mock_send_to_admins.assert_called_once()
         call_kwargs = mock_send_to_admins.call_args[1]
         self.assertEqual(call_kwargs['template_name'], 'newsletter_subscription')
@@ -2229,9 +2239,29 @@ class NewsletterSubscriptionApiTests(APITestCase):
             format='json',
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertFalse(response.data['created'])
+        self._assert_same_success_body(response)
         mock_send_to_admins.assert_not_called()
+
+    @patch('profiles.views.EmailService.send_to_admins')
+    def test_unknown_source_is_replaced(self, mock_send_to_admins):
+        from profiles.models import NewsletterSubscription
+        mock_send_to_admins.return_value = {'sent': ['admin@example.com'], 'failed': []}
+
+        response = self.client.post(
+            self.url,
+            {'email': 'origen@example.com', 'source': '<script>alert(1)</script>'},
+            format='json',
+        )
+
+        self._assert_same_success_body(response)
+        self.assertEqual(
+            NewsletterSubscription.objects.get(email='origen@example.com').source,
+            'frontend_subscribe',
+        )
+        self.assertEqual(
+            mock_send_to_admins.call_args[1]['context']['source_label'],
+            'Página /unirme',
+        )
 
     @patch('profiles.views.EmailService.send_to_admins')
     def test_newsletter_subscription_email_failure_does_not_fail_request(self, mock_send_to_admins):
@@ -2243,8 +2273,22 @@ class NewsletterSubscriptionApiTests(APITestCase):
             format='json',
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(response.data['created'])
+        self._assert_same_success_body(response)
+
+    @patch('profiles.newsletter.NewsletterSubscription.objects.get_or_create')
+    @patch('profiles.views.EmailService.send_to_admins')
+    def test_concurrent_duplicate_does_not_notify(self, mock_send_to_admins, mock_get_or_create):
+        from django.db import IntegrityError
+        mock_get_or_create.side_effect = IntegrityError
+
+        response = self.client.post(
+            self.url,
+            {'email': 'carrera@example.com'},
+            format='json',
+        )
+
+        self._assert_same_success_body(response)
+        mock_send_to_admins.assert_not_called()
 
     def test_newsletter_subscription_invalid_email_returns_detail(self):
         response = self.client.post(
@@ -2254,5 +2298,116 @@ class NewsletterSubscriptionApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('detail', response.data)
+        self.assertEqual(set(response.data.keys()), {'detail'})
         self.assertIn('email', response.data['detail'].lower())
+
+    @patch('profiles.views.EmailService.send_to_admins')
+    def test_newsletter_subscription_rate_limit(self, mock_send_to_admins):
+        from profiles.models import NewsletterSubscribeRateLimit, NewsletterSubscription
+        mock_send_to_admins.return_value = {'sent': ['admin@example.com'], 'failed': []}
+
+        for index in range(5):
+            response = self.client.post(
+                self.url,
+                {'email': f'rate{index}@example.com'},
+                format='json',
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        blocked = self.client.post(
+            self.url,
+            {'email': 'blocked@example.com'},
+            format='json',
+        )
+        self.assertEqual(blocked.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertIn('detail', blocked.data)
+        self.assertFalse(
+            NewsletterSubscription.objects.filter(email='blocked@example.com').exists()
+        )
+
+        other_ip = self.client.post(
+            self.url,
+            {'email': 'otra-ip@example.com'},
+            format='json',
+            HTTP_X_REAL_IP='203.0.113.9',
+        )
+        self.assertEqual(other_ip.status_code, status.HTTP_200_OK)
+
+        forwarded = self.client.post(
+            self.url,
+            {'email': 'forwarded@example.com'},
+            format='json',
+            HTTP_X_FORWARDED_FOR='198.51.100.20',
+        )
+        self.assertEqual(forwarded.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+        bucket = NewsletterSubscribeRateLimit.objects.get(ip_address='127.0.0.1')
+        bucket.window_start = timezone.now() - timedelta(hours=2)
+        bucket.save(update_fields=['window_start'])
+
+        after_window = self.client.post(
+            self.url,
+            {'email': 'despues@example.com'},
+            format='json',
+        )
+        self.assertEqual(after_window.status_code, status.HTTP_200_OK)
+
+
+class NewsletterSubscribePageTests(APITestCase):
+    def _post_form(self, email):
+        """
+        Call the HTML view directly.
+
+        The Django test client copies template context on render, and that
+        copy fails on Python 3.14. RequestFactory does not attach that hook.
+        """
+        from django.contrib.sessions.middleware import SessionMiddleware
+        from django.test import RequestFactory
+        from profiles.views import newsletter_subscribe
+
+        request = RequestFactory().post('/subscribe/', {'email': email})
+        SessionMiddleware(lambda req: None).process_request(request)
+        request.session.save()
+        return newsletter_subscribe(request), request
+
+    @patch('profiles.views.EmailService.send_to_admins')
+    def test_post_redirects_to_success_page(self, mock_send_to_admins):
+        from django.test import RequestFactory
+        from profiles.models import NewsletterSubscription
+        from profiles.views import newsletter_subscribe_success
+        mock_send_to_admins.return_value = {'sent': ['admin@example.com'], 'failed': []}
+
+        response, request = self._post_form('pagina@example.com')
+
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertEqual(response.url, reverse('newsletter_subscribe_success'))
+        self.assertTrue(
+            NewsletterSubscription.objects.filter(email='pagina@example.com').exists()
+        )
+
+        success_request = RequestFactory().get('/subscribe/gracias/')
+        success_request.session = request.session
+        success = newsletter_subscribe_success(success_request)
+        self.assertContains(success, 'pagina@example.com')
+        self.assertContains(success, settings.FRONTEND_PUBLIC_URL)
+        refreshed = newsletter_subscribe_success(success_request)
+        self.assertNotContains(refreshed, 'pagina@example.com')
+
+    @patch('profiles.views.EmailService.send_to_admins')
+    def test_page_shares_api_rate_limit(self, mock_send_to_admins):
+        from profiles.models import NewsletterSubscription
+        mock_send_to_admins.return_value = {'sent': ['admin@example.com'], 'failed': []}
+        api_url = reverse('profiles:newsletter_subscribe_api')
+        for index in range(5):
+            self.client.post(
+                api_url,
+                {'email': f'pagina-rate{index}@example.com'},
+                format='json',
+            )
+
+        response, _request = self._post_form('pagina-bloqueada@example.com')
+        self.assertEqual(response.status_code, 429)
+        self.assertContains(response, 'Demasiados intentos', status_code=429)
+        self.assertFalse(
+            NewsletterSubscription.objects.filter(email='pagina-bloqueada@example.com').exists()
+        )
