@@ -33,6 +33,7 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EventDateTimeField from './EventDateTimeField';
+import EventLandingField from './EventLandingField';
 import { eventDatesAreOrdered, formatDateTimeForInput } from '../utils/dateUtils';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 import useAuthErrorHandler, { AUTH_ERROR_STRATEGY } from '../hooks/useAuthErrorHandler';
@@ -76,6 +77,7 @@ const schema = yup.object({
       otherwise: (field) => field,
     }),
   reference_price: yup.string().default(''),
+  course_code: yup.string().default(''),
   date_start: yup.string().default(''),
   date_end: yup
     .string()
@@ -126,6 +128,7 @@ const EventEdit = () => {
       platform: '',
       other_platform: '',
       reference_price: '',
+      course_code: '',
       date_start: '',
       date_end: '',
       schedule_description: '',
@@ -149,6 +152,7 @@ const EventEdit = () => {
           platform: eventData.platform || '',
           other_platform: eventData.other_platform || '',
           reference_price: eventData.reference_price ? eventData.reference_price.toString() : '',
+          course_code: eventData.landing_page?.course_code || '',
           date_start: formatDateTimeForInput(
             eventData.date_start,
             eventData.date_start_has_time !== false,
@@ -420,6 +424,18 @@ const EventEdit = () => {
                 helperText={errors.reference_price?.message || ''}
                 placeholder="0.00"
                 fullWidth
+              />
+
+              <Controller
+                name="course_code"
+                control={control}
+                render={({ field }) => (
+                  <EventLandingField
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.course_code?.message}
+                  />
+                )}
               />
 
               <Grid container spacing={2}>

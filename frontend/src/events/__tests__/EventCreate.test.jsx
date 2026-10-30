@@ -19,6 +19,16 @@ vi.mock('../../api/eventsApi', () => ({
   createEvent: (...args) => mockCreateEvent(...args),
 }));
 
+vi.mock('../../api/paymentsApi', () => ({
+  listPublicCourses: vi.fn().mockResolvedValue([
+    {
+      code: 'real-historia-bitcoin',
+      title: 'La Real Historia de Bitcoin y la Guerra por las Criptomonedas',
+      path: '/cursos/real-historia-bitcoin',
+    },
+  ]),
+}));
+
 vi.mock('../EventDateTimeField', () => ({
   default: ({ label }) => <div data-testid={`date-field-${label}`} />,
 }));
@@ -60,6 +70,26 @@ describe('EventCreate', () => {
     expect(formData.get('description')).toBe('Un curso introductorio');
     expect(formData.get('event_type')).toBe('LIVE_COURSE');
     expect(await screen.findByText(/evento creado exitosamente/i)).toBeInTheDocument();
+  });
+
+  it('submits the selected course page with the event', async () => {
+    const user = userEvent.setup();
+    mockCreateEvent.mockResolvedValue({ id: 12 });
+    renderWithProviders(<EventCreate />);
+
+    await user.type(screen.getByLabelText(/título/i), 'Curso de Bitcoin');
+    await user.type(screen.getByLabelText(/descripción \*/i), 'Un curso introductorio');
+    await user.click(screen.getAllByRole('combobox')[0]);
+    await user.click(await screen.findByRole('option', { name: /curso en vivo/i }));
+    await user.click(screen.getByLabelText(/página del curso/i));
+    await user.click(await screen.findByRole('option', { name: /real historia de bitcoin/i }));
+    await user.click(screen.getByRole('button', { name: /crear evento/i }));
+
+    await waitFor(() => {
+      expect(mockCreateEvent).toHaveBeenCalledTimes(1);
+    });
+    const formData = mockCreateEvent.mock.calls[0][0];
+    expect(formData.get('course_code')).toBe('real-historia-bitcoin');
   });
 
   it('shows a Spanish alert when the API call fails', async () => {

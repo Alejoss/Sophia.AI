@@ -128,6 +128,39 @@ class EventSerializerTest(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn('date_end', serializer.errors)
 
+    def test_event_serializer_links_a_published_course_page(self):
+        self.event_data['course_code'] = 'real-historia-bitcoin'
+        serializer = EventSerializer(data=self.event_data, context={'request': self.request})
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        event = serializer.save()
+
+        self.assertEqual(event.course_links.get().course.code, 'real-historia-bitcoin')
+        self.assertEqual(serializer.data['landing_page']['path'], '/cursos/real-historia-bitcoin')
+        self.assertEqual(serializer.data['landing_page']['course_code'], 'real-historia-bitcoin')
+
+    def test_event_serializer_rejects_an_unpublished_course_page(self):
+        self.event_data['course_code'] = 'no-such-course'
+        serializer = EventSerializer(data=self.event_data, context={'request': self.request})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('course_code', serializer.errors)
+
+    def test_event_serializer_can_clear_the_course_page(self):
+        from payments.models import Course, CourseEvent
+        event = EventFactory(owner=self.user)
+        course = Course.objects.get(code='real-historia-bitcoin')
+        CourseEvent.objects.create(course=course, event=event)
+
+        serializer = EventSerializer(
+            event,
+            data={'title': event.title, 'description': event.description, 'course_code': ''},
+            partial=True,
+            context={'request': self.request},
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+        self.assertFalse(event.course_links.filter(course__public_landing=True).exists())
+        self.assertIsNone(serializer.data['landing_page'])
+
     def test_event_serializer_update(self):
         """Test event update through serializer."""
         event = EventFactory(owner=self.user)

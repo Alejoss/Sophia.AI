@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import { ArrowForward as ArrowForwardIcon } from '@mui/icons-material';
 import { Box, Button, Container, Typography } from '@mui/material';
 import { getCourse } from '../api/paymentsApi.js';
+import { formatEventWhen } from '../utils/dateUtils';
+import { useDateLocales } from '../hooks/useDateLocales';
 import '../styles/brand-home.css';
 import '../styles/course-real-historia-bitcoin.css';
 
@@ -39,8 +41,10 @@ const formatCoursePrice = (amount) => {
 
 const RealHistoriaBitcoinLanding = () => {
   const { t } = useTranslation('courses');
+  const { intl } = useDateLocales();
   const [priceLabel, setPriceLabel] = useState('');
   const [offerState, setOfferState] = useState('loading');
+  const [liveEvents, setLiveEvents] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,10 +52,12 @@ const RealHistoriaBitcoinLanding = () => {
       .then((course) => {
         if (cancelled) return;
         if (!course?.is_for_sale) {
+          setLiveEvents(Array.isArray(course.events) ? course.events : []);
           setOfferState('closed');
           return;
         }
         setPriceLabel(formatCoursePrice(course.price_usd));
+        setLiveEvents(Array.isArray(course.events) ? course.events : []);
         setOfferState('ready');
       })
       .catch(() => {
@@ -333,6 +339,26 @@ const RealHistoriaBitcoinLanding = () => {
           <div className="rhb-window-note">
             <strong>{t('landing.windowLabel')}</strong> {t('landing.windowBody')}
           </div>
+          {liveEvents.length > 0 && (
+            <nav className="rhb-window-note" aria-label={t('landing.linkedEventsAria')}>
+              {liveEvents.map((liveEvent) => {
+                const start = liveEvent.date_start
+                  ? formatEventWhen(liveEvent.date_start, liveEvent.date_start_has_time, intl)
+                  : '';
+                const end = liveEvent.date_end
+                  ? formatEventWhen(liveEvent.date_end, liveEvent.date_end_has_time, intl)
+                  : '';
+                const when = [start, end].filter(Boolean).join(' – ');
+                return (
+                  <p key={liveEvent.id}>
+                    <Link to={`/events/${liveEvent.id}`}>
+                      {when ? `${liveEvent.title} — ${when}` : liveEvent.title}
+                    </Link>
+                  </p>
+                );
+              })}
+            </nav>
+          )}
         </Container>
       </section>
 

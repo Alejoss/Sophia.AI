@@ -13,6 +13,23 @@ from profiles.serializers import UserSerializer, AcceptedCryptoSerializer
 from profiles.models import AcceptedCrypto
 
 
+def _landing_page_for_event(event):
+    """The published course page this event is attached to, if any."""
+    link = None
+    for candidate in event.course_links.all():
+        if candidate.course.public_landing:
+            link = candidate
+            break
+    if link is None:
+        return None
+    course = link.course
+    return {
+        'course_code': course.code,
+        'title': course.title,
+        'path': course.landing_path,
+    }
+
+
 def _parse_bool(value):
     if isinstance(value, bool):
         return value
@@ -43,6 +60,7 @@ class EventSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         if instance.image:
             data['image'] = build_media_url(instance.image, self.context.get('request'))
+        data['landing_page'] = _landing_page_for_event(instance)
         return data
 
     def to_internal_value(self, data):
@@ -50,8 +68,12 @@ class EventSerializer(serializers.ModelSerializer):
 
         ``YYYY-MM-DD`` is stored at noon UTC and ``date_*_has_time`` is False.
         A blank date clears the field. A value that includes a time keeps it.
+        ``course_code`` attaches the event to that course's public landing page.
         """
         mutable = _mapping_copy(data)
+        self._course_code_provided = 'course_code' in mutable
+        raw_course = mutable.pop('course_code', '')
+        self._course_code = raw_course.strip() if isinstance(raw_course, str) else ''
         for field_name, flag_name in (
             ('date_start', 'date_start_has_time'),
             ('date_end', 'date_end_has_time'),
@@ -100,8 +122,26 @@ class EventSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'date_end': 'La fecha de finalización debe ser posterior a la fecha de inicio'
             })
+
+        if getattr(self, '_course_code_provided', False) and self._course_code:
+            from payments.models import Course
+            if not Course.objects.filter(code=self._course_code, public_landing=True).exists():
+                raise serializers.ValidationError({
+                    'course_code': 'Esta página de destino no está disponible.'
+                })
         
         return data
+
+    def _assign_landing_page(self, event):
+        """Point the event at one published course page, or clear that link."""
+        if not getattr(self, '_course_code_provided', False):
+            return
+        from payments.models import Course, CourseEvent
+        event.course_links.filter(course__public_landing=True).delete()
+        if not self._course_code:
+            return
+        course = Course.objects.get(code=self._course_code, public_landing=True)
+        CourseEvent.objects.create(course=course, event=event)
 
     def create(self, validated_data):
         # Set owner based on the request user
@@ -110,10 +150,12 @@ class EventSerializer(serializers.ModelSerializer):
             validated_data['owner'] = request.user
         validated_data.setdefault('is_visible', False)
         instance = super().create(validated_data)
+        self._assign_landing_page(instance)
         return instance
 
     def update(self, instance, validated_data):
         instance = super().update(instance, validated_data)
+        self._assign_landing_page(instance)
         return instance
 
 
