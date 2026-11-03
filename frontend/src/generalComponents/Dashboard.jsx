@@ -16,6 +16,7 @@ export const DashboardHome = () => (
 const showDashboardTabs = (pathname) =>
   pathname === '/dashboard'
   || pathname === '/dashboard/'
+  || pathname.startsWith('/dashboard/suscriptores')
   || pathname.startsWith('/dashboard/consultas')
   || pathname.startsWith('/dashboard/libros-destacados')
   || pathname.startsWith('/dashboard/evento-destacado')
@@ -25,6 +26,7 @@ const showDashboardTabs = (pathname) =>
   || pathname.startsWith('/dashboard/credenciales');
 
 const dashboardTabValue = (pathname) => {
+  if (pathname.startsWith('/dashboard/suscriptores')) return 'subscribers';
   if (pathname.startsWith('/dashboard/consultas')) return 'consultations';
   if (pathname.startsWith('/dashboard/libros-destacados')) return 'featured-books';
   if (pathname.startsWith('/dashboard/evento-destacado')) return 'featured-event';
@@ -80,6 +82,12 @@ const Dashboard = () => {
               value="home"
               component={RouterLink}
               to="/dashboard"
+            />
+            <Tab
+              label={t('dashboard.subscribers')}
+              value="subscribers"
+              component={RouterLink}
+              to="/dashboard/suscriptores"
             />
             <Tab
               label={t('dashboard.consultations')}

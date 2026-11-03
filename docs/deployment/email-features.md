@@ -60,6 +60,28 @@ Transactional HTML is rendered by Django templates under `acbc_app/profiles/temp
 
 - `base_email.html` — shared layout (logo, brand orange `#E86A00`, footer)
 - Feature templates extend the base (`suggestion_notification`, `newsletter_subscription`, `topic_creation_request`, `book_club_invite`)
+- If the template context includes `unsubscribe_url`, the base footer prints that link and `EmailService` adds the `List-Unsubscribe` / `List-Unsubscribe-Post` headers (RFC 8058 one-click)
+
+## Newsletter unsubscribe
+
+Signup stores each address on `NewsletterSubscription`. There is no shared baja link: every row has its own `unsubscribe_token`.
+
+Public page (GET asks for confirmation, POST performs the baja, including a mail client's one-click POST):
+
+`/api/profiles/newsletter/unsubscribe/<token>/`
+
+That path is already proxied to Django in production (`/api/`). Opening it does not unsubscribe; the visitor confirms with the button. A second visit says they were already removed. Signing up again with the same email turns the row back on and keeps the same link.
+
+Staff can review and correct the same list in the dashboard at `/dashboard/suscriptores` (active, unsubscribed, or all; search; CSV of the current filter). Marking someone inactive there is the same baja as the public link. The chips count every address; the table follows the filter.
+
+Active recipients, with a personal URL for each one:
+
+```bash
+cd acbc_app && . .venv/bin/activate
+ENVIRONMENT=DEVELOPMENT python manage.py list_newsletter_subscribers
+```
+
+Use `unsubscribe_url` only in that recipient's copy. Passing `unsubscribe_url` into `EmailService.send_template_email` puts the link in the shared email footer and sets the one-click headers. `--include-inactive` lists addresses that already opted out; do not mail those.
 
 The logo URL is absolute: `{FRONTEND_PUBLIC_URL}/images/logo.png` (same asset as the web header). Set `FRONTEND_PUBLIC_URL` (and `ACADEMIA_PUBLIC_URL` for Django admin links) in production so images and CTAs resolve correctly. This is **not** configured in the SMTP2GO template editor.
 
