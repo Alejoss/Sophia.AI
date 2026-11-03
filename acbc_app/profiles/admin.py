@@ -57,6 +57,14 @@ class SuggestionAdmin(admin.ModelAdmin):
 
 @admin.register(NewsletterSubscription)
 class NewsletterSubscriptionAdmin(admin.ModelAdmin):
-    list_display = ('email', 'created_at', 'source')
+    list_display = ('email', 'is_active', 'created_at', 'unsubscribed_at', 'source')
     search_fields = ('email', 'source')
-    list_filter = ('source', 'created_at')
+    list_filter = ('is_active', 'source', 'created_at')
+    readonly_fields = ('created_at', 'unsubscribed_at', 'unsubscribe_token', 'unsubscribe_link')
+
+    @admin.display(description='Enlace de baja')
+    def unsubscribe_link(self, obj):
+        if not obj or not obj.unsubscribe_token:
+            return ''
+        from profiles.newsletter import newsletter_unsubscribe_url
+        return newsletter_unsubscribe_url(obj)

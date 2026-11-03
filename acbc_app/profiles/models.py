@@ -173,14 +173,31 @@ class Suggestion(models.Model):
 class NewsletterSubscription(models.Model):
     """
     Stores newsletter subscriptions for users that provide an email address.
+
+    ``unsubscribe_token`` is the secret in each recipient's baja link.
+    Inactive rows stay in the table so the same link keeps working and a
+    later signup can turn the address back on.
     """
 
     email = models.EmailField(unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     source = models.CharField(max_length=100, blank=True, help_text="Optional source tag (e.g. landing, footer)")
+    is_active = models.BooleanField(default=True)
+    unsubscribed_at = models.DateTimeField(null=True, blank=True)
+    unsubscribe_token = models.CharField(max_length=64, unique=True, editable=False)
 
     class Meta:
         ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.unsubscribe_token:
+            from profiles.newsletter import generate_unsubscribe_token
+
+            self.unsubscribe_token = generate_unsubscribe_token()
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None:
+                kwargs['update_fields'] = set(update_fields) | {'unsubscribe_token'}
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.email

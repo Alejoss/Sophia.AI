@@ -41,4 +41,9 @@ urlpatterns = [
 
     # Newsletter subscription API
     path('newsletter/subscribe/', views.NewsletterSubscriptionApiView.as_view(), name='newsletter_subscribe_api'),
+    path(
+        'newsletter/unsubscribe/<str:token>/',
+        views.newsletter_unsubscribe,
+        name='newsletter_unsubscribe',
+    ),
 ]

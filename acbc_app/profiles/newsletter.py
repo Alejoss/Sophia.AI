@@ -1,9 +1,11 @@
-"""Newsletter signup persistence and the public per-IP rate limit."""
+"""Newsletter signup persistence, unsubscribe links, and the public per-IP rate limit."""
 
+import secrets
 from datetime import timedelta
 
 from django.db import IntegrityError
 from django.db.models import F
+from django.urls import reverse
 from django.utils import timezone
 
 from profiles.models import NewsletterSubscribeRateLimit, NewsletterSubscription
@@ -87,13 +89,98 @@ def consume_newsletter_subscribe_attempt(request) -> bool:
     return True
 
 
+def generate_unsubscribe_token() -> str:
+    """Unguessable secret for one subscriber's baja link."""
+    return secrets.token_urlsafe(32)
+
+
+def newsletter_public_base_url() -> str:
+    """
+    Origin used in links we put in outgoing mail.
+
+    Matches the brand context so a production send never points at localhost
+    when the public URL was left at the dev default.
+    """
+    from profiles.email_service import EmailService
+
+    return EmailService.get_brand_context()['backend_url'].rstrip('/')
+
+
+def newsletter_unsubscribe_path(token: str) -> str:
+    return reverse('profiles:newsletter_unsubscribe', kwargs={'token': token})
+
+
+def newsletter_unsubscribe_url(subscription) -> str:
+    """Absolute baja link for this subscriber. Each address has its own token."""
+    return f"{newsletter_public_base_url()}{newsletter_unsubscribe_path(subscription.unsubscribe_token)}"
+
+
+def newsletter_list_unsubscribe_headers(unsubscribe_url: str) -> dict:
+    """
+    RFC 8058 one-click headers.
+
+    Mail clients POST to the same URL with ``List-Unsubscribe=One-Click``.
+    A newline in the URL would break the header, so those values are dropped.
+    """
+    if not unsubscribe_url or any(char in unsubscribe_url for char in '\r\n'):
+        return {}
+    return {
+        'List-Unsubscribe': f'<{unsubscribe_url}>',
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    }
+
+
+def mask_newsletter_email(email: str) -> str:
+    """Show just enough of the address to confirm which inbox is leaving."""
+    local, _, domain = (email or '').partition('@')
+    if not local or not domain:
+        return ''
+    visible = local[0]
+    return f'{visible}***@{domain}'
+
+
 def save_newsletter_subscription(email: str, source: str) -> bool:
-    """Store the address. Returns True only when this call created the row."""
+    """
+    Store the address.
+
+    Returns True when this call created the row or turned a previous baja
+    back on. A second signup of someone who is already active returns False.
+    """
     try:
-        _, created = NewsletterSubscription.objects.get_or_create(
+        subscription, created = NewsletterSubscription.objects.get_or_create(
             email=email,
             defaults={'source': source},
         )
     except IntegrityError:
         return False
-    return created
+    if created:
+        return True
+    if subscription.is_active:
+        return False
+    subscription.is_active = True
+    subscription.unsubscribed_at = None
+    subscription.save(update_fields=['is_active', 'unsubscribed_at'])
+    return True
+
+
+def unsubscribe_newsletter(token: str):
+    """
+    Turn off the subscription that owns this token.
+
+    Returns ``(subscription or None, outcome)`` where outcome is
+    ``unsubscribed``, ``already``, or ``invalid``.
+    A second call keeps the original ``unsubscribed_at``.
+    """
+    subscription = NewsletterSubscription.objects.filter(unsubscribe_token=token).first()
+    if subscription is None:
+        return None, 'invalid'
+    if not subscription.is_active:
+        return subscription, 'already'
+    subscription.is_active = False
+    subscription.unsubscribed_at = timezone.now()
+    subscription.save(update_fields=['is_active', 'unsubscribed_at'])
+    return subscription, 'unsubscribed'
+
+
+def active_newsletter_subscriptions():
+    return NewsletterSubscription.objects.filter(is_active=True).order_by('email')

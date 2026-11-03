@@ -39,9 +39,11 @@ from profiles.newsletter import (
     NEWSLETTER_SUBSCRIBED_EMAIL_SESSION_KEY,
     NEWSLETTER_SUCCESS_MESSAGE,
     consume_newsletter_subscribe_attempt,
+    mask_newsletter_email,
     newsletter_source_label,
     normalize_newsletter_source,
     save_newsletter_subscription,
+    unsubscribe_newsletter,
 )
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
@@ -226,6 +228,39 @@ class NewsletterSubscriptionApiView(APIView):
             {"message": NEWSLETTER_SUCCESS_MESSAGE},
             status=status.HTTP_200_OK,
         )
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def newsletter_unsubscribe(request, token):
+    """
+    Public baja page for one subscriber.
+
+    GET only shows a confirmation. Mail scanners prefetch links with GET and
+    must not remove anyone. POST, including the RFC 8058 one-click body
+    ``List-Unsubscribe=One-Click``, performs the baja. The token is the secret,
+    so this view does not use a CSRF cookie (mail clients do not have one).
+    """
+    if request.method == "POST":
+        subscription, outcome = unsubscribe_newsletter(token)
+    else:
+        from profiles.models import NewsletterSubscription
+
+        subscription = NewsletterSubscription.objects.filter(unsubscribe_token=token).first()
+        if subscription is None:
+            outcome = "invalid"
+        elif subscription.is_active:
+            outcome = "confirm"
+        else:
+            outcome = "already"
+
+    context = {
+        "state": outcome,
+        "email_hint": mask_newsletter_email(subscription.email) if subscription else "",
+        "frontend_url": settings.FRONTEND_PUBLIC_URL,
+    }
+    status_code = 404 if outcome == "invalid" else 200
+    return render(request, "newsletter/unsubscribe.html", context, status=status_code)
 
 
 class CheckAuth(APIView):
