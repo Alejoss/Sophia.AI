@@ -738,7 +738,12 @@ PAYPHONE_TIMEZONE_OFFSET = int(os.getenv('PAYPHONE_TIMEZONE_OFFSET', '-5'))
 # When > 0, split the buyer-facing USD total into amountWithTax + tax (e.g. 15 for Ecuador IVA).
 PAYPHONE_IVA_PERCENT = float(os.getenv('PAYPHONE_IVA_PERCENT', '0') or 0)
 
-# External async workers that upload parsed subtitles/transcripts (machine-to-machine).
+# General machine key for the local Vincent worker (transcripts, embeddings, uploads).
+# When this is set, TRANSCRIPT_INGEST_API_KEY is ignored.
+VINCENT_API_KEY = os.getenv('VINCENT_API_KEY', '')
+# Django user that owns content Vincent publishes. Default is the operator account.
+VINCENT_ACTOR_USER_ID = int(os.getenv('VINCENT_ACTOR_USER_ID', '2'))
+# Legacy name. Used only when VINCENT_API_KEY is empty.
 TRANSCRIPT_INGEST_API_KEY = os.getenv('TRANSCRIPT_INGEST_API_KEY', '')
 
 # Qdrant Cloud — vector search for topic embeddings (written by external embed worker).

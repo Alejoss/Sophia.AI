@@ -115,6 +115,10 @@ from .views_embedding_ingest import (
     ContentEmbeddingIngestDetailView,
 )
 from .views_knowledge_path_ingest import KnowledgePathIngestDetailView
+from .views_vincent_upload import (
+    VincentTopicUploadConfirmView,
+    VincentTopicUploadPresignView,
+)
 from .views_topic_purchase import TopicPurchaseView
 from .views_topic_chat import (
     TopicChatView,
@@ -260,6 +264,16 @@ urlpatterns = [
     path('topics/<int:pk>/timeline/', TopicTimelineView.as_view(), name='topic-timeline'),
     path('topics/<int:pk>/timeline/reorder/', TopicTimelineReorderView.as_view(), name='topic-timeline-reorder'),
     path('topics/<int:pk>/timeline/<int:entry_id>/', TopicTimelineEntryDetailView.as_view(), name='topic-timeline-entry-detail'),
+    path(
+        'agent/topics/<int:pk>/upload/presign/',
+        VincentTopicUploadPresignView.as_view(),
+        name='vincent-topic-upload-presign',
+    ),
+    path(
+        'agent/topics/<int:pk>/upload/confirm/',
+        VincentTopicUploadConfirmView.as_view(),
+        name='vincent-topic-upload-confirm',
+    ),
     path('upload-content/', UploadContentView.as_view(), name='upload_content'),
     path('upload-content/presign/', UploadContentPresignView.as_view(), name='upload_content_presign'),
     path('upload-content/confirm/', UploadContentConfirmView.as_view(), name='upload_content_confirm'),
