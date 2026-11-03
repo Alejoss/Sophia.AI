@@ -31,6 +31,17 @@ def newsletter_source_label(source: str) -> str:
     return NEWSLETTER_SOURCE_LABELS.get(source, 'No especificada')
 
 
+def newsletter_source_display(source: str) -> str:
+    """Staff-facing origin. Known tags use their label; anything else stays visible."""
+    source = (source or '').strip()
+    if source in NEWSLETTER_SOURCE_LABELS:
+        return NEWSLETTER_SOURCE_LABELS[source]
+    if source.startswith('club_de_lectura:'):
+        slug = source.split(':', 1)[1]
+        return f'Club de Lectura ({slug})' if slug else 'Club de Lectura'
+    return source or 'No especificada'
+
+
 def normalize_newsletter_source(raw, default: str = 'frontend_subscribe') -> str:
     source = str(raw or '').strip()[:100]
     if source in NEWSLETTER_SOURCE_LABELS:
@@ -184,3 +195,47 @@ def unsubscribe_newsletter(token: str):
 
 def active_newsletter_subscriptions():
     return NewsletterSubscription.objects.filter(is_active=True).order_by('email')
+
+
+def newsletter_subscribers_queryset(status: str = 'active', query: str = ''):
+    """Staff list. Unknown status values fall back to the people still receiving mail."""
+    rows = NewsletterSubscription.objects.all().order_by('-created_at', '-id')
+    if status == 'inactive':
+        rows = rows.filter(is_active=False)
+    elif status != 'all':
+        rows = rows.filter(is_active=True)
+    needle = (query or '').strip()
+    if needle:
+        rows = rows.filter(email__icontains=needle)
+    return rows
+
+
+def set_newsletter_subscription_active(subscription, active: bool):
+    """
+    Turn a subscriber on or off from the staff list.
+
+    Leaving sets ``unsubscribed_at`` once. Coming back clears it and keeps
+    the same baja token, matching a public signup after an unsubscribe.
+    """
+    if active and not subscription.is_active:
+        subscription.is_active = True
+        subscription.unsubscribed_at = None
+        subscription.save(update_fields=['is_active', 'unsubscribed_at'])
+    elif not active and subscription.is_active:
+        subscription.is_active = False
+        subscription.unsubscribed_at = timezone.now()
+        subscription.save(update_fields=['is_active', 'unsubscribed_at'])
+    return subscription
+
+
+def newsletter_subscriber_payload(subscription) -> dict:
+    return {
+        'id': subscription.id,
+        'email': subscription.email,
+        'source': subscription.source,
+        'source_label': newsletter_source_display(subscription.source),
+        'is_active': subscription.is_active,
+        'created_at': subscription.created_at,
+        'unsubscribed_at': subscription.unsubscribed_at,
+        'unsubscribe_url': newsletter_unsubscribe_url(subscription),
+    }

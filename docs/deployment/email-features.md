@@ -72,6 +72,8 @@ Public page (GET asks for confirmation, POST performs the baja, including a mail
 
 That path is already proxied to Django in production (`/api/`). Opening it does not unsubscribe; the visitor confirms with the button. A second visit says they were already removed. Signing up again with the same email turns the row back on and keeps the same link.
 
+Staff can review and correct the same list in the dashboard at `/dashboard/suscriptores` (active, unsubscribed, or all; search; CSV of the current filter). Marking someone inactive there is the same baja as the public link. The chips count every address; the table follows the filter.
+
 Active recipients, with a personal URL for each one:
 
 ```bash

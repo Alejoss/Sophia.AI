@@ -6,7 +6,8 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from django import forms
@@ -32,7 +33,7 @@ import jwt
 import json
 
 from profiles.serializers import UserSerializer, ProfileSerializer, UserRegistrationSerializer, NotificationSerializer, CryptoCurrencySerializer, AcceptedCryptoSerializer, SuggestionSerializer, ChangePasswordSerializer
-from profiles.models import Profile, CryptoCurrency, AcceptedCrypto, Suggestion
+from profiles.models import NewsletterSubscription, Profile, CryptoCurrency, AcceptedCrypto, Suggestion
 from profiles.email_service import EmailService, EmailServiceError
 from profiles.newsletter import (
     NEWSLETTER_RATE_LIMIT_MESSAGE,
@@ -41,8 +42,11 @@ from profiles.newsletter import (
     consume_newsletter_subscribe_attempt,
     mask_newsletter_email,
     newsletter_source_label,
+    newsletter_subscriber_payload,
+    newsletter_subscribers_queryset,
     normalize_newsletter_source,
     save_newsletter_subscription,
+    set_newsletter_subscription_active,
     unsubscribe_newsletter,
 )
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
@@ -261,6 +265,92 @@ def newsletter_unsubscribe(request, token):
     }
     status_code = 404 if outcome == "invalid" else 200
     return render(request, "newsletter/unsubscribe.html", context, status=status_code)
+
+
+class IsStaffOrSuperuser(BasePermission):
+    """Matches the dashboard: staff and superusers, with or without a profile login role."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and (user.is_staff or user.is_superuser))
+
+
+class NewsletterSubscriberPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+def _newsletter_subscriber_csv(rows):
+    import csv
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="newsletter-suscriptores.csv"'
+    response.write('\ufeff')
+    writer = csv.writer(response)
+    writer.writerow([
+        'email',
+        'is_active',
+        'source',
+        'created_at',
+        'unsubscribed_at',
+        'unsubscribe_url',
+    ])
+    for subscription in rows:
+        payload = newsletter_subscriber_payload(subscription)
+        writer.writerow([
+            payload['email'],
+            'yes' if payload['is_active'] else 'no',
+            payload['source'],
+            payload['created_at'].isoformat() if payload['created_at'] else '',
+            payload['unsubscribed_at'].isoformat() if payload['unsubscribed_at'] else '',
+            payload['unsubscribe_url'],
+        ])
+    return response
+
+
+class NewsletterSubscriberListView(APIView):
+    """
+    Staff list of newsletter addresses.
+
+    These rows are emails, not user accounts. ``status`` is ``active``
+    (default), ``inactive``, or ``all``. ``q`` matches part of the email.
+    ``export=csv`` downloads the filtered rows, including every page.
+    """
+
+    permission_classes = [IsAuthenticated, IsStaffOrSuperuser]
+
+    def get(self, request):
+        status_filter = (request.query_params.get('status') or 'active').strip().lower()
+        query = request.query_params.get('q') or ''
+        rows = newsletter_subscribers_queryset(status_filter, query)
+        if (request.query_params.get('export') or '').strip().lower() == 'csv':
+            return _newsletter_subscriber_csv(rows)
+
+        paginator = NewsletterSubscriberPagination()
+        page = paginator.paginate_queryset(rows, request, view=self)
+        data = paginator.get_paginated_response([
+            newsletter_subscriber_payload(item) for item in page
+        ]).data
+        data['active_count'] = NewsletterSubscription.objects.filter(is_active=True).count()
+        data['inactive_count'] = NewsletterSubscription.objects.filter(is_active=False).count()
+        return Response(data)
+
+
+class NewsletterSubscriberDetailView(APIView):
+    """Turn one email subscription on or off. Body: ``{"is_active": true|false}``."""
+
+    permission_classes = [IsAuthenticated, IsStaffOrSuperuser]
+
+    def patch(self, request, pk):
+        if 'is_active' not in request.data or not isinstance(request.data.get('is_active'), bool):
+            return Response(
+                {'detail': 'is_active debe ser true o false.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        subscription = get_object_or_404(NewsletterSubscription, pk=pk)
+        set_newsletter_subscription_active(subscription, request.data['is_active'])
+        return Response(newsletter_subscriber_payload(subscription))
 
 
 class CheckAuth(APIView):

@@ -314,6 +314,28 @@ const submitNewsletterSubscription = async (email, source = 'frontend_subscribe'
   }
 };
 
+const fetchNewsletterSubscribers = async ({ status = 'active', q = '', page = 1 } = {}) => {
+  const response = await axiosInstance.get('/profiles/newsletter/subscribers/', {
+    params: { status, q, page },
+  });
+  return response.data;
+};
+
+const updateNewsletterSubscriber = async (id, isActive) => {
+  const response = await axiosInstance.patch(`/profiles/newsletter/subscribers/${id}/`, {
+    is_active: isActive,
+  });
+  return response.data;
+};
+
+const downloadNewsletterSubscribers = async ({ status = 'active', q = '' } = {}) => {
+  const response = await axiosInstance.get('/profiles/newsletter/subscribers/', {
+    params: { status, q, export: 'csv' },
+    responseType: 'blob',
+  });
+  return response.data;
+};
+
 const completeFromInvite = async ({ token, username, password }) => {
   const response = await axiosInstance.post('/profiles/complete-from-invite/', {
     token,
@@ -347,4 +369,8 @@ export {
   changePassword,
   requestPasswordReset,
   confirmPasswordReset,
-  submitNewsletterSubscription };
+  submitNewsletterSubscription,
+  fetchNewsletterSubscribers,
+  updateNewsletterSubscriber,
+  downloadNewsletterSubscribers,
+};

@@ -94,6 +94,7 @@ import PublicationDetail from './publications/PublicationDetail';
 import MainSearch from './generalComponents/MainSearch';
 import CommunityBubble from './generalComponents/CommunityBubble.jsx';
 import Dashboard, { DashboardHome } from './generalComponents/Dashboard.jsx';
+import NewsletterSubscribersDashboard from './generalComponents/NewsletterSubscribersDashboard.jsx';
 import ConsultationsDashboard from './topics/ConsultationsDashboard.jsx';
 import FeaturedBooksAdmin from './content/FeaturedBooksAdmin.jsx';
 import FeaturedEventsDashboard from './events/FeaturedEventsDashboard.jsx';
@@ -280,6 +281,7 @@ const AppContent = () => {
             <Route path="search" element={<MainSearch />} />
             <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
               <Route index element={<DashboardHome />} />
+              <Route path="suscriptores" element={<NewsletterSubscribersDashboard />} />
               <Route path="consultas" element={<ConsultationsDashboard />} />
               <Route path="libros-destacados" element={<FeaturedBooksAdmin />} />
               <Route path="evento-destacado" element={<FeaturedEventsDashboard />} />

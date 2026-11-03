@@ -2577,3 +2577,97 @@ class NewsletterUnsubscribeTests(APITestCase):
             newsletter_list_unsubscribe_headers('https://example.com/\r\nBcc: x'),
             {},
         )
+
+
+class NewsletterSubscriberStaffTests(APITestCase):
+    def setUp(self):
+        from profiles.models import NewsletterSubscription
+
+        self.staff = User.objects.create_user(
+            username='staff-news',
+            email='staff-news@example.com',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.member = User.objects.create_user(
+            username='member-news',
+            email='member-news@example.com',
+            password='testpass123',
+        )
+        self.active = NewsletterSubscription.objects.create(
+            email='activa@example.com',
+            source='frontend_subscribe',
+        )
+        self.inactive = NewsletterSubscription.objects.create(
+            email='baja@example.com',
+            source='club_de_lectura:cypherpunk',
+            is_active=False,
+        )
+        self.list_url = reverse('profiles:newsletter_subscribers')
+
+    def test_anonymous_and_members_cannot_read_the_list(self):
+        anonymous = self.client.get(self.list_url)
+        self.assertEqual(anonymous.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.force_authenticate(self.member)
+        forbidden = self.client.get(self.list_url)
+        self.assertEqual(forbidden.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_staff_list_defaults_to_active_emails_without_user_accounts(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['active_count'], 1)
+        self.assertEqual(response.data['inactive_count'], 1)
+        self.assertEqual(response.data['count'], 1)
+        row = response.data['results'][0]
+        self.assertEqual(row['email'], 'activa@example.com')
+        self.assertEqual(row['source_label'], 'Página /unirme')
+        self.assertTrue(row['is_active'])
+        self.assertIn(self.active.unsubscribe_token, row['unsubscribe_url'])
+        self.assertNotIn('user', row)
+
+    def test_staff_can_filter_search_and_export_csv(self):
+        self.client.force_authenticate(self.staff)
+        inactive = self.client.get(self.list_url, {'status': 'inactive'})
+        self.assertEqual(inactive.data['results'][0]['email'], 'baja@example.com')
+        self.assertEqual(
+            inactive.data['results'][0]['source_label'],
+            'Club de Lectura (cypherpunk)',
+        )
+
+        search = self.client.get(self.list_url, {'status': 'all', 'q': 'baja@'})
+        self.assertEqual([row['email'] for row in search.data['results']], ['baja@example.com'])
+
+        exported = self.client.get(self.list_url, {'export': 'csv'})
+        self.assertEqual(exported.status_code, status.HTTP_200_OK)
+        body = exported.content.decode('utf-8-sig')
+        self.assertIn('activa@example.com', body)
+        self.assertIn(self.active.unsubscribe_token, body)
+        self.assertNotIn('baja@example.com', body)
+
+    def test_staff_can_deactivate_and_reactivate_without_a_login(self):
+        self.client.force_authenticate(self.staff)
+        detail = reverse('profiles:newsletter_subscriber_detail', args=[self.active.id])
+
+        removed = self.client.patch(detail, {'is_active': False}, format='json')
+        self.assertEqual(removed.status_code, status.HTTP_200_OK)
+        self.assertFalse(removed.data['is_active'])
+        self.assertIsNotNone(removed.data['unsubscribed_at'])
+        self.active.refresh_from_db()
+        self.assertFalse(self.active.is_active)
+
+        restored = self.client.patch(detail, {'is_active': True}, format='json')
+        self.assertTrue(restored.data['is_active'])
+        self.assertIsNone(restored.data['unsubscribed_at'])
+        self.active.refresh_from_db()
+        self.assertEqual(self.active.unsubscribe_token, restored.data['unsubscribe_url'].rstrip('/').split('/')[-1])
+
+    def test_invalid_active_flag_is_rejected(self):
+        self.client.force_authenticate(self.staff)
+        detail = reverse('profiles:newsletter_subscriber_detail', args=[self.active.id])
+        response = self.client.patch(detail, {'is_active': 'no'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.active.refresh_from_db()
+        self.assertTrue(self.active.is_active)
