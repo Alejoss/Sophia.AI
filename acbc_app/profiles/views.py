@@ -6,7 +6,8 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from django import forms
@@ -32,16 +33,29 @@ import jwt
 import json
 
 from profiles.serializers import UserSerializer, ProfileSerializer, UserRegistrationSerializer, NotificationSerializer, CryptoCurrencySerializer, AcceptedCryptoSerializer, SuggestionSerializer, ChangePasswordSerializer
-from profiles.models import Profile, CryptoCurrency, AcceptedCrypto, Suggestion
+from profiles.models import NewsletterSubscription, Profile, CryptoCurrency, AcceptedCrypto, Suggestion
 from profiles.email_service import EmailService, EmailServiceError
+from content.permissions import VincentMachinePermission
 from profiles.newsletter import (
     NEWSLETTER_RATE_LIMIT_MESSAGE,
     NEWSLETTER_SUBSCRIBED_EMAIL_SESSION_KEY,
     NEWSLETTER_SUCCESS_MESSAGE,
     consume_newsletter_subscribe_attempt,
+    mask_newsletter_email,
     newsletter_source_label,
+    newsletter_subscriber_payload,
+    newsletter_subscribers_queryset,
     normalize_newsletter_source,
     save_newsletter_subscription,
+    set_newsletter_subscription_active,
+    unsubscribe_newsletter,
+    NEWSLETTER_UNSUBSCRIBE_LOOKUP_LIMIT,
+    resolve_newsletter_unsubscribe_links,
+    NEWSLETTER_SUBSCRIBER_SYNC_LIMIT,
+    NEWSLETTER_VINCENT_LIST_DEFAULT_PAGE_SIZE,
+    NewsletterSubscriberSyncError,
+    newsletter_vincent_subscriber_record,
+    sync_newsletter_subscribers,
 )
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
@@ -226,6 +240,276 @@ class NewsletterSubscriptionApiView(APIView):
             {"message": NEWSLETTER_SUCCESS_MESSAGE},
             status=status.HTTP_200_OK,
         )
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def newsletter_unsubscribe(request, token):
+    """
+    Public baja page for one subscriber.
+
+    GET only shows a confirmation. Mail scanners prefetch links with GET and
+    must not remove anyone. POST, including the RFC 8058 one-click body
+    ``List-Unsubscribe=One-Click``, performs the baja. The token is the secret,
+    so this view does not use a CSRF cookie (mail clients do not have one).
+    """
+    if request.method == "POST":
+        subscription, outcome = unsubscribe_newsletter(token)
+    else:
+        from profiles.models import NewsletterSubscription
+
+        subscription = NewsletterSubscription.objects.filter(unsubscribe_token=token).first()
+        if subscription is None:
+            outcome = "invalid"
+        elif subscription.is_active:
+            outcome = "confirm"
+        else:
+            outcome = "already"
+
+    context = {
+        "state": outcome,
+        "email_hint": mask_newsletter_email(subscription.email) if subscription else "",
+        "frontend_url": settings.FRONTEND_PUBLIC_URL,
+    }
+    status_code = 404 if outcome == "invalid" else 200
+    return render(request, "newsletter/unsubscribe.html", context, status=status_code)
+
+
+class IsStaffOrSuperuser(BasePermission):
+    """Matches the dashboard: staff and superusers, with or without a profile login role."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and (user.is_staff or user.is_superuser))
+
+
+class NewsletterSubscriberPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+def _newsletter_subscriber_csv(rows):
+    import csv
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="newsletter-suscriptores.csv"'
+    response.write('\ufeff')
+    writer = csv.writer(response)
+    writer.writerow([
+        'email',
+        'is_active',
+        'source',
+        'created_at',
+        'unsubscribed_at',
+        'unsubscribe_url',
+    ])
+    for subscription in rows:
+        payload = newsletter_subscriber_payload(subscription)
+        writer.writerow([
+            payload['email'],
+            'yes' if payload['is_active'] else 'no',
+            payload['source'],
+            payload['created_at'].isoformat() if payload['created_at'] else '',
+            payload['unsubscribed_at'].isoformat() if payload['unsubscribed_at'] else '',
+            payload['unsubscribe_url'],
+        ])
+    return response
+
+
+class NewsletterSubscriberListView(APIView):
+    """
+    Staff list of newsletter addresses.
+
+    These rows are emails, not user accounts. ``status`` is ``active``
+    (default), ``inactive``, or ``all``. ``q`` matches part of the email.
+    ``export=csv`` downloads the filtered rows, including every page.
+    """
+
+    permission_classes = [IsAuthenticated, IsStaffOrSuperuser]
+
+    def get(self, request):
+        status_filter = (request.query_params.get('status') or 'active').strip().lower()
+        query = request.query_params.get('q') or ''
+        rows = newsletter_subscribers_queryset(status_filter, query)
+        if (request.query_params.get('export') or '').strip().lower() == 'csv':
+            return _newsletter_subscriber_csv(rows)
+
+        paginator = NewsletterSubscriberPagination()
+        page = paginator.paginate_queryset(rows, request, view=self)
+        data = paginator.get_paginated_response([
+            newsletter_subscriber_payload(item) for item in page
+        ]).data
+        data['active_count'] = NewsletterSubscription.objects.filter(is_active=True).count()
+        data['inactive_count'] = NewsletterSubscription.objects.filter(is_active=False).count()
+        return Response(data)
+
+
+class NewsletterSubscriberDetailView(APIView):
+    """Turn one email subscription on or off. Body: ``{"is_active": true|false}``."""
+
+    permission_classes = [IsAuthenticated, IsStaffOrSuperuser]
+
+    def patch(self, request, pk):
+        if 'is_active' not in request.data or not isinstance(request.data.get('is_active'), bool):
+            return Response(
+                {'detail': 'is_active debe ser true o false.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        subscription = get_object_or_404(NewsletterSubscription, pk=pk)
+        set_newsletter_subscription_active(subscription, request.data['is_active'])
+        return Response(newsletter_subscriber_payload(subscription))
+
+
+class NewsletterUnsubscribeLinkView(APIView):
+    """
+    Resolve baja links for the mail worker.
+
+    The token is stored per email and cannot be derived from the address.
+    Body: ``{"emails": ["person@example.com", ...]}`` (max 500).
+    Auth is the Vincent machine key, not a user session.
+    """
+
+    authentication_classes = []
+    permission_classes = [VincentMachinePermission]
+
+    def post(self, request):
+        emails = request.data.get('emails')
+        if not isinstance(emails, list) or not emails:
+            return Response(
+                {'detail': 'emails debe ser una lista con al menos un correo.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(emails) > NEWSLETTER_UNSUBSCRIBE_LOOKUP_LIMIT:
+            return Response(
+                {
+                    'detail': (
+                        f'Máximo {NEWSLETTER_UNSUBSCRIBE_LOOKUP_LIMIT} correos por solicitud.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({'results': resolve_newsletter_unsubscribe_links(emails)})
+
+
+class NewsletterSubscriberSyncView(APIView):
+    """
+    Replace or extend the stored newsletter list from Vincent's current recipients.
+
+    Body: ``{"mode": "replace"|"upsert", "emails": ["person@example.com", ...]}``.
+    ``replace`` makes that list the full active set. ``upsert`` only adds and
+    reactivates. An empty ``replace`` also needs ``"confirm_empty": true``.
+    """
+
+    authentication_classes = []
+    permission_classes = [VincentMachinePermission]
+
+    def post(self, request):
+        mode = request.data.get('mode')
+        emails = request.data.get('emails')
+        if mode not in ('replace', 'upsert'):
+            return Response(
+                {'detail': 'mode debe ser upsert o replace.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not isinstance(emails, list):
+            return Response(
+                {'detail': 'emails debe ser una lista de correos.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(emails) > NEWSLETTER_SUBSCRIBER_SYNC_LIMIT:
+            return Response(
+                {
+                    'detail': (
+                        f'Máximo {NEWSLETTER_SUBSCRIBER_SYNC_LIMIT} correos por solicitud.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if (
+            mode == 'replace'
+            and not emails
+            and request.data.get('confirm_empty') is not True
+        ):
+            return Response(
+                {
+                    'detail': (
+                        'Una lista vacía con mode replace daría de baja a todos. '
+                        'Envía confirm_empty: true si eso es lo que quieres.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            payload = sync_newsletter_subscribers(emails, mode=mode)
+        except NewsletterSubscriberSyncError as exc:
+            body = {'detail': exc.detail}
+            if exc.invalid_emails:
+                body['invalid_emails'] = exc.invalid_emails
+            return Response(body, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload)
+
+
+class NewsletterVincentSubscriberListView(APIView):
+    """
+    Full subscriber list for Vincent.
+
+    ``status`` is ``active`` (default), ``inactive``, or ``all``.
+    Pages are 1-based. ``page_size`` defaults to 1000 and cannot exceed 10000.
+    """
+
+    authentication_classes = []
+    permission_classes = [VincentMachinePermission]
+
+    def get(self, request):
+        status_filter = (request.query_params.get('status') or 'active').strip().lower()
+        if status_filter not in ('active', 'inactive', 'all'):
+            status_filter = 'active'
+        try:
+            page = int(request.query_params.get('page') or 1)
+            page_size = int(
+                request.query_params.get('page_size')
+                or NEWSLETTER_VINCENT_LIST_DEFAULT_PAGE_SIZE
+            )
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'page y page_size deben ser enteros.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if page < 1 or page_size < 1:
+            return Response(
+                {'detail': 'page y page_size deben ser mayores que cero.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        page_size = min(page_size, NEWSLETTER_SUBSCRIBER_SYNC_LIMIT)
+
+        rows = newsletter_subscribers_queryset(status_filter)
+        total = rows.count()
+        start = (page - 1) * page_size
+        page_rows = list(rows[start:start + page_size])
+
+        def page_url(number):
+            if number < 1 or (number - 1) * page_size >= total:
+                return None
+            query = request.GET.copy()
+            query['status'] = status_filter
+            query['page'] = str(number)
+            query['page_size'] = str(page_size)
+            return request.build_absolute_uri(f'{request.path}?{query.urlencode()}')
+
+        return Response({
+            'count': total,
+            'active_count': NewsletterSubscription.objects.filter(is_active=True).count(),
+            'inactive_count': NewsletterSubscription.objects.filter(is_active=False).count(),
+            'page': page,
+            'page_size': page_size,
+            'next': page_url(page + 1) if start + page_size < total else None,
+            'previous': page_url(page - 1) if page > 1 and total else None,
+            'results': [
+                newsletter_vincent_subscriber_record(row)
+                for row in page_rows
+            ],
+        })
 
 
 class CheckAuth(APIView):

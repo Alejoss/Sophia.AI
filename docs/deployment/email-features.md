@@ -60,6 +60,63 @@ Transactional HTML is rendered by Django templates under `acbc_app/profiles/temp
 
 - `base_email.html` — shared layout (logo, brand orange `#E86A00`, footer)
 - Feature templates extend the base (`suggestion_notification`, `newsletter_subscription`, `topic_creation_request`, `book_club_invite`)
+- If the template context includes `unsubscribe_url`, the base footer prints that link and `EmailService` adds the `List-Unsubscribe` / `List-Unsubscribe-Post` headers (RFC 8058 one-click)
+
+## Newsletter unsubscribe
+
+Signup stores each address on `NewsletterSubscription`. There is no shared baja link: every row has its own `unsubscribe_token`.
+
+Public page (GET asks for confirmation, POST performs the baja, including a mail client's one-click POST):
+
+`/api/profiles/newsletter/unsubscribe/<token>/`
+
+That path is already proxied to Django in production (`/api/`). Opening it does not unsubscribe; the visitor confirms with the button. A second visit says they were already removed. Signing up again with the same email turns the row back on and keeps the same link.
+
+Staff can review and correct the same list in the dashboard at `/dashboard/suscriptores` (active, unsubscribed, or all; search; CSV of the current filter). Marking someone inactive there is the same baja as the public link. The chips count every address; the table follows the filter.
+
+Active recipients, with a personal URL for each one:
+
+```bash
+cd acbc_app && . .venv/bin/activate
+ENVIRONMENT=DEVELOPMENT python manage.py list_newsletter_subscribers
+```
+
+Use `unsubscribe_url` only in that recipient's copy. Passing `unsubscribe_url` into `EmailService.send_template_email` puts the link in the shared email footer and sets the one-click headers. `--include-inactive` lists addresses that already opted out; do not mail those.
+
+The mail worker should not download that CSV for each send. The token is random and stored on the subscription, so the URL cannot be calculated from the email. Resolve it at send time:
+
+`POST /api/profiles/newsletter/unsubscribe-links/`
+
+Auth is the same machine key as Vincent (`VINCENT_API_KEY`, or `TRANSCRIPT_INGEST_API_KEY` only while the Vincent key is unset). Send `X-Vincent-Key` or `Authorization: Bearer <key>`. This is not a user login.
+
+```json
+{ "emails": ["person@example.com", "other@example.com"] }
+```
+
+The response keeps that order. Use a row only when `found` and `is_active` are both true. `unsubscribe_url` is absolute. `headers` is ready to copy onto that recipient's message (`List-Unsubscribe` and `List-Unsubscribe-Post`). An unknown address is not subscribed by this call. More than 500 emails must be split across requests.
+
+When Vincent's own recipient list is the one that should be stored, sync it in one call instead of editing the dashboard by hand:
+
+`POST /api/profiles/newsletter/subscribers/sync/`
+
+Same machine key. `mode` is required.
+
+```json
+{
+  "mode": "replace",
+  "emails": ["person@example.com", "other@example.com"]
+}
+```
+
+`replace` makes that list the full active set: new addresses are created, inactive ones in the list are turned back on, and active addresses missing from the list are marked unsubscribed. Their baja tokens stay the same. `upsert` only adds and reactivates; it does not remove anyone. An invalid address rejects the whole request and writes nothing. An empty `replace` is refused unless the body also has `"confirm_empty": true`.
+
+The response lists `created`, `reactivated`, `unchanged`, and `deactivated`, plus `results` for every address in the request with `unsubscribe_url` and `headers`. Up to 10000 emails per call. New rows are tagged `source: vincent`. This does not email the administrators.
+
+To read the stored list back, without a staff login:
+
+`GET /api/profiles/newsletter/subscribers/all/`
+
+Same machine key. `status` is `active` (default), `inactive`, or `all`. `page` starts at 1. `page_size` defaults to 1000 and stops at 10000. Each row includes `unsubscribe_url` and `headers`. `count` is the size of the filtered list. `active_count` and `inactive_count` are the whole table. Follow `next` until it is null to read every page. Machine-readable description of these calls: [newsletter-vincent.json](../api/newsletter-vincent.json).
 
 The logo URL is absolute: `{FRONTEND_PUBLIC_URL}/images/logo.png` (same asset as the web header). Set `FRONTEND_PUBLIC_URL` (and `ACADEMIA_PUBLIC_URL` for Django admin links) in production so images and CTAs resolve correctly. This is **not** configured in the SMTP2GO template editor.
 

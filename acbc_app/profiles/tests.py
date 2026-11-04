@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
@@ -2411,3 +2411,542 @@ class NewsletterSubscribePageTests(APITestCase):
         self.assertFalse(
             NewsletterSubscription.objects.filter(email='pagina-bloqueada@example.com').exists()
         )
+
+
+class NewsletterUnsubscribeTests(APITestCase):
+    def _subscription(self, email='lector@example.com'):
+        from profiles.models import NewsletterSubscription
+        return NewsletterSubscription.objects.create(email=email, source='frontend_subscribe')
+
+    def _call(self, token, method='get', data=None):
+        from django.test import RequestFactory
+        from profiles.views import newsletter_unsubscribe
+
+        factory = RequestFactory()
+        path = f'/api/profiles/newsletter/unsubscribe/{token}/'
+        if method == 'post':
+            request = factory.post(path, data or {})
+        else:
+            request = factory.get(path)
+        return newsletter_unsubscribe(request, token)
+
+    def test_new_subscription_gets_a_token_and_public_link(self):
+        from django.test import override_settings
+        from profiles.newsletter import newsletter_unsubscribe_url
+
+        subscription = self._subscription()
+        self.assertTrue(subscription.is_active)
+        self.assertTrue(subscription.unsubscribe_token)
+        self.assertIsNone(subscription.unsubscribed_at)
+
+        with override_settings(
+            ENVIRONMENT='DEVELOPMENT',
+            ACADEMIA_PUBLIC_URL='http://localhost:8000',
+            FRONTEND_PUBLIC_URL='http://localhost:5173',
+        ):
+            url = newsletter_unsubscribe_url(subscription)
+        self.assertEqual(
+            url,
+            f'http://localhost:8000/api/profiles/newsletter/unsubscribe/{subscription.unsubscribe_token}/',
+        )
+
+    @override_settings(
+        ENVIRONMENT='PRODUCTION',
+        ACADEMIA_PUBLIC_URL='http://localhost:8000',
+        FRONTEND_PUBLIC_URL='http://localhost:5173',
+    )
+    def test_production_link_does_not_use_localhost(self):
+        from profiles.newsletter import newsletter_unsubscribe_url
+
+        subscription = self._subscription('prod@example.com')
+        url = newsletter_unsubscribe_url(subscription)
+        self.assertTrue(url.startswith('https://www.academiablockchain.com/api/profiles/newsletter/unsubscribe/'))
+
+    def test_get_shows_confirmation_and_does_not_unsubscribe(self):
+        subscription = self._subscription()
+        response = self._call(subscription.unsubscribe_token)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Confirmar baja')
+        self.assertContains(response, 'l***@example.com')
+        subscription.refresh_from_db()
+        self.assertTrue(subscription.is_active)
+        self.assertIsNone(subscription.unsubscribed_at)
+
+    def test_post_unsubscribes_and_second_post_is_idempotent(self):
+        subscription = self._subscription()
+        first = self._call(subscription.unsubscribe_token, method='post')
+        self.assertEqual(first.status_code, 200)
+        self.assertContains(first, 'Te dimos de baja')
+        subscription.refresh_from_db()
+        self.assertFalse(subscription.is_active)
+        unsubscribed_at = subscription.unsubscribed_at
+        self.assertIsNotNone(unsubscribed_at)
+
+        second = self._call(subscription.unsubscribe_token, method='post')
+        self.assertContains(second, 'Ya estabas dado de baja')
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.unsubscribed_at, unsubscribed_at)
+
+        confirmation = self._call(subscription.unsubscribe_token)
+        self.assertContains(confirmation, 'Ya estabas dado de baja')
+
+    def test_one_click_post_unsubscribes(self):
+        subscription = self._subscription('unclick@example.com')
+        response = self._call(
+            subscription.unsubscribe_token,
+            method='post',
+            data={'List-Unsubscribe': 'One-Click'},
+        )
+        self.assertContains(response, 'Te dimos de baja')
+        subscription.refresh_from_db()
+        self.assertFalse(subscription.is_active)
+
+    def test_unknown_token_is_not_found(self):
+        response = self._call('no-existe')
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, 'Enlace no válido', status_code=404)
+
+    @patch('profiles.views.EmailService.send_to_admins')
+    def test_subscribing_again_reactivates_the_same_link(self, mock_send_to_admins):
+        from profiles.models import NewsletterSubscription
+        mock_send_to_admins.return_value = {'sent': ['admin@example.com'], 'failed': []}
+        subscription = self._subscription('vuelve@example.com')
+        token = subscription.unsubscribe_token
+        self._call(token, method='post')
+
+        response = self.client.post(
+            reverse('profiles:newsletter_subscribe_api'),
+            {'email': 'vuelve@example.com', 'source': 'frontend_subscribe'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_send_to_admins.assert_called_once()
+        subscription = NewsletterSubscription.objects.get(email='vuelve@example.com')
+        self.assertTrue(subscription.is_active)
+        self.assertIsNone(subscription.unsubscribed_at)
+        self.assertEqual(subscription.unsubscribe_token, token)
+
+    def test_list_command_skips_inactive_subscribers(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        active = self._subscription('activa@example.com')
+        inactive = self._subscription('baja@example.com')
+        self._call(inactive.unsubscribe_token, method='post')
+
+        output = StringIO()
+        call_command('list_newsletter_subscribers', stdout=output)
+        text = output.getvalue()
+        self.assertIn('activa@example.com', text)
+        self.assertIn(active.unsubscribe_token, text)
+        self.assertNotIn('baja@example.com', text)
+
+        everyone = StringIO()
+        call_command('list_newsletter_subscribers', '--include-inactive', stdout=everyone)
+        self.assertIn('baja@example.com', everyone.getvalue())
+
+    def test_template_email_adds_list_unsubscribe_headers(self):
+        from profiles.models import NewsletterSubscription
+        from profiles.newsletter import newsletter_unsubscribe_url
+
+        subscription = NewsletterSubscription.objects.create(
+            email='envio@example.com',
+            source='frontend_subscribe',
+        )
+        unsubscribe_url = newsletter_unsubscribe_url(subscription)
+        with patch('profiles.email_service.EmailService.send_email', return_value=True) as mock_send:
+            EmailService.send_template_email(
+                receiver_email='envio@example.com',
+                subject='Novedades',
+                template_name='newsletter_subscription',
+                context={
+                    'subscriber_email': 'envio@example.com',
+                    'source_label': 'Página /unirme',
+                    'unsubscribe_url': unsubscribe_url,
+                },
+            )
+        headers = mock_send.call_args.kwargs['extra_headers']
+        self.assertEqual(headers['List-Unsubscribe'], f'<{unsubscribe_url}>')
+        self.assertEqual(headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click')
+        self.assertIn(unsubscribe_url, mock_send.call_args.kwargs['html_message'])
+        self.assertIn(unsubscribe_url, mock_send.call_args.kwargs['text_message'])
+
+    def test_newline_in_unsubscribe_url_is_not_a_header(self):
+        from profiles.newsletter import newsletter_list_unsubscribe_headers
+        self.assertEqual(
+            newsletter_list_unsubscribe_headers('https://example.com/\r\nBcc: x'),
+            {},
+        )
+
+
+class NewsletterSubscriberStaffTests(APITestCase):
+    def setUp(self):
+        from profiles.models import NewsletterSubscription
+
+        self.staff = User.objects.create_user(
+            username='staff-news',
+            email='staff-news@example.com',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.member = User.objects.create_user(
+            username='member-news',
+            email='member-news@example.com',
+            password='testpass123',
+        )
+        self.active = NewsletterSubscription.objects.create(
+            email='activa@example.com',
+            source='frontend_subscribe',
+        )
+        self.inactive = NewsletterSubscription.objects.create(
+            email='baja@example.com',
+            source='club_de_lectura:cypherpunk',
+            is_active=False,
+        )
+        self.list_url = reverse('profiles:newsletter_subscribers')
+
+    def test_anonymous_and_members_cannot_read_the_list(self):
+        anonymous = self.client.get(self.list_url)
+        self.assertEqual(anonymous.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.force_authenticate(self.member)
+        forbidden = self.client.get(self.list_url)
+        self.assertEqual(forbidden.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_staff_list_defaults_to_active_emails_without_user_accounts(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['active_count'], 1)
+        self.assertEqual(response.data['inactive_count'], 1)
+        self.assertEqual(response.data['count'], 1)
+        row = response.data['results'][0]
+        self.assertEqual(row['email'], 'activa@example.com')
+        self.assertEqual(row['source_label'], 'Página /unirme')
+        self.assertTrue(row['is_active'])
+        self.assertIn(self.active.unsubscribe_token, row['unsubscribe_url'])
+        self.assertNotIn('user', row)
+
+    def test_staff_can_filter_search_and_export_csv(self):
+        self.client.force_authenticate(self.staff)
+        inactive = self.client.get(self.list_url, {'status': 'inactive'})
+        self.assertEqual(inactive.data['results'][0]['email'], 'baja@example.com')
+        self.assertEqual(
+            inactive.data['results'][0]['source_label'],
+            'Club de Lectura (cypherpunk)',
+        )
+
+        search = self.client.get(self.list_url, {'status': 'all', 'q': 'baja@'})
+        self.assertEqual([row['email'] for row in search.data['results']], ['baja@example.com'])
+
+        exported = self.client.get(self.list_url, {'export': 'csv'})
+        self.assertEqual(exported.status_code, status.HTTP_200_OK)
+        body = exported.content.decode('utf-8-sig')
+        self.assertIn('activa@example.com', body)
+        self.assertIn(self.active.unsubscribe_token, body)
+        self.assertNotIn('baja@example.com', body)
+
+    def test_staff_can_deactivate_and_reactivate_without_a_login(self):
+        self.client.force_authenticate(self.staff)
+        detail = reverse('profiles:newsletter_subscriber_detail', args=[self.active.id])
+
+        removed = self.client.patch(detail, {'is_active': False}, format='json')
+        self.assertEqual(removed.status_code, status.HTTP_200_OK)
+        self.assertFalse(removed.data['is_active'])
+        self.assertIsNotNone(removed.data['unsubscribed_at'])
+        self.active.refresh_from_db()
+        self.assertFalse(self.active.is_active)
+
+        restored = self.client.patch(detail, {'is_active': True}, format='json')
+        self.assertTrue(restored.data['is_active'])
+        self.assertIsNone(restored.data['unsubscribed_at'])
+        self.active.refresh_from_db()
+        self.assertEqual(self.active.unsubscribe_token, restored.data['unsubscribe_url'].rstrip('/').split('/')[-1])
+
+    def test_invalid_active_flag_is_rejected(self):
+        self.client.force_authenticate(self.staff)
+        detail = reverse('profiles:newsletter_subscriber_detail', args=[self.active.id])
+        response = self.client.patch(detail, {'is_active': 'no'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.active.refresh_from_db()
+        self.assertTrue(self.active.is_active)
+
+
+@override_settings(VINCENT_API_KEY='mail-worker-key')
+class NewsletterUnsubscribeLinkAPITests(APITestCase):
+    def setUp(self):
+        from profiles.models import NewsletterSubscription
+
+        self.url = reverse('profiles:newsletter_unsubscribe_links')
+        self.headers = {'HTTP_X_VINCENT_KEY': 'mail-worker-key'}
+        self.active = NewsletterSubscription.objects.create(
+            email='activa@example.com',
+            source='frontend_subscribe',
+        )
+        self.inactive = NewsletterSubscription.objects.create(
+            email='Baja@Example.com',
+            source='club_de_lectura:cypherpunk',
+            is_active=False,
+        )
+        NewsletterSubscription.objects.create(
+            email='juana@example.com',
+            source='frontend_subscribe',
+        )
+
+    def test_missing_or_wrong_key_is_rejected(self):
+        missing = self.client.post(self.url, {'emails': ['activa@example.com']}, format='json')
+        self.assertEqual(missing.status_code, status.HTTP_403_FORBIDDEN)
+
+        wrong = self.client.post(
+            self.url,
+            {'emails': ['activa@example.com']},
+            format='json',
+            HTTP_X_VINCENT_KEY='nope',
+        )
+        self.assertEqual(wrong.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_resolves_exact_emails_and_does_not_create_missing_ones(self):
+        from profiles.models import NewsletterSubscription
+
+        response = self.client.post(
+            self.url,
+            {
+                'emails': [
+                    '  Activa@Example.com ',
+                    'baja@example.com',
+                    'nadie@example.com',
+                    'ana@example.com',
+                    'no-es-email',
+                ],
+            },
+            format='json',
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertEqual(
+            [row['email'] for row in results],
+            [
+                'activa@example.com',
+                'baja@example.com',
+                'nadie@example.com',
+                'ana@example.com',
+                'no-es-email',
+            ],
+        )
+        active = results[0]
+        self.assertTrue(active['found'])
+        self.assertTrue(active['is_active'])
+        self.assertIn(self.active.unsubscribe_token, active['unsubscribe_url'])
+        self.assertEqual(
+            active['headers']['List-Unsubscribe'],
+            f"<{active['unsubscribe_url']}>",
+        )
+        self.assertEqual(
+            active['headers']['List-Unsubscribe-Post'],
+            'List-Unsubscribe=One-Click',
+        )
+        self.assertTrue(results[1]['found'])
+        self.assertFalse(results[1]['is_active'])
+        self.assertIn(self.inactive.unsubscribe_token, results[1]['unsubscribe_url'])
+        self.assertFalse(results[2]['found'])
+        self.assertIsNone(results[2]['unsubscribe_url'])
+        self.assertFalse(results[3]['found'])
+        self.assertEqual(results[4]['detail'], 'Email no válido.')
+        self.assertFalse(
+            NewsletterSubscription.objects.filter(email='nadie@example.com').exists()
+        )
+
+    def test_bearer_key_is_accepted(self):
+        response = self.client.post(
+            self.url,
+            {'emails': ['activa@example.com']},
+            format='json',
+            HTTP_AUTHORIZATION='Bearer mail-worker-key',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['results'][0]['found'])
+
+    def test_empty_and_oversized_batches_are_rejected(self):
+        empty = self.client.post(self.url, {'emails': []}, format='json', **self.headers)
+        self.assertEqual(empty.status_code, status.HTTP_400_BAD_REQUEST)
+
+        oversized = self.client.post(
+            self.url,
+            {'emails': [f'n{i}@example.com' for i in range(501)]},
+            format='json',
+            **self.headers,
+        )
+        self.assertEqual(oversized.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+@override_settings(VINCENT_API_KEY='mail-worker-key')
+class NewsletterSubscriberSyncAPITests(APITestCase):
+    def setUp(self):
+        from profiles.models import NewsletterSubscription
+
+        self.url = reverse('profiles:newsletter_subscribers_sync')
+        self.headers = {'HTTP_X_VINCENT_KEY': 'mail-worker-key'}
+        self.kept = NewsletterSubscription.objects.create(
+            email='sigue@example.com',
+            source='frontend_subscribe',
+        )
+        self.quiet = NewsletterSubscription.objects.create(
+            email='vuelve@example.com',
+            source='frontend_subscribe',
+            is_active=False,
+        )
+        self.stale = NewsletterSubscription.objects.create(
+            email='viejo@example.com',
+            source='subscribe_page',
+        )
+        self.kept_token = self.kept.unsubscribe_token
+        self.quiet_token = self.quiet.unsubscribe_token
+
+    def _replace(self, emails, **extra):
+        body = {'mode': 'replace', 'emails': emails}
+        body.update(extra)
+        return self.client.post(self.url, body, format='json', **self.headers)
+
+    def test_missing_key_is_rejected(self):
+        response = self.client.post(
+            self.url,
+            {'mode': 'replace', 'emails': ['sigue@example.com']},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_replace_creates_reactivates_and_deactivates(self):
+        from profiles.models import NewsletterSubscription
+
+        response = self._replace([
+            '  Sigue@Example.com ',
+            'vuelve@example.com',
+            'nuevo@example.com',
+        ])
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['created'], ['nuevo@example.com'])
+        self.assertEqual(response.data['reactivated'], ['vuelve@example.com'])
+        self.assertEqual(response.data['unchanged'], ['sigue@example.com'])
+        self.assertEqual(response.data['deactivated'], ['viejo@example.com'])
+        self.assertEqual(response.data['active_count'], 3)
+
+        by_email = {row['email']: row for row in response.data['results']}
+        self.assertEqual(
+            by_email['sigue@example.com']['unsubscribe_url'].rstrip('/').split('/')[-1],
+            self.kept_token,
+        )
+        self.assertEqual(
+            by_email['vuelve@example.com']['unsubscribe_url'].rstrip('/').split('/')[-1],
+            self.quiet_token,
+        )
+        self.assertTrue(by_email['nuevo@example.com']['unsubscribe_url'])
+        self.assertEqual(
+            by_email['nuevo@example.com']['headers']['List-Unsubscribe-Post'],
+            'List-Unsubscribe=One-Click',
+        )
+
+        self.stale.refresh_from_db()
+        self.assertFalse(self.stale.is_active)
+        created = NewsletterSubscription.objects.get(email='nuevo@example.com')
+        self.assertEqual(created.source, 'vincent')
+        self.assertTrue(created.is_active)
+
+    def test_upsert_does_not_remove_anyone(self):
+        response = self.client.post(
+            self.url,
+            {'mode': 'upsert', 'emails': ['nuevo@example.com']},
+            format='json',
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['deactivated'], [])
+        self.stale.refresh_from_db()
+        self.assertTrue(self.stale.is_active)
+        self.assertEqual(response.data['active_count'], 3)
+
+    def test_invalid_email_changes_nothing(self):
+        from profiles.models import NewsletterSubscription
+
+        before = NewsletterSubscription.objects.count()
+        response = self._replace(['sigue@example.com', 'no-es-email'])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('no-es-email', response.data['invalid_emails'])
+        self.assertEqual(NewsletterSubscription.objects.count(), before)
+        self.stale.refresh_from_db()
+        self.assertTrue(self.stale.is_active)
+
+    def test_empty_replace_requires_confirmation(self):
+        refused = self._replace([])
+        self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
+        self.stale.refresh_from_db()
+        self.assertTrue(self.stale.is_active)
+
+        cleared = self._replace([], confirm_empty=True)
+        self.assertEqual(cleared.status_code, status.HTTP_200_OK, cleared.data)
+        self.assertEqual(cleared.data['active_count'], 0)
+        self.assertCountEqual(
+            cleared.data['deactivated'],
+            ['sigue@example.com', 'viejo@example.com'],
+        )
+        self.quiet.refresh_from_db()
+        self.assertFalse(self.quiet.is_active)
+
+
+@override_settings(VINCENT_API_KEY='mail-worker-key')
+class NewsletterVincentSubscriberListAPITests(APITestCase):
+    def setUp(self):
+        from profiles.models import NewsletterSubscription
+
+        self.url = reverse('profiles:newsletter_subscribers_all')
+        self.headers = {'HTTP_X_VINCENT_KEY': 'mail-worker-key'}
+        self.active = NewsletterSubscription.objects.create(
+            email='activa@example.com',
+            source='frontend_subscribe',
+        )
+        NewsletterSubscription.objects.create(
+            email='baja@example.com',
+            source='vincent',
+            is_active=False,
+        )
+
+    def test_missing_key_is_rejected(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_default_list_is_active_subscribers_with_links(self):
+        response = self.client.get(self.url, **self.headers)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['active_count'], 1)
+        self.assertEqual(response.data['inactive_count'], 1)
+        self.assertIsNone(response.data['next'])
+        row = response.data['results'][0]
+        self.assertEqual(row['email'], 'activa@example.com')
+        self.assertTrue(row['is_active'])
+        self.assertIn(self.active.unsubscribe_token, row['unsubscribe_url'])
+        self.assertEqual(
+            row['headers']['List-Unsubscribe'],
+            f"<{row['unsubscribe_url']}>",
+        )
+        self.assertNotIn('baja@example.com', [item['email'] for item in response.data['results']])
+
+    def test_status_all_includes_unsubscribed_and_pages(self):
+        everyone = self.client.get(self.url, {'status': 'all', 'page_size': 1}, **self.headers)
+        self.assertEqual(everyone.status_code, status.HTTP_200_OK)
+        self.assertEqual(everyone.data['count'], 2)
+        self.assertEqual(len(everyone.data['results']), 1)
+        self.assertIsNotNone(everyone.data['next'])
+
+        second = self.client.get(self.url, {'status': 'all', 'page': 2, 'page_size': 1}, **self.headers)
+        self.assertEqual(len(second.data['results']), 1)
+        emails = {
+            everyone.data['results'][0]['email'],
+            second.data['results'][0]['email'],
+        }
+        self.assertEqual(emails, {'activa@example.com', 'baja@example.com'})
+
+    def test_bad_page_is_rejected(self):
+        response = self.client.get(self.url, {'page': 'no'}, **self.headers)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

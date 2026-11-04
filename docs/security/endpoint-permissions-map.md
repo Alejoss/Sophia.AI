@@ -85,8 +85,11 @@ Objects must have `author` (FK to User). Used for:
 | GET | `/api/content/transcript-ingest/` | `TRANSCRIPT_INGEST_API_KEY` via `X-Transcript-Ingest-Key` or `Authorization: Bearer` |
 | GET | `/api/content/transcript-ingest/<content_id>/` | same |
 | PUT | `/api/content/transcript-ingest/<content_id>/` | same |
+| POST | `/api/profiles/newsletter/unsubscribe-links/` | `VINCENT_API_KEY` via `X-Vincent-Key` or `Authorization: Bearer` (legacy `TRANSCRIPT_INGEST_API_KEY` only while the Vincent key is unset) |
+| POST | `/api/profiles/newsletter/subscribers/sync/` | same Vincent key; body `mode` is `replace` or `upsert` |
+| GET | `/api/profiles/newsletter/subscribers/all/` | same Vincent key; `status` is `active`, `inactive`, or `all` |
 
-Not JWT. Empty/unset key → all ingest routes **403**. Full contract: [transcript-ingest.md](../api/transcript-ingest.md).
+Not a user JWT. An empty or wrong key returns **403**. Transcript ingest contract: [transcript-ingest.md](../api/transcript-ingest.md). Newsletter link lookup: [email-features.md](../deployment/email-features.md).
 
 ## Transcript certification (Bitcoin)
 

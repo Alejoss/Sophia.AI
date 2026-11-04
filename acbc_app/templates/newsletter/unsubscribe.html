@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>
+        {% if state == "unsubscribed" or state == "already" %}Baja de la newsletter{% elif state == "invalid" %}Enlace no válido{% else %}Darte de baja de la newsletter{% endif %}
+    </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: radial-gradient(circle at top left, #0f172a, #020617);
+            color: #e5e7eb;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+        .card {
+            background: rgba(15, 23, 42, 0.9);
+            border-radius: 1.25rem;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.65);
+            max-width: 420px;
+            width: 100%;
+            padding: 1.75rem 1.75rem 1.5rem;
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin: 0 0 0.75rem;
+        }
+        p {
+            margin: 0.5rem 0;
+            color: #9ca3af;
+            font-size: 0.95rem;
+        }
+        strong {
+            color: #e5e7eb;
+        }
+        button {
+            margin-top: 1.25rem;
+            width: 100%;
+            padding: 0.7rem 0.9rem;
+            border-radius: 999px;
+            border: none;
+            background: linear-gradient(135deg, #f97316, #c2410c);
+            color: white;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+        }
+        a.home {
+            display: inline-block;
+            margin-top: 1.25rem;
+            padding: 0.55rem 1.1rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.55);
+            color: #e5e7eb;
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        {% if state == "confirm" %}
+            <h1>Darte de baja</h1>
+            <p>Vas a dejar de recibir la newsletter de <strong>Academia Blockchain</strong>{% if email_hint %} en <strong>{{ email_hint }}</strong>{% endif %}.</p>
+            <form method="post">
+                <button type="submit">Confirmar baja</button>
+            </form>
+        {% elif state == "unsubscribed" %}
+            <h1>Listo</h1>
+            <p>Te dimos de baja de la newsletter{% if email_hint %} (<strong>{{ email_hint }}</strong>){% endif %}. No te escribiremos más por este medio.</p>
+            <p>Si fue un error, puedes volver a apuntarte cuando quieras.</p>
+        {% elif state == "already" %}
+            <h1>Ya estabas dado de baja</h1>
+            <p>Esta dirección no recibe la newsletter{% if email_hint %} (<strong>{{ email_hint }}</strong>){% endif %}.</p>
+        {% else %}
+            <h1>Enlace no válido</h1>
+            <p>Este enlace de baja no corresponde a ninguna suscripción.</p>
+        {% endif %}
+        <a class="home" href="{{ frontend_url }}">Volver a la página principal</a>
+    </div>
+</body>
+</html>

@@ -135,6 +135,7 @@ class EmailService:
         from_email: Optional[str] = None,
         from_name: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
     ) -> bool:
         """
         Send an email via Django's email backend (SMTP2GO when SEND_EMAILS=true).
@@ -147,6 +148,7 @@ class EmailService:
             from_email: Sender email (defaults to EMAIL_FROM)
             from_name: Sender name (defaults to EMAIL_FROM_NAME)
             tags: Optional labels for logging only (not sent via SMTP)
+            extra_headers: Optional SMTP headers (for example List-Unsubscribe)
 
         Returns:
             bool: True if sent successfully, False if SEND_EMAILS is False
@@ -185,6 +187,7 @@ class EmailService:
                 body=text_message,
                 from_email=from_address,
                 to=[receiver_email],
+                headers=extra_headers or None,
             )
             if html_message:
                 msg.attach_alternative(html_message, "text/html")
@@ -207,16 +210,28 @@ class EmailService:
         from_email: Optional[str] = None,
         from_name: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
     ) -> bool:
         """
         Send an email using a Django template.
         Renders profiles/emails/{template_name}.html and optionally .txt.
         Merges get_brand_context() into the template context (caller values win).
+
+        When the context includes ``unsubscribe_url``, the message also gets
+        the one-click List-Unsubscribe headers unless the caller already set them.
         """
         import re
         from html import unescape
 
+        from profiles.newsletter import newsletter_list_unsubscribe_headers
+
         merged_context = {**EmailService.get_brand_context(), **(context or {})}
+        headers = newsletter_list_unsubscribe_headers(
+            merged_context.get('unsubscribe_url') or ''
+        )
+        if extra_headers:
+            headers.update(extra_headers)
+
         html_template = f"profiles/emails/{template_name}.html"
         html_message = render_to_string(html_template, merged_context)
 
@@ -227,6 +242,13 @@ class EmailService:
             text_message = re.sub(r'<[^>]+>', '', html_message)
             text_message = unescape(text_message).strip()
 
+        unsubscribe_url = merged_context.get('unsubscribe_url') or ''
+        if unsubscribe_url and unsubscribe_url not in text_message:
+            text_message = (
+                f"{text_message.rstrip()}\n\n"
+                f"Darte de baja de la newsletter: {unsubscribe_url}\n"
+            )
+
         return EmailService.send_email(
             receiver_email=receiver_email,
             subject=subject,
@@ -235,6 +257,7 @@ class EmailService:
             from_email=from_email,
             from_name=from_name,
             tags=tags,
+            extra_headers=headers or None,
         )
 
     @staticmethod
