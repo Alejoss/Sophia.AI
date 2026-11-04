@@ -133,7 +133,8 @@
     "startDate": "Fecha de Inicio:",
     "endDate": "Fecha de Fin:",
     "schedule": "Horario:",
-    "landing": "Página del curso:",
+    "courseBannerKicker": "Este evento pertenece al curso",
+    "viewCoursePage": "Ver página del curso",
     "eventPrice": "Precio del evento"
   },
   "registration": {

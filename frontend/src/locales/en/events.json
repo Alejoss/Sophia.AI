@@ -133,7 +133,8 @@
     "startDate": "Start Date:",
     "endDate": "End Date:",
     "schedule": "Schedule:",
-    "landing": "Course page:",
+    "courseBannerKicker": "This event is part of the course",
+    "viewCoursePage": "View course page",
     "eventPrice": "Event price"
   },
   "registration": {
