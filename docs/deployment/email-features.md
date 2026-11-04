@@ -83,6 +83,18 @@ ENVIRONMENT=DEVELOPMENT python manage.py list_newsletter_subscribers
 
 Use `unsubscribe_url` only in that recipient's copy. Passing `unsubscribe_url` into `EmailService.send_template_email` puts the link in the shared email footer and sets the one-click headers. `--include-inactive` lists addresses that already opted out; do not mail those.
 
+The mail worker should not download that CSV for each send. The token is random and stored on the subscription, so the URL cannot be calculated from the email. Resolve it at send time:
+
+`POST /api/profiles/newsletter/unsubscribe-links/`
+
+Auth is the same machine key as Vincent (`VINCENT_API_KEY`, or `TRANSCRIPT_INGEST_API_KEY` only while the Vincent key is unset). Send `X-Vincent-Key` or `Authorization: Bearer <key>`. This is not a user login.
+
+```json
+{ "emails": ["person@example.com", "other@example.com"] }
+```
+
+The response keeps that order. Use a row only when `found` and `is_active` are both true. `unsubscribe_url` is absolute. `headers` is ready to copy onto that recipient's message (`List-Unsubscribe` and `List-Unsubscribe-Post`). An unknown address is not subscribed by this call. More than 500 emails must be split across requests.
+
 The logo URL is absolute: `{FRONTEND_PUBLIC_URL}/images/logo.png` (same asset as the web header). Set `FRONTEND_PUBLIC_URL` (and `ACADEMIA_PUBLIC_URL` for Django admin links) in production so images and CTAs resolve correctly. This is **not** configured in the SMTP2GO template editor.
 
 ### Smoke test after deploy

@@ -35,6 +35,7 @@ import json
 from profiles.serializers import UserSerializer, ProfileSerializer, UserRegistrationSerializer, NotificationSerializer, CryptoCurrencySerializer, AcceptedCryptoSerializer, SuggestionSerializer, ChangePasswordSerializer
 from profiles.models import NewsletterSubscription, Profile, CryptoCurrency, AcceptedCrypto, Suggestion
 from profiles.email_service import EmailService, EmailServiceError
+from content.permissions import VincentMachinePermission
 from profiles.newsletter import (
     NEWSLETTER_RATE_LIMIT_MESSAGE,
     NEWSLETTER_SUBSCRIBED_EMAIL_SESSION_KEY,
@@ -48,6 +49,8 @@ from profiles.newsletter import (
     save_newsletter_subscription,
     set_newsletter_subscription_active,
     unsubscribe_newsletter,
+    NEWSLETTER_UNSUBSCRIBE_LOOKUP_LIMIT,
+    resolve_newsletter_unsubscribe_links,
 )
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
@@ -351,6 +354,37 @@ class NewsletterSubscriberDetailView(APIView):
         subscription = get_object_or_404(NewsletterSubscription, pk=pk)
         set_newsletter_subscription_active(subscription, request.data['is_active'])
         return Response(newsletter_subscriber_payload(subscription))
+
+
+class NewsletterUnsubscribeLinkView(APIView):
+    """
+    Resolve baja links for the mail worker.
+
+    The token is stored per email and cannot be derived from the address.
+    Body: ``{"emails": ["person@example.com", ...]}`` (max 500).
+    Auth is the Vincent machine key, not a user session.
+    """
+
+    authentication_classes = []
+    permission_classes = [VincentMachinePermission]
+
+    def post(self, request):
+        emails = request.data.get('emails')
+        if not isinstance(emails, list) or not emails:
+            return Response(
+                {'detail': 'emails debe ser una lista con al menos un correo.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(emails) > NEWSLETTER_UNSUBSCRIBE_LOOKUP_LIMIT:
+            return Response(
+                {
+                    'detail': (
+                        f'Máximo {NEWSLETTER_UNSUBSCRIBE_LOOKUP_LIMIT} correos por solicitud.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({'results': resolve_newsletter_unsubscribe_links(emails)})
 
 
 class CheckAuth(APIView):

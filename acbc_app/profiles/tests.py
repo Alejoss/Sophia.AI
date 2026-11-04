@@ -2671,3 +2671,111 @@ class NewsletterSubscriberStaffTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.active.refresh_from_db()
         self.assertTrue(self.active.is_active)
+
+
+@override_settings(VINCENT_API_KEY='mail-worker-key')
+class NewsletterUnsubscribeLinkAPITests(APITestCase):
+    def setUp(self):
+        from profiles.models import NewsletterSubscription
+
+        self.url = reverse('profiles:newsletter_unsubscribe_links')
+        self.headers = {'HTTP_X_VINCENT_KEY': 'mail-worker-key'}
+        self.active = NewsletterSubscription.objects.create(
+            email='activa@example.com',
+            source='frontend_subscribe',
+        )
+        self.inactive = NewsletterSubscription.objects.create(
+            email='Baja@Example.com',
+            source='club_de_lectura:cypherpunk',
+            is_active=False,
+        )
+        NewsletterSubscription.objects.create(
+            email='juana@example.com',
+            source='frontend_subscribe',
+        )
+
+    def test_missing_or_wrong_key_is_rejected(self):
+        missing = self.client.post(self.url, {'emails': ['activa@example.com']}, format='json')
+        self.assertEqual(missing.status_code, status.HTTP_403_FORBIDDEN)
+
+        wrong = self.client.post(
+            self.url,
+            {'emails': ['activa@example.com']},
+            format='json',
+            HTTP_X_VINCENT_KEY='nope',
+        )
+        self.assertEqual(wrong.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_resolves_exact_emails_and_does_not_create_missing_ones(self):
+        from profiles.models import NewsletterSubscription
+
+        response = self.client.post(
+            self.url,
+            {
+                'emails': [
+                    '  Activa@Example.com ',
+                    'baja@example.com',
+                    'nadie@example.com',
+                    'ana@example.com',
+                    'no-es-email',
+                ],
+            },
+            format='json',
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertEqual(
+            [row['email'] for row in results],
+            [
+                'activa@example.com',
+                'baja@example.com',
+                'nadie@example.com',
+                'ana@example.com',
+                'no-es-email',
+            ],
+        )
+        active = results[0]
+        self.assertTrue(active['found'])
+        self.assertTrue(active['is_active'])
+        self.assertIn(self.active.unsubscribe_token, active['unsubscribe_url'])
+        self.assertEqual(
+            active['headers']['List-Unsubscribe'],
+            f"<{active['unsubscribe_url']}>",
+        )
+        self.assertEqual(
+            active['headers']['List-Unsubscribe-Post'],
+            'List-Unsubscribe=One-Click',
+        )
+        self.assertTrue(results[1]['found'])
+        self.assertFalse(results[1]['is_active'])
+        self.assertIn(self.inactive.unsubscribe_token, results[1]['unsubscribe_url'])
+        self.assertFalse(results[2]['found'])
+        self.assertIsNone(results[2]['unsubscribe_url'])
+        self.assertFalse(results[3]['found'])
+        self.assertEqual(results[4]['detail'], 'Email no válido.')
+        self.assertFalse(
+            NewsletterSubscription.objects.filter(email='nadie@example.com').exists()
+        )
+
+    def test_bearer_key_is_accepted(self):
+        response = self.client.post(
+            self.url,
+            {'emails': ['activa@example.com']},
+            format='json',
+            HTTP_AUTHORIZATION='Bearer mail-worker-key',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['results'][0]['found'])
+
+    def test_empty_and_oversized_batches_are_rejected(self):
+        empty = self.client.post(self.url, {'emails': []}, format='json', **self.headers)
+        self.assertEqual(empty.status_code, status.HTTP_400_BAD_REQUEST)
+
+        oversized = self.client.post(
+            self.url,
+            {'emails': [f'n{i}@example.com' for i in range(501)]},
+            format='json',
+            **self.headers,
+        )
+        self.assertEqual(oversized.status_code, status.HTTP_400_BAD_REQUEST)
