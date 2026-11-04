@@ -5,7 +5,7 @@ import { fetchCurrentFeaturedEvent } from '../api/eventsApi';
 import { formatEventWhen } from '../utils/dateUtils';
 import { useDateLocales } from '../hooks/useDateLocales';
 
-/** Matches the MUI `md` breakpoint where the banner switches to its 1600 × 280 shape. */
+/** Matches the MUI `md` breakpoint where the banner switches to the desktop image. */
 const MOBILE_MEDIA = '(max-width: 899.95px)';
 
 const FeaturedEventBanner = () => {
@@ -67,8 +67,7 @@ const FeaturedEventBanner = () => {
           alt=""
           sx={{
             width: '100%',
-            aspectRatio: { xs: '12 / 5', md: '1600 / 280' },
-            objectFit: 'cover',
+            height: 'auto',
             display: 'block',
             transition: 'transform 0.45s ease',
           }}

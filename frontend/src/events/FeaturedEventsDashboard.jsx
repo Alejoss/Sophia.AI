@@ -29,8 +29,8 @@ import { formatEventWhen } from '../utils/dateUtils';
 import { useDateLocales } from '../hooks/useDateLocales';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const DESKTOP_RATIO = '1600 / 280';
-const MOBILE_RATIO = '12 / 5';
+const DESKTOP_RATIO = '3 / 1';
+const MOBILE_RATIO = '3 / 2';
 
 const responseData = (error) => error?.data ?? error?.response?.data;
 
@@ -64,33 +64,33 @@ const useEventWhen = () => {
   };
 };
 
+/** Shows the whole image, as the public banner does; the ratio only shapes the empty placeholder. */
 const BannerPreview = ({ src, ratio, emptyLabel, maxWidth }) => (
-  <Box
-    sx={{
-      width: '100%',
-      maxWidth,
-      aspectRatio: ratio,
-      borderRadius: 1,
-      overflow: 'hidden',
-      backgroundColor: '#12141c',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}
-  >
-    {src ? (
-      <Box
-        component="img"
-        src={src}
-        alt=""
-        sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-      />
-    ) : (
+  src ? (
+    <Box
+      component="img"
+      src={src}
+      alt=""
+      sx={{ width: '100%', maxWidth, height: 'auto', display: 'block', borderRadius: 1 }}
+    />
+  ) : (
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth,
+        aspectRatio: ratio,
+        borderRadius: 1,
+        backgroundColor: '#12141c',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
       <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
         {emptyLabel}
       </Typography>
-    )}
-  </Box>
+    </Box>
+  )
 );
 
 const ImageSlot = ({ label, hint, ratio, maxWidth, preview, error, onFile }) => {

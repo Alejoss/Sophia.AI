@@ -146,12 +146,12 @@ class FeaturedEvent(models.Model):
     )
     desktop_image = models.ImageField(
         upload_to=upload_featured_event_banner,
-        help_text='Desktop banner, about 1600×280 pixels. Shown under the nav on Biblioteca, Caminos, and Temas.',
+        help_text='Desktop banner, 1600 px wide, any height (shown uncropped). WebP or JPEG under 200 KB. Shown under the nav on Biblioteca, Caminos, and Temas.',
     )
     mobile_image = models.ImageField(
         upload_to=upload_featured_event_mobile_banner,
         blank=True,
-        help_text='Mobile banner, about 1200×500 pixels. Shown on screens narrower than 900 pixels.',
+        help_text='Mobile banner, 1080 px wide, any height (shown uncropped). WebP or JPEG under 200 KB. Shown on screens narrower than 900 pixels.',
     )
     is_active = models.BooleanField(
         default=True,
