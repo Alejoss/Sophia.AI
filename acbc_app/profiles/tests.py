@@ -2892,3 +2892,61 @@ class NewsletterSubscriberSyncAPITests(APITestCase):
         )
         self.quiet.refresh_from_db()
         self.assertFalse(self.quiet.is_active)
+
+
+@override_settings(VINCENT_API_KEY='mail-worker-key')
+class NewsletterVincentSubscriberListAPITests(APITestCase):
+    def setUp(self):
+        from profiles.models import NewsletterSubscription
+
+        self.url = reverse('profiles:newsletter_subscribers_all')
+        self.headers = {'HTTP_X_VINCENT_KEY': 'mail-worker-key'}
+        self.active = NewsletterSubscription.objects.create(
+            email='activa@example.com',
+            source='frontend_subscribe',
+        )
+        NewsletterSubscription.objects.create(
+            email='baja@example.com',
+            source='vincent',
+            is_active=False,
+        )
+
+    def test_missing_key_is_rejected(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_default_list_is_active_subscribers_with_links(self):
+        response = self.client.get(self.url, **self.headers)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['active_count'], 1)
+        self.assertEqual(response.data['inactive_count'], 1)
+        self.assertIsNone(response.data['next'])
+        row = response.data['results'][0]
+        self.assertEqual(row['email'], 'activa@example.com')
+        self.assertTrue(row['is_active'])
+        self.assertIn(self.active.unsubscribe_token, row['unsubscribe_url'])
+        self.assertEqual(
+            row['headers']['List-Unsubscribe'],
+            f"<{row['unsubscribe_url']}>",
+        )
+        self.assertNotIn('baja@example.com', [item['email'] for item in response.data['results']])
+
+    def test_status_all_includes_unsubscribed_and_pages(self):
+        everyone = self.client.get(self.url, {'status': 'all', 'page_size': 1}, **self.headers)
+        self.assertEqual(everyone.status_code, status.HTTP_200_OK)
+        self.assertEqual(everyone.data['count'], 2)
+        self.assertEqual(len(everyone.data['results']), 1)
+        self.assertIsNotNone(everyone.data['next'])
+
+        second = self.client.get(self.url, {'status': 'all', 'page': 2, 'page_size': 1}, **self.headers)
+        self.assertEqual(len(second.data['results']), 1)
+        emails = {
+            everyone.data['results'][0]['email'],
+            second.data['results'][0]['email'],
+        }
+        self.assertEqual(emails, {'activa@example.com', 'baja@example.com'})
+
+    def test_bad_page_is_rejected(self):
+        response = self.client.get(self.url, {'page': 'no'}, **self.headers)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
