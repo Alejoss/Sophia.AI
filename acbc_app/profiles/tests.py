@@ -2779,3 +2779,116 @@ class NewsletterUnsubscribeLinkAPITests(APITestCase):
             **self.headers,
         )
         self.assertEqual(oversized.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+@override_settings(VINCENT_API_KEY='mail-worker-key')
+class NewsletterSubscriberSyncAPITests(APITestCase):
+    def setUp(self):
+        from profiles.models import NewsletterSubscription
+
+        self.url = reverse('profiles:newsletter_subscribers_sync')
+        self.headers = {'HTTP_X_VINCENT_KEY': 'mail-worker-key'}
+        self.kept = NewsletterSubscription.objects.create(
+            email='sigue@example.com',
+            source='frontend_subscribe',
+        )
+        self.quiet = NewsletterSubscription.objects.create(
+            email='vuelve@example.com',
+            source='frontend_subscribe',
+            is_active=False,
+        )
+        self.stale = NewsletterSubscription.objects.create(
+            email='viejo@example.com',
+            source='subscribe_page',
+        )
+        self.kept_token = self.kept.unsubscribe_token
+        self.quiet_token = self.quiet.unsubscribe_token
+
+    def _replace(self, emails, **extra):
+        body = {'mode': 'replace', 'emails': emails}
+        body.update(extra)
+        return self.client.post(self.url, body, format='json', **self.headers)
+
+    def test_missing_key_is_rejected(self):
+        response = self.client.post(
+            self.url,
+            {'mode': 'replace', 'emails': ['sigue@example.com']},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_replace_creates_reactivates_and_deactivates(self):
+        from profiles.models import NewsletterSubscription
+
+        response = self._replace([
+            '  Sigue@Example.com ',
+            'vuelve@example.com',
+            'nuevo@example.com',
+        ])
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['created'], ['nuevo@example.com'])
+        self.assertEqual(response.data['reactivated'], ['vuelve@example.com'])
+        self.assertEqual(response.data['unchanged'], ['sigue@example.com'])
+        self.assertEqual(response.data['deactivated'], ['viejo@example.com'])
+        self.assertEqual(response.data['active_count'], 3)
+
+        by_email = {row['email']: row for row in response.data['results']}
+        self.assertEqual(
+            by_email['sigue@example.com']['unsubscribe_url'].rstrip('/').split('/')[-1],
+            self.kept_token,
+        )
+        self.assertEqual(
+            by_email['vuelve@example.com']['unsubscribe_url'].rstrip('/').split('/')[-1],
+            self.quiet_token,
+        )
+        self.assertTrue(by_email['nuevo@example.com']['unsubscribe_url'])
+        self.assertEqual(
+            by_email['nuevo@example.com']['headers']['List-Unsubscribe-Post'],
+            'List-Unsubscribe=One-Click',
+        )
+
+        self.stale.refresh_from_db()
+        self.assertFalse(self.stale.is_active)
+        created = NewsletterSubscription.objects.get(email='nuevo@example.com')
+        self.assertEqual(created.source, 'vincent')
+        self.assertTrue(created.is_active)
+
+    def test_upsert_does_not_remove_anyone(self):
+        response = self.client.post(
+            self.url,
+            {'mode': 'upsert', 'emails': ['nuevo@example.com']},
+            format='json',
+            **self.headers,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['deactivated'], [])
+        self.stale.refresh_from_db()
+        self.assertTrue(self.stale.is_active)
+        self.assertEqual(response.data['active_count'], 3)
+
+    def test_invalid_email_changes_nothing(self):
+        from profiles.models import NewsletterSubscription
+
+        before = NewsletterSubscription.objects.count()
+        response = self._replace(['sigue@example.com', 'no-es-email'])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('no-es-email', response.data['invalid_emails'])
+        self.assertEqual(NewsletterSubscription.objects.count(), before)
+        self.stale.refresh_from_db()
+        self.assertTrue(self.stale.is_active)
+
+    def test_empty_replace_requires_confirmation(self):
+        refused = self._replace([])
+        self.assertEqual(refused.status_code, status.HTTP_400_BAD_REQUEST)
+        self.stale.refresh_from_db()
+        self.assertTrue(self.stale.is_active)
+
+        cleared = self._replace([], confirm_empty=True)
+        self.assertEqual(cleared.status_code, status.HTTP_200_OK, cleared.data)
+        self.assertEqual(cleared.data['active_count'], 0)
+        self.assertCountEqual(
+            cleared.data['deactivated'],
+            ['sigue@example.com', 'viejo@example.com'],
+        )
+        self.quiet.refresh_from_db()
+        self.assertFalse(self.quiet.is_active)

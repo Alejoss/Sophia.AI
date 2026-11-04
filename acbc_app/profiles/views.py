@@ -51,6 +51,9 @@ from profiles.newsletter import (
     unsubscribe_newsletter,
     NEWSLETTER_UNSUBSCRIBE_LOOKUP_LIMIT,
     resolve_newsletter_unsubscribe_links,
+    NEWSLETTER_SUBSCRIBER_SYNC_LIMIT,
+    NewsletterSubscriberSyncError,
+    sync_newsletter_subscribers,
 )
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
@@ -385,6 +388,64 @@ class NewsletterUnsubscribeLinkView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response({'results': resolve_newsletter_unsubscribe_links(emails)})
+
+
+class NewsletterSubscriberSyncView(APIView):
+    """
+    Replace or extend the stored newsletter list from Vincent's current recipients.
+
+    Body: ``{"mode": "replace"|"upsert", "emails": ["person@example.com", ...]}``.
+    ``replace`` makes that list the full active set. ``upsert`` only adds and
+    reactivates. An empty ``replace`` also needs ``"confirm_empty": true``.
+    """
+
+    authentication_classes = []
+    permission_classes = [VincentMachinePermission]
+
+    def post(self, request):
+        mode = request.data.get('mode')
+        emails = request.data.get('emails')
+        if mode not in ('replace', 'upsert'):
+            return Response(
+                {'detail': 'mode debe ser upsert o replace.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not isinstance(emails, list):
+            return Response(
+                {'detail': 'emails debe ser una lista de correos.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(emails) > NEWSLETTER_SUBSCRIBER_SYNC_LIMIT:
+            return Response(
+                {
+                    'detail': (
+                        f'Máximo {NEWSLETTER_SUBSCRIBER_SYNC_LIMIT} correos por solicitud.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if (
+            mode == 'replace'
+            and not emails
+            and request.data.get('confirm_empty') is not True
+        ):
+            return Response(
+                {
+                    'detail': (
+                        'Una lista vacía con mode replace daría de baja a todos. '
+                        'Envía confirm_empty: true si eso es lo que quieres.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            payload = sync_newsletter_subscribers(emails, mode=mode)
+        except NewsletterSubscriberSyncError as exc:
+            body = {'detail': exc.detail}
+            if exc.invalid_emails:
+                body['invalid_emails'] = exc.invalid_emails
+            return Response(body, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload)
 
 
 class CheckAuth(APIView):

@@ -57,6 +57,11 @@ urlpatterns = [
         name='newsletter_unsubscribe_links',
     ),
     path(
+        'newsletter/subscribers/sync/',
+        views.NewsletterSubscriberSyncView.as_view(),
+        name='newsletter_subscribers_sync',
+    ),
+    path(
         'newsletter/unsubscribe/<str:token>/',
         views.newsletter_unsubscribe,
         name='newsletter_unsubscribe',
