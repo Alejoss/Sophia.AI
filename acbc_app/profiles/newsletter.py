@@ -3,8 +3,11 @@
 import secrets
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import IntegrityError
 from django.db.models import F
+from django.db.models.functions import Lower
 from django.urls import reverse
 from django.utils import timezone
 
@@ -25,6 +28,7 @@ NEWSLETTER_RATE_LIMIT_MESSAGE = (
 )
 NEWSLETTER_SUBSCRIBED_EMAIL_SESSION_KEY = 'newsletter_subscribed_email'
 NEWSLETTER_SUCCESS_MESSAGE = 'Suscripción registrada correctamente.'
+NEWSLETTER_UNSUBSCRIBE_LOOKUP_LIMIT = 500
 
 
 def newsletter_source_label(source: str) -> str:
@@ -226,6 +230,71 @@ def set_newsletter_subscription_active(subscription, active: bool):
         subscription.unsubscribed_at = timezone.now()
         subscription.save(update_fields=['is_active', 'unsubscribed_at'])
     return subscription
+
+
+def _newsletter_email_key(raw) -> str:
+    return str(raw or '').strip().lower()
+
+
+def _newsletter_email_is_valid(email: str) -> bool:
+    if not email:
+        return False
+    try:
+        validate_email(email)
+    except ValidationError:
+        return False
+    return True
+
+
+def resolve_newsletter_unsubscribe_links(emails) -> list:
+    """
+    Map each requested address to its stored baja link.
+
+    The token is random and lives on the subscription row, so a worker cannot
+    derive the URL from the email. Missing addresses are not created.
+    Results stay in request order. Matching ignores case.
+    """
+    requested = [_newsletter_email_key(raw) for raw in emails]
+    valid = [email for email in requested if _newsletter_email_is_valid(email)]
+    stored = {
+        row.email_key: row
+        for row in NewsletterSubscription.objects.annotate(
+            email_key=Lower('email'),
+        ).filter(email_key__in=valid)
+    }
+    results = []
+    for email in requested:
+        if not _newsletter_email_is_valid(email):
+            results.append({
+                'email': email,
+                'found': False,
+                'is_active': False,
+                'unsubscribe_url': None,
+                'headers': None,
+                'detail': 'Email no válido.',
+            })
+            continue
+        subscription = stored.get(email)
+        if subscription is None:
+            results.append({
+                'email': email,
+                'found': False,
+                'is_active': False,
+                'unsubscribe_url': None,
+                'headers': None,
+                'detail': None,
+            })
+            continue
+        url = newsletter_unsubscribe_url(subscription)
+        results.append({
+            'email': email,
+            'found': True,
+            'is_active': subscription.is_active,
+            'unsubscribe_url': url,
+            'headers': newsletter_list_unsubscribe_headers(url),
+            'detail': None,
+        })
+    return results
 
 
 def newsletter_subscriber_payload(subscription) -> dict:
