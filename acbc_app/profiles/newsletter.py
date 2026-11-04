@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import F
 from django.db.models.functions import Lower
 from django.urls import reverse
@@ -29,6 +29,9 @@ NEWSLETTER_RATE_LIMIT_MESSAGE = (
 NEWSLETTER_SUBSCRIBED_EMAIL_SESSION_KEY = 'newsletter_subscribed_email'
 NEWSLETTER_SUCCESS_MESSAGE = 'Suscripción registrada correctamente.'
 NEWSLETTER_UNSUBSCRIBE_LOOKUP_LIMIT = 500
+NEWSLETTER_SUBSCRIBER_SYNC_LIMIT = 10000
+NEWSLETTER_VINCENT_LIST_DEFAULT_PAGE_SIZE = 1000
+NEWSLETTER_SYNC_SOURCE = 'vincent'
 
 
 def newsletter_source_label(source: str) -> str:
@@ -38,6 +41,8 @@ def newsletter_source_label(source: str) -> str:
 def newsletter_source_display(source: str) -> str:
     """Staff-facing origin. Known tags use their label; anything else stays visible."""
     source = (source or '').strip()
+    if source == NEWSLETTER_SYNC_SOURCE:
+        return 'Vincent'
     if source in NEWSLETTER_SOURCE_LABELS:
         return NEWSLETTER_SOURCE_LABELS[source]
     if source.startswith('club_de_lectura:'):
@@ -246,6 +251,116 @@ def _newsletter_email_is_valid(email: str) -> bool:
     return True
 
 
+class NewsletterSubscriberSyncError(Exception):
+    """The sync payload cannot be applied. Nothing was written."""
+
+    def __init__(self, detail, invalid_emails=None):
+        super().__init__(detail)
+        self.detail = detail
+        self.invalid_emails = invalid_emails or []
+
+
+def _newsletter_link_result(email, subscription):
+    url = newsletter_unsubscribe_url(subscription)
+    return {
+        'email': email,
+        'is_active': True,
+        'unsubscribe_url': url,
+        'headers': newsletter_list_unsubscribe_headers(url),
+    }
+
+
+def sync_newsletter_subscribers(emails, *, mode):
+    """
+    Make the stored list match the addresses Vincent is actually mailing.
+
+    ``upsert`` adds and reactivates the given emails and leaves everyone else.
+    ``replace`` does that and marks every other active address as unsubscribed.
+    Existing baja tokens are kept. Invalid emails abort the whole call.
+    """
+    if mode not in ('upsert', 'replace'):
+        raise NewsletterSubscriberSyncError('mode debe ser upsert o replace.')
+
+    requested = []
+    seen = set()
+    invalid = []
+    for raw in emails:
+        email = _newsletter_email_key(raw)
+        if not _newsletter_email_is_valid(email):
+            invalid.append(email)
+            continue
+        if email not in seen:
+            seen.add(email)
+            requested.append(email)
+    if invalid:
+        raise NewsletterSubscriberSyncError(
+            'Hay correos no válidos. No se cambió la lista.',
+            invalid,
+        )
+
+    created = []
+    reactivated = []
+    unchanged = []
+    deactivated = []
+
+    with transaction.atomic():
+        stored = {
+            row.email_key: row
+            for row in NewsletterSubscription.objects.annotate(
+                email_key=Lower('email'),
+            )
+        }
+        for email in requested:
+            subscription = stored.get(email)
+            if subscription is None:
+                subscription = NewsletterSubscription(
+                    email=email,
+                    source=NEWSLETTER_SYNC_SOURCE,
+                    is_active=True,
+                )
+                subscription.save()
+                stored[email] = subscription
+                created.append(email)
+            elif subscription.is_active:
+                unchanged.append(email)
+            else:
+                set_newsletter_subscription_active(subscription, True)
+                reactivated.append(email)
+
+        if mode == 'replace':
+            active_rows = NewsletterSubscription.objects.annotate(
+                email_key=Lower('email'),
+            ).filter(is_active=True)
+            for subscription in active_rows:
+                if subscription.email_key in seen:
+                    continue
+                set_newsletter_subscription_active(subscription, False)
+                deactivated.append(subscription.email_key)
+
+    results = []
+    if requested:
+        fresh = {
+            row.email_key: row
+            for row in NewsletterSubscription.objects.annotate(
+                email_key=Lower('email'),
+            ).filter(email_key__in=requested)
+        }
+        results = [
+            _newsletter_link_result(email, fresh[email])
+            for email in requested
+        ]
+
+    return {
+        'mode': mode,
+        'created': created,
+        'reactivated': reactivated,
+        'unchanged': unchanged,
+        'deactivated': deactivated,
+        'active_count': NewsletterSubscription.objects.filter(is_active=True).count(),
+        'results': results,
+    }
+
+
 def resolve_newsletter_unsubscribe_links(emails) -> list:
     """
     Map each requested address to its stored baja link.
@@ -295,6 +410,21 @@ def resolve_newsletter_unsubscribe_links(emails) -> list:
             'detail': None,
         })
     return results
+
+
+def newsletter_vincent_subscriber_record(subscription) -> dict:
+    """One subscriber as Vincent should read it, including the baja link."""
+    url = newsletter_unsubscribe_url(subscription)
+    return {
+        'email': subscription.email,
+        'is_active': subscription.is_active,
+        'source': subscription.source,
+        'source_label': newsletter_source_display(subscription.source),
+        'created_at': subscription.created_at,
+        'unsubscribed_at': subscription.unsubscribed_at,
+        'unsubscribe_url': url,
+        'headers': newsletter_list_unsubscribe_headers(url),
+    }
 
 
 def newsletter_subscriber_payload(subscription) -> dict:

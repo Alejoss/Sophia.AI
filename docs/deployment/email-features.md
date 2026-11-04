@@ -95,6 +95,29 @@ Auth is the same machine key as Vincent (`VINCENT_API_KEY`, or `TRANSCRIPT_INGES
 
 The response keeps that order. Use a row only when `found` and `is_active` are both true. `unsubscribe_url` is absolute. `headers` is ready to copy onto that recipient's message (`List-Unsubscribe` and `List-Unsubscribe-Post`). An unknown address is not subscribed by this call. More than 500 emails must be split across requests.
 
+When Vincent's own recipient list is the one that should be stored, sync it in one call instead of editing the dashboard by hand:
+
+`POST /api/profiles/newsletter/subscribers/sync/`
+
+Same machine key. `mode` is required.
+
+```json
+{
+  "mode": "replace",
+  "emails": ["person@example.com", "other@example.com"]
+}
+```
+
+`replace` makes that list the full active set: new addresses are created, inactive ones in the list are turned back on, and active addresses missing from the list are marked unsubscribed. Their baja tokens stay the same. `upsert` only adds and reactivates; it does not remove anyone. An invalid address rejects the whole request and writes nothing. An empty `replace` is refused unless the body also has `"confirm_empty": true`.
+
+The response lists `created`, `reactivated`, `unchanged`, and `deactivated`, plus `results` for every address in the request with `unsubscribe_url` and `headers`. Up to 10000 emails per call. New rows are tagged `source: vincent`. This does not email the administrators.
+
+To read the stored list back, without a staff login:
+
+`GET /api/profiles/newsletter/subscribers/all/`
+
+Same machine key. `status` is `active` (default), `inactive`, or `all`. `page` starts at 1. `page_size` defaults to 1000 and stops at 10000. Each row includes `unsubscribe_url` and `headers`. `count` is the size of the filtered list. `active_count` and `inactive_count` are the whole table. Follow `next` until it is null to read every page. Machine-readable description of these calls: [newsletter-vincent.json](../api/newsletter-vincent.json).
+
 The logo URL is absolute: `{FRONTEND_PUBLIC_URL}/images/logo.png` (same asset as the web header). Set `FRONTEND_PUBLIC_URL` (and `ACADEMIA_PUBLIC_URL` for Django admin links) in production so images and CTAs resolve correctly. This is **not** configured in the SMTP2GO template editor.
 
 ### Smoke test after deploy

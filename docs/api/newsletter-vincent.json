@@ -1,0 +1,122 @@
+{
+  "base_url": "https://www.academiablockchain.com",
+  "auth": {
+    "type": "machine_key",
+    "env": "VINCENT_API_KEY",
+    "legacy_env_when_primary_unset": "TRANSCRIPT_INGEST_API_KEY",
+    "headers": [
+      "X-Vincent-Key: <key>",
+      "Authorization: Bearer <key>"
+    ],
+    "not": "This is not a user login. A staff JWT does not call these routes."
+  },
+  "endpoints": [
+    {
+      "name": "list_subscribers",
+      "purpose": "Read every stored newsletter address and its unsubscribe link.",
+      "method": "GET",
+      "path": "/api/profiles/newsletter/subscribers/all/",
+      "query": {
+        "status": "active | inactive | all. Default active.",
+        "page": "1-based. Default 1.",
+        "page_size": "Default 1000. Maximum 10000."
+      },
+      "response": {
+        "count": "Rows matching status.",
+        "active_count": "Active rows in the whole table.",
+        "inactive_count": "Inactive rows in the whole table.",
+        "page": 1,
+        "page_size": 1000,
+        "next": "Absolute URL of the next page, or null.",
+        "previous": "Absolute URL of the previous page, or null.",
+        "results": [
+          {
+            "email": "person@example.com",
+            "is_active": true,
+            "source": "vincent",
+            "source_label": "Vincent",
+            "created_at": "2026-11-04T21:00:00+00:00",
+            "unsubscribed_at": null,
+            "unsubscribe_url": "https://www.academiablockchain.com/api/profiles/newsletter/unsubscribe/<token>/",
+            "headers": {
+              "List-Unsubscribe": "<https://www.academiablockchain.com/api/profiles/newsletter/unsubscribe/<token>/>",
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+            }
+          }
+        ]
+      },
+      "send_only_when": "is_active is true. Follow next until it is null."
+    },
+    {
+      "name": "sync_subscribers",
+      "purpose": "Make the stored list match the addresses Vincent is mailing.",
+      "method": "POST",
+      "path": "/api/profiles/newsletter/subscribers/sync/",
+      "body": {
+        "mode": "replace | upsert",
+        "emails": ["person@example.com"],
+        "confirm_empty": "Required true only for mode replace with an empty emails array."
+      },
+      "behavior": {
+        "replace": "The emails array becomes the full active set. Missing active addresses are unsubscribed.",
+        "upsert": "Adds and reactivates the emails. Does not remove anyone.",
+        "tokens": "An address that already exists keeps its unsubscribe token.",
+        "invalid_email": "The whole request is rejected and nothing is written.",
+        "limit": 10000
+      },
+      "response": {
+        "mode": "replace",
+        "created": ["new@example.com"],
+        "reactivated": ["back@example.com"],
+        "unchanged": ["keep@example.com"],
+        "deactivated": ["old@example.com"],
+        "active_count": 3,
+        "results": [
+          {
+            "email": "person@example.com",
+            "is_active": true,
+            "unsubscribe_url": "https://www.academiablockchain.com/api/profiles/newsletter/unsubscribe/<token>/",
+            "headers": {
+              "List-Unsubscribe": "<https://www.academiablockchain.com/api/profiles/newsletter/unsubscribe/<token>/>",
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "resolve_unsubscribe_links",
+      "purpose": "Look up links for specific emails without changing the list.",
+      "method": "POST",
+      "path": "/api/profiles/newsletter/unsubscribe-links/",
+      "body": {
+        "emails": ["person@example.com"]
+      },
+      "limit": 500,
+      "response": {
+        "results": [
+          {
+            "email": "person@example.com",
+            "found": true,
+            "is_active": true,
+            "unsubscribe_url": "https://www.academiablockchain.com/api/profiles/newsletter/unsubscribe/<token>/",
+            "headers": {
+              "List-Unsubscribe": "<https://www.academiablockchain.com/api/profiles/newsletter/unsubscribe/<token>/>",
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+            },
+            "detail": null
+          }
+        ]
+      },
+      "send_only_when": "found is true and is_active is true. An unknown address is not created."
+    },
+    {
+      "name": "public_unsubscribe",
+      "purpose": "The link a recipient opens. Vincent does not call this to build the list.",
+      "method": "GET then POST",
+      "path": "/api/profiles/newsletter/unsubscribe/<token>/",
+      "auth": "none",
+      "behavior": "GET shows a confirmation page and does not unsubscribe. POST, including List-Unsubscribe=One-Click, marks that email inactive."
+    }
+  ]
+}

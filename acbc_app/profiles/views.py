@@ -51,6 +51,11 @@ from profiles.newsletter import (
     unsubscribe_newsletter,
     NEWSLETTER_UNSUBSCRIBE_LOOKUP_LIMIT,
     resolve_newsletter_unsubscribe_links,
+    NEWSLETTER_SUBSCRIBER_SYNC_LIMIT,
+    NEWSLETTER_VINCENT_LIST_DEFAULT_PAGE_SIZE,
+    NewsletterSubscriberSyncError,
+    newsletter_vincent_subscriber_record,
+    sync_newsletter_subscribers,
 )
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
@@ -385,6 +390,126 @@ class NewsletterUnsubscribeLinkView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response({'results': resolve_newsletter_unsubscribe_links(emails)})
+
+
+class NewsletterSubscriberSyncView(APIView):
+    """
+    Replace or extend the stored newsletter list from Vincent's current recipients.
+
+    Body: ``{"mode": "replace"|"upsert", "emails": ["person@example.com", ...]}``.
+    ``replace`` makes that list the full active set. ``upsert`` only adds and
+    reactivates. An empty ``replace`` also needs ``"confirm_empty": true``.
+    """
+
+    authentication_classes = []
+    permission_classes = [VincentMachinePermission]
+
+    def post(self, request):
+        mode = request.data.get('mode')
+        emails = request.data.get('emails')
+        if mode not in ('replace', 'upsert'):
+            return Response(
+                {'detail': 'mode debe ser upsert o replace.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not isinstance(emails, list):
+            return Response(
+                {'detail': 'emails debe ser una lista de correos.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(emails) > NEWSLETTER_SUBSCRIBER_SYNC_LIMIT:
+            return Response(
+                {
+                    'detail': (
+                        f'Máximo {NEWSLETTER_SUBSCRIBER_SYNC_LIMIT} correos por solicitud.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if (
+            mode == 'replace'
+            and not emails
+            and request.data.get('confirm_empty') is not True
+        ):
+            return Response(
+                {
+                    'detail': (
+                        'Una lista vacía con mode replace daría de baja a todos. '
+                        'Envía confirm_empty: true si eso es lo que quieres.'
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            payload = sync_newsletter_subscribers(emails, mode=mode)
+        except NewsletterSubscriberSyncError as exc:
+            body = {'detail': exc.detail}
+            if exc.invalid_emails:
+                body['invalid_emails'] = exc.invalid_emails
+            return Response(body, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload)
+
+
+class NewsletterVincentSubscriberListView(APIView):
+    """
+    Full subscriber list for Vincent.
+
+    ``status`` is ``active`` (default), ``inactive``, or ``all``.
+    Pages are 1-based. ``page_size`` defaults to 1000 and cannot exceed 10000.
+    """
+
+    authentication_classes = []
+    permission_classes = [VincentMachinePermission]
+
+    def get(self, request):
+        status_filter = (request.query_params.get('status') or 'active').strip().lower()
+        if status_filter not in ('active', 'inactive', 'all'):
+            status_filter = 'active'
+        try:
+            page = int(request.query_params.get('page') or 1)
+            page_size = int(
+                request.query_params.get('page_size')
+                or NEWSLETTER_VINCENT_LIST_DEFAULT_PAGE_SIZE
+            )
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'page y page_size deben ser enteros.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if page < 1 or page_size < 1:
+            return Response(
+                {'detail': 'page y page_size deben ser mayores que cero.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        page_size = min(page_size, NEWSLETTER_SUBSCRIBER_SYNC_LIMIT)
+
+        rows = newsletter_subscribers_queryset(status_filter)
+        total = rows.count()
+        start = (page - 1) * page_size
+        page_rows = list(rows[start:start + page_size])
+
+        def page_url(number):
+            if number < 1 or (number - 1) * page_size >= total:
+                return None
+            query = request.GET.copy()
+            query['status'] = status_filter
+            query['page'] = str(number)
+            query['page_size'] = str(page_size)
+            return request.build_absolute_uri(f'{request.path}?{query.urlencode()}')
+
+        return Response({
+            'count': total,
+            'active_count': NewsletterSubscription.objects.filter(is_active=True).count(),
+            'inactive_count': NewsletterSubscription.objects.filter(is_active=False).count(),
+            'page': page,
+            'page_size': page_size,
+            'next': page_url(page + 1) if start + page_size < total else None,
+            'previous': page_url(page - 1) if page > 1 and total else None,
+            'results': [
+                newsletter_vincent_subscriber_record(row)
+                for row in page_rows
+            ],
+        })
 
 
 class CheckAuth(APIView):
