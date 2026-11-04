@@ -52,7 +52,9 @@ from profiles.newsletter import (
     NEWSLETTER_UNSUBSCRIBE_LOOKUP_LIMIT,
     resolve_newsletter_unsubscribe_links,
     NEWSLETTER_SUBSCRIBER_SYNC_LIMIT,
+    NEWSLETTER_VINCENT_LIST_DEFAULT_PAGE_SIZE,
     NewsletterSubscriberSyncError,
+    newsletter_vincent_subscriber_record,
     sync_newsletter_subscribers,
 )
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
@@ -446,6 +448,68 @@ class NewsletterSubscriberSyncView(APIView):
                 body['invalid_emails'] = exc.invalid_emails
             return Response(body, status=status.HTTP_400_BAD_REQUEST)
         return Response(payload)
+
+
+class NewsletterVincentSubscriberListView(APIView):
+    """
+    Full subscriber list for Vincent.
+
+    ``status`` is ``active`` (default), ``inactive``, or ``all``.
+    Pages are 1-based. ``page_size`` defaults to 1000 and cannot exceed 10000.
+    """
+
+    authentication_classes = []
+    permission_classes = [VincentMachinePermission]
+
+    def get(self, request):
+        status_filter = (request.query_params.get('status') or 'active').strip().lower()
+        if status_filter not in ('active', 'inactive', 'all'):
+            status_filter = 'active'
+        try:
+            page = int(request.query_params.get('page') or 1)
+            page_size = int(
+                request.query_params.get('page_size')
+                or NEWSLETTER_VINCENT_LIST_DEFAULT_PAGE_SIZE
+            )
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'page y page_size deben ser enteros.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if page < 1 or page_size < 1:
+            return Response(
+                {'detail': 'page y page_size deben ser mayores que cero.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        page_size = min(page_size, NEWSLETTER_SUBSCRIBER_SYNC_LIMIT)
+
+        rows = newsletter_subscribers_queryset(status_filter)
+        total = rows.count()
+        start = (page - 1) * page_size
+        page_rows = list(rows[start:start + page_size])
+
+        def page_url(number):
+            if number < 1 or (number - 1) * page_size >= total:
+                return None
+            query = request.GET.copy()
+            query['status'] = status_filter
+            query['page'] = str(number)
+            query['page_size'] = str(page_size)
+            return request.build_absolute_uri(f'{request.path}?{query.urlencode()}')
+
+        return Response({
+            'count': total,
+            'active_count': NewsletterSubscription.objects.filter(is_active=True).count(),
+            'inactive_count': NewsletterSubscription.objects.filter(is_active=False).count(),
+            'page': page,
+            'page_size': page_size,
+            'next': page_url(page + 1) if start + page_size < total else None,
+            'previous': page_url(page - 1) if page > 1 and total else None,
+            'results': [
+                newsletter_vincent_subscriber_record(row)
+                for row in page_rows
+            ],
+        })
 
 
 class CheckAuth(APIView):

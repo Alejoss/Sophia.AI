@@ -30,6 +30,7 @@ NEWSLETTER_SUBSCRIBED_EMAIL_SESSION_KEY = 'newsletter_subscribed_email'
 NEWSLETTER_SUCCESS_MESSAGE = 'Suscripción registrada correctamente.'
 NEWSLETTER_UNSUBSCRIBE_LOOKUP_LIMIT = 500
 NEWSLETTER_SUBSCRIBER_SYNC_LIMIT = 10000
+NEWSLETTER_VINCENT_LIST_DEFAULT_PAGE_SIZE = 1000
 NEWSLETTER_SYNC_SOURCE = 'vincent'
 
 
@@ -409,6 +410,21 @@ def resolve_newsletter_unsubscribe_links(emails) -> list:
             'detail': None,
         })
     return results
+
+
+def newsletter_vincent_subscriber_record(subscription) -> dict:
+    """One subscriber as Vincent should read it, including the baja link."""
+    url = newsletter_unsubscribe_url(subscription)
+    return {
+        'email': subscription.email,
+        'is_active': subscription.is_active,
+        'source': subscription.source,
+        'source_label': newsletter_source_display(subscription.source),
+        'created_at': subscription.created_at,
+        'unsubscribed_at': subscription.unsubscribed_at,
+        'unsubscribe_url': url,
+        'headers': newsletter_list_unsubscribe_headers(url),
+    }
 
 
 def newsletter_subscriber_payload(subscription) -> dict:

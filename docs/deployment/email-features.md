@@ -112,6 +112,12 @@ Same machine key. `mode` is required.
 
 The response lists `created`, `reactivated`, `unchanged`, and `deactivated`, plus `results` for every address in the request with `unsubscribe_url` and `headers`. Up to 10000 emails per call. New rows are tagged `source: vincent`. This does not email the administrators.
 
+To read the stored list back, without a staff login:
+
+`GET /api/profiles/newsletter/subscribers/all/`
+
+Same machine key. `status` is `active` (default), `inactive`, or `all`. `page` starts at 1. `page_size` defaults to 1000 and stops at 10000. Each row includes `unsubscribe_url` and `headers`. `count` is the size of the filtered list. `active_count` and `inactive_count` are the whole table. Follow `next` until it is null to read every page. Machine-readable description of these calls: [newsletter-vincent.json](../api/newsletter-vincent.json).
+
 The logo URL is absolute: `{FRONTEND_PUBLIC_URL}/images/logo.png` (same asset as the web header). Set `FRONTEND_PUBLIC_URL` (and `ACADEMIA_PUBLIC_URL` for Django admin links) in production so images and CTAs resolve correctly. This is **not** configured in the SMTP2GO template editor.
 
 ### Smoke test after deploy
