@@ -2464,6 +2464,49 @@ class CoursePurchasePaymentTests(TestCase):
         purchase.refresh_from_db()
         self.assertEqual(purchase.payment_status, 'PAID')
 
+    def test_same_title_live_course_links_to_the_published_page(self):
+        import importlib
+
+        from django.apps import apps
+
+        migration = importlib.import_module(
+            'payments.migrations.0021_link_course_landing_events',
+        )
+        course = Course.objects.get(code='real-historia-bitcoin')
+        matching = EventFactory(
+            owner=self.buyer,
+            title=course.title,
+            event_type='LIVE_COURSE',
+        )
+        other_type = EventFactory(
+            owner=self.buyer,
+            title=course.title,
+            event_type='LIVE_MASTER_CLASS',
+        )
+        deleted = EventFactory(
+            owner=self.buyer,
+            title=course.title,
+            event_type='LIVE_COURSE',
+            deleted=True,
+        )
+        other_title = EventFactory(
+            owner=self.buyer,
+            title='Otro curso en vivo',
+            event_type='LIVE_COURSE',
+        )
+
+        migration.link_published_course_events(apps, None)
+        migration.link_published_course_events(apps, None)
+
+        self.assertTrue(CourseEvent.objects.filter(course=course, event=matching).exists())
+        self.assertEqual(
+            CourseEvent.objects.filter(course=course, event=matching).count(),
+            1,
+        )
+        self.assertFalse(CourseEvent.objects.filter(event=other_type).exists())
+        self.assertFalse(CourseEvent.objects.filter(event=deleted).exists())
+        self.assertFalse(CourseEvent.objects.filter(event=other_title).exists())
+
     def test_course_links_one_path_and_many_events(self):
         from datetime import timedelta
         from django.utils import timezone

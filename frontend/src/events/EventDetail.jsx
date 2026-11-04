@@ -40,10 +40,13 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 const EventDetail = () => {
   const { t } = useTranslation('events');
@@ -408,6 +411,71 @@ const EventDetail = () => {
         <Chip color="primary" variant="outlined" label={getEventTypeLabel(event.event_type)} />
       </Stack>
 
+      {event.landing_page?.path && (
+        <Paper
+          component={Link}
+          to={event.landing_page.path}
+          elevation={0}
+          sx={{
+            mb: 2.5,
+            px: { xs: 2, sm: 2.5 },
+            py: 2,
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'stretch', sm: 'center' },
+            justifyContent: 'space-between',
+            gap: 2,
+            textDecoration: 'none',
+            color: 'inherit',
+            border: '2px solid',
+            borderColor: 'primary.main',
+            borderRadius: 2,
+            background: (theme) =>
+              `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.22)}, ${alpha(theme.palette.primary.main, 0.06)})`,
+            '&:hover': {
+              borderColor: 'primary.light',
+              background: (theme) =>
+                `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.32)}, ${alpha(theme.palette.primary.main, 0.12)})`,
+            },
+            '&:focus-visible': {
+              outline: '2px solid',
+              outlineColor: 'primary.light',
+              outlineOffset: 2,
+            },
+          }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <SchoolOutlinedIcon color="primary" sx={{ fontSize: 36 }} />
+            <Box>
+              <Typography variant="overline" color="primary.main" sx={{ lineHeight: 1.2 }}>
+                {t('card.courseBannerKicker')}
+              </Typography>
+              <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.25 }}>
+                {event.landing_page.title}
+              </Typography>
+            </Box>
+          </Stack>
+          <Box
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.75,
+              flexShrink: 0,
+              px: 2,
+              py: 1,
+              borderRadius: 1,
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+              fontWeight: 700,
+            }}
+          >
+            {t('card.viewCoursePage')}
+            <ArrowForwardIcon fontSize="small" />
+          </Box>
+        </Paper>
+      )}
+
       <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' } }}>
         <Card variant="outlined">
           <CardContent>
@@ -449,14 +517,6 @@ const EventDetail = () => {
               )}
               {event.schedule_description && (
                 <Typography variant="body2"><strong>{t('card.schedule')}</strong> {event.schedule_description}</Typography>
-              )}
-              {event.landing_page?.path && (
-                <Typography variant="body2">
-                  <strong>{t('card.landing')}</strong>{' '}
-                  <MuiLink component={Link} to={event.landing_page.path} underline="hover">
-                    {event.landing_page.title}
-                  </MuiLink>
-                </Typography>
               )}
             </Stack>
           </CardContent>

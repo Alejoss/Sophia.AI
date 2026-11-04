@@ -135,6 +135,36 @@ describe('EventDetail', () => {
     });
   });
 
+  it('shows a course page link at the top when the event has a landing page', async () => {
+    peekEventDetailCache.mockReturnValue({
+      ...mockEvent,
+      landing_page: {
+        course_code: 'real-historia-bitcoin',
+        title: 'La Real Historia de Bitcoin',
+        path: '/cursos/real-historia-bitcoin',
+      },
+    });
+
+    renderEventDetail();
+
+    const link = await screen.findByRole('link', { name: /ver página del curso/i });
+    expect(link).toHaveAttribute('href', '/cursos/real-historia-bitcoin');
+    expect(link).toHaveTextContent('La Real Historia de Bitcoin');
+    expect(link).toHaveTextContent('Este evento pertenece al curso');
+
+    const description = screen.getByRole('heading', { name: 'Descripción' });
+    expect(link.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('does not show a course page link when the event has no landing page', async () => {
+    peekEventDetailCache.mockReturnValue(mockEvent);
+
+    renderEventDetail();
+
+    expect(await screen.findByRole('heading', { level: 4, name: 'Evento de prueba' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /página del curso/i })).not.toBeInTheDocument();
+  });
+
   it('skips registration lookup for the event owner', async () => {
     peekEventDetailCache.mockReturnValue({
       ...mockEvent,
