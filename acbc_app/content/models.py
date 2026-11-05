@@ -990,6 +990,54 @@ class TopicChatQuery(models.Model):
         preview = (self.question or '')[:60]
         return f'TopicChatQuery({self.pk}, topic={self.topic_id}): {preview}'
 
+    @property
+    def is_pinned(self):
+        return self.pins.exists()
+
+
+class TopicChatPin(models.Model):
+    """
+    Publishes one consultation onto one indexed text.
+
+    A consultation is visible to everyone who can view the topic while it has
+    at least one pin. Removing the pins hides it again.
+    """
+
+    query = models.ForeignKey(
+        TopicChatQuery,
+        on_delete=models.CASCADE,
+        related_name='pins',
+    )
+    content = models.ForeignKey(
+        'Content',
+        on_delete=models.CASCADE,
+        related_name='topic_chat_pins',
+    )
+    pinned_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='topic_chat_pins',
+    )
+    pinned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-pinned_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['query', 'content'],
+                name='uniq_topic_chat_pin_query_content',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=['content', 'pinned_at'],
+                name='topic_chat_pin_content_at',
+            ),
+        ]
+
+    def __str__(self):
+        return f'TopicChatPin(query={self.query_id}, content={self.content_id})'
+
 
 class UnlimitedConsultationUser(models.Model):
     """

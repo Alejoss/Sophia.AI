@@ -10,12 +10,14 @@ import { renderWithProviders } from '../../test/formTestUtils';
 const mockGetContentDetails = vi.fn();
 const mockGetContentTranscript = vi.fn();
 const mockGetTranscriptAnchor = vi.fn();
+const mockListPublicTopicChatQueries = vi.fn();
 
 vi.mock('../../api/contentApi', () => ({
   default: {
     getContentDetails: (...args) => mockGetContentDetails(...args),
     getContentTranscript: (...args) => mockGetContentTranscript(...args),
     getTranscriptAnchor: (...args) => mockGetTranscriptAnchor(...args),
+    listPublicTopicChatQueries: (...args) => mockListPublicTopicChatQueries(...args),
   },
 }));
 
@@ -55,6 +57,10 @@ describe('ContentTranscriptPage', () => {
     mockGetTranscriptAnchor.mockResolvedValue({
       content_id: 50,
       anchor: null,
+    });
+    mockListPublicTopicChatQueries.mockResolvedValue({
+      count: 0,
+      results: [],
     });
   });
 

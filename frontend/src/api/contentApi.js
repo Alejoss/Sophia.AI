@@ -700,6 +700,31 @@ const contentApi = {
     return response.data;
   },
 
+  listPublicTopicChatQueries: async (topicId, params = {}) => {
+    const query = { limit: params.limit };
+    if (params.contentId) {
+      query.content_id = params.contentId;
+    }
+    const response = await axiosInstance.get(`/content/topics/${topicId}/chat/public/`, {
+      params: query,
+    });
+    return response.data;
+  },
+
+  pinTopicChatQuery: async (topicId, queryId, contentIds) => {
+    const response = await axiosInstance.post(
+      `/content/topics/${topicId}/chat/queries/${queryId}/pins/`,
+      { content_ids: contentIds },
+    );
+    return response.data;
+  },
+
+  unpinTopicChatQuery: async (topicId, queryId) => {
+    await axiosInstance.delete(
+      `/content/topics/${topicId}/chat/queries/${queryId}/pins/`,
+    );
+  },
+
   getTopicDetailsSimple: async (topicId) => {
     try {
       const response = await axiosInstance.get(`/content/topics/${topicId}/content-simple/`);

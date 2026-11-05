@@ -1,3 +1,4 @@
+import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -8,6 +9,8 @@ const mockListTopicChatQueries = vi.fn();
 const mockGetTopicChatQuery = vi.fn();
 const mockTopicChat = vi.fn();
 const mockListTopicChatSources = vi.fn();
+const mockListPublicTopicChatQueries = vi.fn();
+const mockPinTopicChatQuery = vi.fn();
 
 vi.mock('../../api/contentApi', () => ({
   default: {
@@ -15,6 +18,15 @@ vi.mock('../../api/contentApi', () => ({
     listTopicChatSources: (...args) => mockListTopicChatSources(...args),
     getTopicChatQuery: (...args) => mockGetTopicChatQuery(...args),
     topicChat: (...args) => mockTopicChat(...args),
+    listPublicTopicChatQueries: (...args) => mockListPublicTopicChatQueries(...args),
+    pinTopicChatQuery: (...args) => mockPinTopicChatQuery(...args),
+    unpinTopicChatQuery: vi.fn(),
+  },
+}));
+
+vi.mock('../../votes/VoteComponent', () => ({
+  default: function VoteStub() {
+    return <span>vote</span>;
   },
 }));
 
@@ -47,15 +59,23 @@ describe('TopicChat component', () => {
       count: indexedSources.length,
       results: indexedSources,
     });
+    mockListPublicTopicChatQueries.mockResolvedValue({
+      count: 0,
+      limit: 50,
+      results: [],
+    });
   });
 
-  it('renders login prompt when not authenticated', () => {
+  it('renders login prompt when not authenticated', async () => {
     renderWithProviders(<TopicChat topicId={5} />, {
       auth: unauthenticatedAuth(),
     });
 
     expect(
       screen.getByText(/inicia sesión para consultar los contenidos de este tema/i)
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/nadie ha fijado una consulta en este tema todavía/i)
     ).toBeInTheDocument();
   });
 
@@ -295,5 +315,80 @@ describe('TopicChat component', () => {
     const tokensLink = screen.getByRole('link', { name: /ir a mis tokens/i });
     expect(tokensLink.getAttribute('href')).toBe('/profiles/my_profile?section=tokens');
     expect(screen.getByRole('button', { name: /nueva consulta/i })).toBeDisabled();
+  });
+
+  it('shows pinned consultations to a guest', async () => {
+    mockListPublicTopicChatQueries.mockResolvedValue({
+      count: 1,
+      limit: 50,
+      results: [
+        {
+          id: 7,
+          topic_id: 5,
+          author_username: 'ana',
+          question: '¿Qué dice el libro sobre los bloques?',
+          answer: 'El libro describe un límite de tamaño [1].',
+          sources: [],
+          pinned_content_ids: [42],
+          vote_count: 3,
+          user_vote: 0,
+          can_unpin: false,
+        },
+      ],
+    });
+
+    renderWithProviders(<TopicChat topicId={5} />, {
+      auth: unauthenticatedAuth(),
+    });
+
+    expect(
+      screen.getByText(/inicia sesión para consultar los contenidos de este tema/i)
+    ).toBeInTheDocument();
+    expect(await screen.findByText(/qué dice el libro sobre los bloques/i)).toBeInTheDocument();
+    expect(screen.getByText(/fijada por ana/i)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/escribe tu pregunta/i)).not.toBeInTheDocument();
+  });
+
+  it('pins the open consultation onto a selected text', async () => {
+    const user = userEvent.setup();
+    mockTopicChat.mockResolvedValue({
+      id: 101,
+      topic_id: 5,
+      question: '¿Qué es Bitcoin?',
+      answer: 'Bitcoin es efectivo electrónico según el video [1].',
+      sources: [],
+      selected_content_ids: [88],
+      pinned_content_ids: [],
+      created_at: '2026-09-02T12:00:00Z',
+    });
+    mockPinTopicChatQuery.mockResolvedValue({
+      id: 101,
+      topic_id: 5,
+      question: '¿Qué es Bitcoin?',
+      answer: 'Bitcoin es efectivo electrónico según el video [1].',
+      sources: [],
+      selected_content_ids: [88],
+      pinned_content_ids: [88],
+      vote_count: 0,
+      user_vote: 0,
+      can_unpin: true,
+    });
+
+    renderWithProviders(<TopicChat topicId={5} />, {
+      auth: mockAuthValue,
+    });
+
+    await user.click(await screen.findByRole('checkbox', { name: /explicación en video/i }));
+    await user.type(screen.getByPlaceholderText(/escribe tu pregunta/i), '¿Qué es Bitcoin?');
+    await user.click(screen.getByRole('button', { name: /^consultar$/i }));
+
+    const pinTarget = await screen.findByRole('checkbox', { name: /explicación en video/i });
+    await user.click(pinTarget);
+    await user.click(screen.getByRole('button', { name: /fijar en el texto/i }));
+
+    await waitFor(() => {
+      expect(mockPinTopicChatQuery).toHaveBeenCalledWith(5, 101, [88]);
+    });
+    expect(await screen.findByText(/consulta visible en el texto/i)).toBeInTheDocument();
   });
 });

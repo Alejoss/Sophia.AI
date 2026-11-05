@@ -1885,8 +1885,13 @@ class TopicChatSourceSerializer(serializers.Serializer):
     embedded_at = serializers.DateTimeField(allow_null=True)
 
 
+def _pinned_content_ids(obj):
+    return [pin.content_id for pin in obj.pins.all()]
+
+
 class TopicChatQueryListSerializer(serializers.ModelSerializer):
     question_preview = serializers.SerializerMethodField()
+    pinned_content_ids = serializers.SerializerMethodField()
 
     class Meta:
         model = TopicChatQuery
@@ -1895,6 +1900,7 @@ class TopicChatQueryListSerializer(serializers.ModelSerializer):
             'topic_id',
             'question_preview',
             'selected_content_ids',
+            'pinned_content_ids',
             'created_at',
         ]
 
@@ -1904,8 +1910,13 @@ class TopicChatQueryListSerializer(serializers.ModelSerializer):
             return text
         return text[:117] + '…'
 
+    def get_pinned_content_ids(self, obj):
+        return _pinned_content_ids(obj)
+
 
 class TopicChatQuerySerializer(serializers.ModelSerializer):
+    pinned_content_ids = serializers.SerializerMethodField()
+
     class Meta:
         model = TopicChatQuery
         fields = [
@@ -1917,9 +1928,64 @@ class TopicChatQuerySerializer(serializers.ModelSerializer):
             'retrieved_chunk_count',
             'used_chunk_count',
             'selected_content_ids',
+            'pinned_content_ids',
             'created_at',
         ]
         read_only_fields = fields
+
+    def get_pinned_content_ids(self, obj):
+        return _pinned_content_ids(obj)
+
+
+class TopicChatPinRequestSerializer(serializers.Serializer):
+    """Body for POST …/chat/queries/{id}/pins/. Replaces the consultation's pin set."""
+
+    content_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False,
+        max_length=100,
+    )
+
+    def validate_content_ids(self, value):
+        seen = set()
+        ordered = []
+        for cid in value:
+            if cid in seen:
+                continue
+            seen.add(cid)
+            ordered.append(cid)
+        return ordered
+
+
+class TopicChatPublicQuerySerializer(serializers.Serializer):
+    """A consultation that is pinned to at least one text."""
+
+    id = serializers.IntegerField()
+    topic_id = serializers.IntegerField()
+    author_id = serializers.IntegerField(source='user_id')
+    author_username = serializers.CharField(source='user.username')
+    question = serializers.CharField()
+    answer = serializers.CharField()
+    sources = serializers.JSONField()
+    selected_content_ids = serializers.JSONField()
+    pinned_content_ids = serializers.SerializerMethodField()
+    pinned_at = serializers.DateTimeField(allow_null=True)
+    vote_count = serializers.IntegerField()
+    user_vote = serializers.IntegerField()
+    can_unpin = serializers.SerializerMethodField()
+
+    def get_pinned_content_ids(self, obj):
+        return _pinned_content_ids(obj)
+
+    def get_can_unpin(self, obj):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if user is None or not user.is_authenticated:
+            return False
+        if obj.user_id == user.id or user.is_staff:
+            return True
+        topic = obj.topic
+        return topic.is_moderator_or_creator(user)
 
 
 class ContentEmbeddingAckSerializer(serializers.Serializer):

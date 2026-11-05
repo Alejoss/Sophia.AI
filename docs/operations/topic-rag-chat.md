@@ -173,7 +173,58 @@ the Consultas UI can link there when remaining is 0.
 GET /api/content/topics/{topic_id}/chat/queries/{query_id}/
 ```
 
-Same shape as the create response. Other users get **404**.
+Same shape as the create response, plus `pinned_content_ids` (empty until the author pins it). Other users get **404**.
+
+### Pin a consultation to a text
+
+Pinning publishes the consultation. It stays public while it has at least one pin. The author chooses indexed texts that this consultation used (`selected_content_ids`). When that list is empty, any indexed text in the topic is eligible.
+
+```http
+POST /api/content/topics/{topic_id}/chat/queries/{query_id}/pins/
+Authorization: Bearer <JWT>
+Content-Type: application/json
+```
+
+```json
+{ "content_ids": [46] }
+```
+
+Author only. **201** returns the public card (`pinned_content_ids`, `vote_count`, `user_vote`, `can_unpin`). A later POST replaces the pin set. **400** `invalid_content_ids` when a text is not eligible. Other users get **404**.
+
+```http
+DELETE /api/content/topics/{topic_id}/chat/queries/{query_id}/pins/
+```
+
+Author, topic creator, or moderator. **204**. The private `TopicChatQuery` remains. Votes stay stored and show again if it is pinned once more.
+
+### List pinned consultations
+
+Reading does not require Consultas purchase. The topic must be visible to the caller and `chat_enabled` must be true.
+
+```http
+GET /api/content/topics/{topic_id}/chat/public/?content_id=46&limit=50
+```
+
+`content_id` is optional. Results are ordered by net vote score, then earliest pin time.
+
+```http
+GET /api/content/topics/{topic_id}/chat/public/{query_id}/
+```
+
+**404** when the consultation has no pins, or the topic is hidden.
+
+### Vote
+
+```http
+POST /api/votes/topics/{topic_id}/consultations/{query_id}/vote/
+Authorization: Bearer <JWT>
+```
+
+```json
+{ "action": "upvote" }
+```
+
+`action` is `upvote`, `downvote`, or `remove`. Same toggle as content votes. **404** while the consultation is not pinned. `GET` on the same path returns `{ "vote_count", "user_vote" }` and allows anonymous readers (`user_vote` is 0). An upvote notifies the author. Voting on your own consultation does not.
 
 ### Errors (create)
 

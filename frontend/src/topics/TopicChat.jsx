@@ -20,6 +20,7 @@ import contentApi from '../api/contentApi';
 import { useAuth } from '../context/AuthContext';
 import { getTopicContentPath } from '../utils/urlUtils';
 import { useDateLocales } from '../hooks/useDateLocales';
+import PublicConsultations from './PublicConsultations';
 
 function formatQueryDate(iso, intl) {
   if (!iso) return '';
@@ -370,10 +371,135 @@ function TranscriptChecklist({
   );
 }
 
+function pinCandidates(query, sources) {
+  const byId = {};
+  sources.forEach((src) => {
+    byId[src.content_id] = src;
+  });
+  const selected = Array.isArray(query.selected_content_ids) ? query.selected_content_ids : [];
+  const ids = selected.length ? selected : sources.map((src) => src.content_id);
+  return ids.map((id) => byId[id] || { content_id: id, title: '', media_type: '' });
+}
+
+function PinControls({ topicId, query, sources, onPinned, onUnpinned }) {
+  const { t } = useTranslation('topics');
+  const pinnedKey = (query.pinned_content_ids || []).join(',');
+  const [selected, setSelected] = useState(() => query.pinned_content_ids || []);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [error, setError] = useState(null);
+  const candidates = pinCandidates(query, sources);
+  const isPinned = (query.pinned_content_ids || []).length > 0;
+
+  useEffect(() => {
+    setSelected(query.pinned_content_ids || []);
+    setMessage(null);
+    setError(null);
+  }, [query.id]);
+
+  useEffect(() => {
+    setSelected(query.pinned_content_ids || []);
+  }, [pinnedKey]);
+
+  const toggle = (contentId) => {
+    setSelected((prev) => (
+      prev.includes(contentId)
+        ? prev.filter((id) => id !== contentId)
+        : [...prev, contentId]
+    ));
+  };
+
+  const pin = async () => {
+    if (selected.length === 0) {
+      setError(t('chat.selectPinTarget'));
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const data = await contentApi.pinTopicChatQuery(topicId, query.id, selected);
+      setMessage(t('chat.pinSaved'));
+      onPinned(data);
+    } catch (err) {
+      const detail = err?.response?.data?.error;
+      setError(typeof detail === 'string' ? detail : t('chat.pinError'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const unpin = async () => {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await contentApi.unpinTopicChatQuery(topicId, query.id);
+      setSelected([]);
+      setMessage(t('chat.unpinSaved'));
+      onUnpinned(query.id);
+    } catch {
+      setError(t('chat.unpinError'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!candidates.length) return null;
+
+  return (
+    <Box
+      sx={{
+        border: '1px solid',
+        borderColor: 'divider',
+        px: { xs: 1.5, sm: 2.5 },
+        py: 2,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+      }}
+    >
+      <Typography variant="subtitle2">{t('chat.pinTitle')}</Typography>
+      <Typography variant="caption" color="text.secondary">
+        {t('chat.pinHelp')}
+      </Typography>
+      <FormGroup>
+        {candidates.map((src) => (
+          <FormControlLabel
+            key={src.content_id}
+            control={(
+              <Checkbox
+                size="small"
+                checked={selected.includes(src.content_id)}
+                onChange={() => toggle(src.content_id)}
+                disabled={saving}
+              />
+            )}
+            label={src.title || t('chat.contentId', { id: src.content_id })}
+          />
+        ))}
+      </FormGroup>
+      {message && <Alert severity="success" sx={{ borderRadius: 0 }}>{message}</Alert>}
+      {error && <Alert severity="error" sx={{ borderRadius: 0 }}>{error}</Alert>}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+        {isPinned && (
+          <Button size="small" color="inherit" onClick={unpin} disabled={saving}>
+            {t('chat.unpin')}
+          </Button>
+        )}
+        <Button size="small" variant="contained" onClick={pin} disabled={saving || selected.length === 0}>
+          {isPinned ? t('chat.pinUpdate') : t('chat.pinAction')}
+        </Button>
+      </Box>
+    </Box>
+  );
+}
+
 /**
  * Independent topic consultations (one question → one answer), with history.
+ * Pinned consultations are listed for anyone who can open the topic.
  */
-function TopicChat({ topicId }) {
+function TopicChat({ topicId, canCreate = true }) {
   const { t } = useTranslation('topics');
   const { intl } = useDateLocales();
   const { isAuthenticated } = useAuth();
@@ -390,6 +516,7 @@ function TopicChat({ topicId }) {
   const [dailyLimit, setDailyLimit] = useState(null);
   const [dailyRemaining, setDailyRemaining] = useState(null);
   const [tokensUrl, setTokensUrl] = useState('/profiles/my_profile?section=tokens');
+  const [publicVersion, setPublicVersion] = useState(0);
 
   const sourceById = useMemo(() => {
     const map = {};
@@ -421,7 +548,7 @@ function TopicChat({ topicId }) {
       : t('chat.limitReachedGeneric');
 
   const loadHistory = useCallback(async () => {
-    if (!isAuthenticated || !topicId) return;
+    if (!isAuthenticated || !canCreate || !topicId) return;
     setHistoryLoading(true);
     try {
       const data = await contentApi.listTopicChatQueries(topicId);
@@ -439,10 +566,10 @@ function TopicChat({ topicId }) {
     } finally {
       setHistoryLoading(false);
     }
-  }, [isAuthenticated, topicId]);
+  }, [isAuthenticated, canCreate, topicId]);
 
   const loadSources = useCallback(async () => {
-    if (!isAuthenticated || !topicId) return;
+    if (!isAuthenticated || !canCreate || !topicId) return;
     setSourcesLoading(true);
     try {
       const data = await contentApi.listTopicChatSources(topicId);
@@ -456,20 +583,40 @@ function TopicChat({ topicId }) {
     } finally {
       setSourcesLoading(false);
     }
-  }, [isAuthenticated, topicId]);
+  }, [isAuthenticated, canCreate, topicId]);
 
   useEffect(() => {
     loadHistory();
     loadSources();
   }, [loadHistory, loadSources]);
 
-  if (!isAuthenticated) {
-    return (
-      <Alert severity="info" sx={{ borderRadius: 0, mb: 4 }}>
-        {t('chat.loginRequired')}
-      </Alert>
-    );
-  }
+  const showComposer = isAuthenticated && canCreate;
+
+  const onPinned = (data) => {
+    setActiveQuery((current) => (
+      current && current.id === data.id
+        ? { ...current, ...data }
+        : current
+    ));
+    setHistory((prev) => prev.map((item) => (
+      item.id === data.id
+        ? { ...item, pinned_content_ids: data.pinned_content_ids || [] }
+        : item
+    )));
+    setPublicVersion((version) => version + 1);
+  };
+
+  const onUnpinned = (queryId) => {
+    setActiveQuery((current) => (
+      current && current.id === queryId
+        ? { ...current, pinned_content_ids: [] }
+        : current
+    ));
+    setHistory((prev) => prev.map((item) => (
+      item.id === queryId ? { ...item, pinned_content_ids: [] } : item
+    )));
+    setPublicVersion((version) => version + 1);
+  };
 
   const startNewConsultation = () => {
     if (atDailyLimit) {
@@ -594,6 +741,13 @@ function TopicChat({ topicId }) {
         pb: 1,
       }}
     >
+      {!isAuthenticated && (
+        <Alert severity="info" sx={{ borderRadius: 0 }}>
+          {t('chat.loginRequired')}
+        </Alert>
+      )}
+
+      {showComposer && (
       <Typography variant="body2" color="text.secondary">
         {t('chat.intro')}
         {dailyLimit != null && (
@@ -604,7 +758,10 @@ function TopicChat({ topicId }) {
           </>
         )}
       </Typography>
+      )}
 
+      {showComposer && (
+      <>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Button
           variant="outlined"
@@ -683,11 +840,22 @@ function TopicChat({ topicId }) {
           </Box>
         </Box>
       ) : (
-        <ConsultationView
-          query={activeQuery}
-          topicId={topicId}
-          sourceById={sourceById}
-        />
+        <>
+          <ConsultationView
+            query={activeQuery}
+            topicId={topicId}
+            sourceById={sourceById}
+          />
+          {activeQuery && (
+            <PinControls
+              topicId={topicId}
+              query={activeQuery}
+              sources={sources}
+              onPinned={onPinned}
+              onUnpinned={onUnpinned}
+            />
+          )}
+        </>
       )}
 
       <Divider />
@@ -750,6 +918,9 @@ function TopicChat({ topicId }) {
                     {selectedCount > 0
                       ? t('chat.files', { count: selectedCount })
                       : t('chat.allFiles')}
+                    {(item.pinned_content_ids || []).length > 0
+                      ? ` · ${t('chat.pinnedBadge')}`
+                      : ''}
                   </Typography>
                 </Box>
               );
@@ -757,6 +928,12 @@ function TopicChat({ topicId }) {
           </Box>
         )}
       </Box>
+      </>
+      )}
+
+      <Divider />
+
+      <PublicConsultations key={publicVersion} topicId={topicId} showEmpty />
     </Box>
   );
 }

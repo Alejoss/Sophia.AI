@@ -4,19 +4,26 @@ from __future__ import annotations
 
 import logging
 
+from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
+from django.db.models import Exists, IntegerField, OuterRef, Subquery, Value
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from content.models import ContentEmbedding, Topic, TopicChatQuery
+from content.models import ContentEmbedding, Topic, TopicChatPin, TopicChatQuery
 from content.serializers import (
+    TopicChatPinRequestSerializer,
+    TopicChatPublicQuerySerializer,
     TopicChatQueryListSerializer,
     TopicChatQuerySerializer,
     TopicChatRequestSerializer,
     TopicChatSourceSerializer,
 )
+from votes.models import Vote, VoteCount
 from content.topic_access import user_has_topic_consultas_access
 from content.topic_chat import TopicChatError, run_topic_chat, topic_chat_ready
 from content.topic_chat_quota import daily_quota_exceeded_payload, daily_quota_payload
@@ -268,7 +275,10 @@ class TopicChatQueryListView(APIView):
         if unpaid:
             return unpaid
 
-        qs = TopicChatQuery.objects.filter(topic=topic, user=request.user)
+        qs = (
+            TopicChatQuery.objects.filter(topic=topic, user=request.user)
+            .prefetch_related('pins')
+        )
         try:
             limit = int(request.query_params.get('limit', 50))
         except (TypeError, ValueError):
@@ -305,14 +315,272 @@ class TopicChatQueryDetailView(APIView):
         if unpaid:
             return unpaid
 
-        query = TopicChatQuery.objects.filter(
-            pk=query_id,
-            topic=topic,
-            user=request.user,
-        ).first()
+        query = (
+            TopicChatQuery.objects.filter(
+                pk=query_id,
+                topic=topic,
+                user=request.user,
+            )
+            .prefetch_related('pins')
+            .first()
+        )
         if query is None:
             return Response(
                 {'error': 'Consulta no encontrada'},
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(TopicChatQuerySerializer(query).data)
+
+
+def _can_unpin(user, query):
+    if user is None or not user.is_authenticated:
+        return False
+    if query.user_id == user.id or user.is_staff:
+        return True
+    return query.topic.is_moderator_or_creator(user)
+
+
+def _eligible_pin_content_ids(topic, query):
+    """Indexed texts this consultation is allowed to be pinned to."""
+    indexed_ids = set(_indexed_contents_qs(topic).values_list('id', flat=True))
+    selected = list(query.selected_content_ids or [])
+    if selected:
+        return indexed_ids.intersection(selected)
+    return indexed_ids
+
+
+def _parse_optional_content_id(request):
+    raw = request.query_params.get('content_id')
+    if raw is None or raw == '':
+        return None, None
+    try:
+        content_id = int(raw)
+    except (TypeError, ValueError):
+        return None, Response(
+            {'error': 'content_id debe ser un entero.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if content_id < 1:
+        return None, Response(
+            {'error': 'content_id debe ser un entero.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return content_id, None
+
+
+def _public_queries(topic, user, content_id=None):
+    """Pinned consultations with vote score and the viewer's own vote."""
+    pin_exists = TopicChatPin.objects.filter(query_id=OuterRef('pk'))
+    if content_id is not None:
+        pin_exists = pin_exists.filter(content_id=content_id)
+    first_pin = (
+        TopicChatPin.objects.filter(query_id=OuterRef('pk'))
+        .order_by('pinned_at')
+        .values('pinned_at')[:1]
+    )
+    content_type = ContentType.objects.get_for_model(TopicChatQuery)
+    vote_count_sq = VoteCount.objects.filter(
+        content_type=content_type,
+        object_id=OuterRef('pk'),
+        topic_id=OuterRef('topic_id'),
+    ).values('vote_count')[:1]
+    if user is not None and user.is_authenticated:
+        user_vote_expr = Coalesce(
+            Subquery(
+                Vote.objects.filter(
+                    content_type=content_type,
+                    object_id=OuterRef('pk'),
+                    topic_id=OuterRef('topic_id'),
+                    user_id=user.id,
+                ).values('value')[:1],
+                output_field=IntegerField(),
+            ),
+            Value(0),
+        )
+    else:
+        user_vote_expr = Value(0, output_field=IntegerField())
+
+    return (
+        TopicChatQuery.objects.filter(topic=topic)
+        .filter(Exists(pin_exists))
+        .annotate(
+            pinned_at=Subquery(first_pin),
+            vote_count=Coalesce(
+                Subquery(vote_count_sq, output_field=IntegerField()),
+                Value(0),
+            ),
+            user_vote=user_vote_expr,
+        )
+        .select_related('user', 'topic')
+        .prefetch_related('pins', 'topic__moderators')
+        .order_by('-vote_count', '-pinned_at', '-id')
+    )
+
+
+def _serialize_public(request, queries):
+    return TopicChatPublicQuerySerializer(
+        queries,
+        many=True,
+        context={'request': request},
+    ).data
+
+
+class TopicChatPublicListView(APIView):
+    """GET pinned consultations for a topic. Reading does not require purchase."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk):
+        topic, error_response = _get_viewable_topic(request, pk)
+        if error_response:
+            return error_response
+        disabled = _require_chat_enabled(topic)
+        if disabled:
+            return disabled
+
+        content_id, error_response = _parse_optional_content_id(request)
+        if error_response:
+            return error_response
+
+        try:
+            limit = int(request.query_params.get('limit', 50))
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'limit debe ser un entero.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        limit = max(1, min(limit, 100))
+
+        qs = _public_queries(topic, request.user, content_id=content_id)
+        total = qs.count()
+        items = list(qs[:limit])
+        return Response({
+            'count': total,
+            'limit': limit,
+            'results': _serialize_public(request, items),
+        })
+
+
+class TopicChatPublicDetailView(APIView):
+    """GET one pinned consultation. 404 while it has no pins."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk, query_id):
+        topic, error_response = _get_viewable_topic(request, pk)
+        if error_response:
+            return error_response
+        disabled = _require_chat_enabled(topic)
+        if disabled:
+            return disabled
+
+        query = _public_queries(topic, request.user).filter(pk=query_id).first()
+        if query is None:
+            return Response(
+                {'error': 'Consulta no encontrada'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(
+            TopicChatPublicQuerySerializer(
+                query,
+                context={'request': request},
+            ).data
+        )
+
+
+class TopicChatQueryPinView(APIView):
+    """Author pins a consultation onto texts. Author or moderator can unpin."""
+
+    permission_classes = [IsAuthenticated]
+
+    def _owned_query(self, request, topic, query_id):
+        return (
+            TopicChatQuery.objects.filter(
+                pk=query_id,
+                topic=topic,
+                user=request.user,
+            )
+            .prefetch_related('pins')
+            .first()
+        )
+
+    def post(self, request, pk, query_id):
+        topic, error_response = _get_viewable_topic(request, pk)
+        if error_response:
+            return error_response
+        disabled = _require_chat_enabled(topic)
+        if disabled:
+            return disabled
+
+        query = self._owned_query(request, topic, query_id)
+        if query is None:
+            return Response(
+                {'error': 'Consulta no encontrada'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = TopicChatPinRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        content_ids = serializer.validated_data['content_ids']
+        eligible = _eligible_pin_content_ids(topic, query)
+        invalid = [cid for cid in content_ids if cid not in eligible]
+        if invalid:
+            return Response(
+                {
+                    'error': (
+                        'Solo puedes fijar la consulta en textos indexados '
+                        'que formaron parte de esta consulta.'
+                    ),
+                    'invalid_content_ids': invalid,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        desired = set(content_ids)
+        with transaction.atomic():
+            existing = {
+                pin.content_id: pin
+                for pin in query.pins.select_for_update()
+            }
+            for content_id, pin in existing.items():
+                if content_id not in desired:
+                    pin.delete()
+            for content_id in content_ids:
+                if content_id not in existing:
+                    TopicChatPin.objects.create(
+                        query=query,
+                        content_id=content_id,
+                        pinned_by=request.user,
+                    )
+
+        published = _public_queries(topic, request.user).filter(pk=query.pk).first()
+        return Response(
+            TopicChatPublicQuerySerializer(
+                published,
+                context={'request': request},
+            ).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def delete(self, request, pk, query_id):
+        topic, error_response = _get_viewable_topic(request, pk)
+        if error_response:
+            return error_response
+        disabled = _require_chat_enabled(topic)
+        if disabled:
+            return disabled
+
+        query = (
+            TopicChatQuery.objects.filter(pk=query_id, topic=topic)
+            .select_related('topic')
+            .first()
+        )
+        if query is None or not _can_unpin(request.user, query):
+            return Response(
+                {'error': 'Consulta no encontrada'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        query.pins.all().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

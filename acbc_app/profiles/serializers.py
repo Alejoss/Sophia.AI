@@ -387,6 +387,15 @@ class NotificationSerializer(serializers.ModelSerializer):
                     return obj.target.original_title or None
                 return obj.target.title if hasattr(obj.target, 'title') else None
 
+            if self._verb_is(verb, 'votó positivamente tu consulta') and obj.target:
+                question = getattr(obj.target, 'question', None)
+                if not question:
+                    return None
+                text = question.strip()
+                if len(text) > 80:
+                    return text[:77] + '…'
+                return text
+
             return None
         except Exception as e:
             logger.error("Error getting context title", extra={
@@ -456,6 +465,12 @@ class NotificationSerializer(serializers.ModelSerializer):
 
             if self._verb_is(verb, 'votó positivamente tu contenido') and obj.target:
                 return f'/content/{obj.target.id}/library' if hasattr(obj.target, 'id') else None
+
+            if self._verb_is(verb, 'votó positivamente tu consulta') and obj.target:
+                topic_id = getattr(obj.target, 'topic_id', None)
+                if topic_id:
+                    return f'/content/topics/{topic_id}?tab=consultations'
+                return None
 
             # For event registrations
             if self._verb_in(verb, EVENT_TARGET_VERB_KEYS) and obj.target:
@@ -543,6 +558,8 @@ class NotificationSerializer(serializers.ModelSerializer):
         elif notification.verb == 'rechazó tu solicitud de certificado para':
             return notification.description
         elif notification.verb == 'votó positivamente tu contenido':
+            return notification.description
+        elif notification.verb == 'votó positivamente tu consulta':
             return notification.description
         elif notification.verb == 'votó positivamente tu camino de conocimiento':
             return notification.description
