@@ -162,6 +162,8 @@
     "retrieved": " / retrieved: {{count}}",
     "communityTitle": "Pinned consultations",
     "communityHelp": "Consultations someone pinned so everyone can see them on this topic.",
+    "communityCount_one": "{{count}} consultation",
+    "communityCount_other": "{{count}} consultations",
     "communityEmpty": "No one has pinned a consultation in this topic yet.",
     "communityLoading": "Loading pinned consultations…",
     "communityLoadError": "Could not load the pinned consultations.",

@@ -65,6 +65,7 @@ describe('TopicChat component', () => {
   });
 
   it('renders login prompt when not authenticated', async () => {
+    const user = userEvent.setup();
     renderWithProviders(<TopicChat topicId={5} />, {
       auth: unauthenticatedAuth(),
     });
@@ -72,8 +73,13 @@ describe('TopicChat component', () => {
     expect(
       screen.getByText(/inicia sesión para consultar los contenidos de este tema/i)
     ).toBeInTheDocument();
+    expect(await screen.findByText(/0 consultas/i)).toBeInTheDocument();
     expect(
-      await screen.findByText(/nadie ha fijado una consulta en este tema todavía/i)
+      screen.queryByText(/nadie ha fijado una consulta en este tema todavía/i)
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /consultas fijadas/i }));
+    expect(
+      screen.getByText(/nadie ha fijado una consulta en este tema todavía/i)
     ).toBeInTheDocument();
   });
 
@@ -310,6 +316,7 @@ describe('TopicChat component', () => {
   });
 
   it('shows pinned consultations to a guest', async () => {
+    const user = userEvent.setup();
     mockListPublicTopicChatQueries.mockResolvedValue({
       count: 1,
       limit: 50,
@@ -336,7 +343,10 @@ describe('TopicChat component', () => {
     expect(
       screen.getByText(/inicia sesión para consultar los contenidos de este tema/i)
     ).toBeInTheDocument();
-    expect(await screen.findByText(/qué dice el libro sobre los bloques/i)).toBeInTheDocument();
+    expect(await screen.findByText(/1 consulta/i)).toBeInTheDocument();
+    expect(screen.queryByText(/qué dice el libro sobre los bloques/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /consultas fijadas/i }));
+    expect(screen.getByText(/qué dice el libro sobre los bloques/i)).toBeInTheDocument();
     expect(screen.getByText(/fijada por ana/i)).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/escribe tu pregunta/i)).not.toBeInTheDocument();
   });
