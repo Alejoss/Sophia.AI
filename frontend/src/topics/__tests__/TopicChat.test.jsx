@@ -36,14 +36,12 @@ const indexedSources = [
     title: 'Libro Blanco Bitcoin',
     media_type: 'VIDEO',
     original_author: 'Satoshi',
-    chunk_count: 3,
   },
   {
     content_id: 88,
     title: 'Explicación en Video',
     media_type: 'VIDEO',
     original_author: '',
-    chunk_count: 5,
   },
 ];
 
@@ -110,6 +108,7 @@ describe('TopicChat component', () => {
 
     const firstRadio = screen.getByRole('radio', { name: /libro blanco bitcoin/i });
     const secondRadio = screen.getByRole('radio', { name: /explicación en video/i });
+    expect(screen.queryByText(/fragmentos/i)).not.toBeInTheDocument();
     expect(firstRadio).not.toBeChecked();
     expect(secondRadio).not.toBeChecked();
     expect(screen.queryByRole('button', { name: /^todas$/i })).not.toBeInTheDocument();

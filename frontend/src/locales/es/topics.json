@@ -147,7 +147,6 @@
     "files_one": " · {{count}} archivo",
     "files_other": " · {{count}} archivos",
     "allFiles": " · todos los archivos",
-    "fragments": " · {{count}} fragmentos",
     "text": "Texto",
     "audio": "Audio",
     "video": "Video",
