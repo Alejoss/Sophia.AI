@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import {
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import ProfileVerticalNavigation, {
   getProfileMenuItems,
   getProfileMenuConfig,
   SHOW_FAVORITE_CRYPTOS_SECTION,
@@ -28,5 +30,31 @@ describe('getProfileMenuItems', () => {
       ),
     ).toBe(false);
     expect(mobileMenuItems.some((item) => item.section === 'tokens')).toBe(true);
+  });
+});
+
+describe('ProfileVerticalNavigation messages link', () => {
+  it('links to the inbox at the bottom of the own-profile sidebar', () => {
+    render(
+      <MemoryRouter>
+        <ProfileVerticalNavigation isOwnProfile />
+      </MemoryRouter>,
+    );
+
+    const messages = screen.getByRole('link', { name: 'Mensajes' });
+    expect(messages).toHaveAttribute('href', '/messages');
+
+    const links = screen.getAllByRole('link');
+    expect(links[links.length - 1]).toBe(messages);
+  });
+
+  it('hides the inbox link when viewing another profile', () => {
+    render(
+      <MemoryRouter>
+        <ProfileVerticalNavigation isOwnProfile={false} userId={4} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('link', { name: 'Mensajes' })).not.toBeInTheDocument();
   });
 });

@@ -10,6 +10,7 @@ from content.models import (
     ContentSuggestion,
     FileSuggestion,
     Topic,
+    TopicChatQuery,
     TopicModeratorInvitation,
     TopicCreationRequest,
 )
@@ -812,6 +813,52 @@ def notify_content_upvote(vote):
             'content_id': content.id if 'content' in locals() else None,
             'voter_id': vote.user.id,
         }, exc_info=True)
+
+def notify_topic_consultation_upvote(vote):
+    """Notify the consultation author when someone else upvotes a pinned consultation."""
+    try:
+        query = vote.content_object
+        if not isinstance(query, TopicChatQuery):
+            return
+        if vote.user_id == query.user_id:
+            logger.info("User is upvoting their own consultation - skipping notification", extra={
+                'vote_id': vote.id,
+                'query_id': query.id,
+            })
+            return
+
+        voter_ct = ContentType.objects.get_for_model(vote.user)
+        query_ct = ContentType.objects.get_for_model(TopicChatQuery)
+        verb = 'votó positivamente tu consulta'
+        if Notification.objects.filter(
+            recipient_id=query.user_id,
+            actor_content_type=voter_ct,
+            actor_object_id=vote.user_id,
+            target_content_type=query_ct,
+            target_object_id=query.id,
+        ).filter(matching_verb_q(verb)).exists():
+            return
+
+        preview = (query.question or '').strip()
+        if len(preview) > 80:
+            preview = preview[:77] + '…'
+        create_notification(
+            recipient=query.user,
+            actor_content_type=voter_ct,
+            actor_object_id=vote.user_id,
+            verb=verb,
+            target_content_type=query_ct,
+            target_object_id=query.id,
+            description=(
+                f'{vote.user.username} votó positivamente tu consulta'
+                + (f' "{preview}"' if preview else '')
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Error creating consultation upvote notification: {str(e)}", extra={
+            'vote_id': getattr(vote, 'id', None),
+        }, exc_info=True)
+
 
 def notify_knowledge_path_upvote(vote):
     """

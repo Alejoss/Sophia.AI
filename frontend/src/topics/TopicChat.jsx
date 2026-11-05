@@ -11,6 +11,8 @@ import {
   FormGroup,
   FormControlLabel,
   Checkbox,
+  RadioGroup,
+  Radio,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import SendIcon from '@mui/icons-material/Send';
@@ -20,6 +22,7 @@ import contentApi from '../api/contentApi';
 import { useAuth } from '../context/AuthContext';
 import { getTopicContentPath } from '../utils/urlUtils';
 import { useDateLocales } from '../hooks/useDateLocales';
+import PublicConsultations from './PublicConsultations';
 
 function formatQueryDate(iso, intl) {
   if (!iso) return '';
@@ -122,7 +125,9 @@ function SelectedTranscriptsSummary({ selectedContentIds, sourceById, topicId })
   return (
     <Box sx={{ mt: 1.5, px: 0.5 }}>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
-        {t('chat.selectedFiles', { count: selectedContentIds.length })}
+        {selectedContentIds.length === 1
+          ? t('chat.selectedFile')
+          : t('chat.selectedFiles', { count: selectedContentIds.length })}
       </Typography>
       <Box
         component="ul"
@@ -236,12 +241,10 @@ function ConsultationView({ query, topicId, sourceById }) {
   );
 }
 
-function TranscriptChecklist({
+function TranscriptPicker({
   sources,
-  selectedIds,
-  onToggle,
-  onSelectAll,
-  onClear,
+  selectedId,
+  onSelect,
   disabled,
   loading,
 }) {
@@ -265,45 +268,21 @@ function TranscriptChecklist({
     );
   }
 
-  const allSelected = selectedIds.length === sources.length;
-  const showAllSelectedWarning = allSelected && sources.length > 1;
-
   return (
     <Box>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 1,
-          flexWrap: 'wrap',
-          mb: 1,
-        }}
-      >
-        <Typography variant="subtitle2">
-          {t('chat.contentsCount', { selected: selectedIds.length, total: sources.length })}
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button size="small" onClick={onSelectAll} disabled={disabled || allSelected}>
-            {t('chat.all')}
-          </Button>
-          <Button size="small" onClick={onClear} disabled={disabled || selectedIds.length === 0}>
-            {t('chat.none')}
-          </Button>
-        </Box>
-      </Box>
+      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+        {t('chat.contentsCount')}
+      </Typography>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
         {t('chat.markFiles')}
       </Typography>
-      {showAllSelectedWarning && (
-        <Alert severity="warning" sx={{ borderRadius: 0, mb: 1 }}>
-          {t('chat.tooMuchContent')}
-        </Alert>
-      )}
-      <FormGroup
+      <RadioGroup
+        name="consultation-content"
+        value={selectedId == null ? '' : String(selectedId)}
+        onChange={(event) => onSelect(Number(event.target.value))}
         sx={{
-          // One column + vertical scroll. FormGroup defaults to column + wrap,
-          // which fills sideways under maxHeight and creates a horizontal scrollbar.
+          // One column + vertical scroll. The default wrap fills sideways
+          // under maxHeight and creates a horizontal scrollbar.
           flexWrap: 'nowrap',
           maxHeight: 380,
           overflowY: 'auto',
@@ -315,7 +294,7 @@ function TranscriptChecklist({
         }}
       >
         {sources.map((src) => {
-          const checked = selectedIds.includes(src.content_id);
+          const checked = selectedId === src.content_id;
           const label = (
             <Box sx={{ py: 0.25, minWidth: 0 }}>
               <Typography
@@ -342,14 +321,8 @@ function TranscriptChecklist({
           return (
             <FormControlLabel
               key={src.content_id}
-              control={
-                <Checkbox
-                  checked={checked}
-                  onChange={() => onToggle(src.content_id)}
-                  disabled={disabled}
-                  size="small"
-                />
-              }
+              value={String(src.content_id)}
+              control={<Radio disabled={disabled} size="small" />}
               label={label}
               sx={{
                 alignItems: 'flex-start',
@@ -365,15 +338,140 @@ function TranscriptChecklist({
             />
           );
         })}
+      </RadioGroup>
+    </Box>
+  );
+}
+
+function pinCandidates(query, sources) {
+  const byId = {};
+  sources.forEach((src) => {
+    byId[src.content_id] = src;
+  });
+  const selected = Array.isArray(query.selected_content_ids) ? query.selected_content_ids : [];
+  const ids = selected.length ? selected : sources.map((src) => src.content_id);
+  return ids.map((id) => byId[id] || { content_id: id, title: '', media_type: '' });
+}
+
+function PinControls({ topicId, query, sources, onPinned, onUnpinned }) {
+  const { t } = useTranslation('topics');
+  const pinnedKey = (query.pinned_content_ids || []).join(',');
+  const [selected, setSelected] = useState(() => query.pinned_content_ids || []);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [error, setError] = useState(null);
+  const candidates = pinCandidates(query, sources);
+  const isPinned = (query.pinned_content_ids || []).length > 0;
+
+  useEffect(() => {
+    setSelected(query.pinned_content_ids || []);
+    setMessage(null);
+    setError(null);
+  }, [query.id]);
+
+  useEffect(() => {
+    setSelected(query.pinned_content_ids || []);
+  }, [pinnedKey]);
+
+  const toggle = (contentId) => {
+    setSelected((prev) => (
+      prev.includes(contentId)
+        ? prev.filter((id) => id !== contentId)
+        : [...prev, contentId]
+    ));
+  };
+
+  const pin = async () => {
+    if (selected.length === 0) {
+      setError(t('chat.selectPinTarget'));
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const data = await contentApi.pinTopicChatQuery(topicId, query.id, selected);
+      setMessage(t('chat.pinSaved'));
+      onPinned(data);
+    } catch (err) {
+      const detail = err?.response?.data?.error;
+      setError(typeof detail === 'string' ? detail : t('chat.pinError'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const unpin = async () => {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await contentApi.unpinTopicChatQuery(topicId, query.id);
+      setSelected([]);
+      setMessage(t('chat.unpinSaved'));
+      onUnpinned(query.id);
+    } catch {
+      setError(t('chat.unpinError'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!candidates.length) return null;
+
+  return (
+    <Box
+      sx={{
+        border: '1px solid',
+        borderColor: 'divider',
+        px: { xs: 1.5, sm: 2.5 },
+        py: 2,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+      }}
+    >
+      <Typography variant="subtitle2">{t('chat.pinTitle')}</Typography>
+      <Typography variant="caption" color="text.secondary">
+        {t('chat.pinHelp')}
+      </Typography>
+      <FormGroup>
+        {candidates.map((src) => (
+          <FormControlLabel
+            key={src.content_id}
+            control={(
+              <Checkbox
+                size="small"
+                checked={selected.includes(src.content_id)}
+                onChange={() => toggle(src.content_id)}
+                disabled={saving}
+              />
+            )}
+            label={src.title || t('chat.contentId', { id: src.content_id })}
+          />
+        ))}
       </FormGroup>
+      {message && <Alert severity="success" sx={{ borderRadius: 0 }}>{message}</Alert>}
+      {error && <Alert severity="error" sx={{ borderRadius: 0 }}>{error}</Alert>}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+        {isPinned && (
+          <Button size="small" color="inherit" onClick={unpin} disabled={saving}>
+            {t('chat.unpin')}
+          </Button>
+        )}
+        <Button size="small" variant="contained" onClick={pin} disabled={saving || selected.length === 0}>
+          {isPinned ? t('chat.pinUpdate') : t('chat.pinAction')}
+        </Button>
+      </Box>
     </Box>
   );
 }
 
 /**
  * Independent topic consultations (one question → one answer), with history.
+ * Pinned consultations are listed for anyone who can open the topic.
  */
-function TopicChat({ topicId }) {
+function TopicChat({ topicId, canCreate = true }) {
   const { t } = useTranslation('topics');
   const { intl } = useDateLocales();
   const { isAuthenticated } = useAuth();
@@ -386,10 +484,11 @@ function TopicChat({ topicId }) {
   const [activeQuery, setActiveQuery] = useState(null);
   const [composing, setComposing] = useState(true);
   const [sources, setSources] = useState([]);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
   const [dailyLimit, setDailyLimit] = useState(null);
   const [dailyRemaining, setDailyRemaining] = useState(null);
   const [tokensUrl, setTokensUrl] = useState('/profiles/my_profile?section=tokens');
+  const [publicVersion, setPublicVersion] = useState(0);
 
   const sourceById = useMemo(() => {
     const map = {};
@@ -421,7 +520,7 @@ function TopicChat({ topicId }) {
       : t('chat.limitReachedGeneric');
 
   const loadHistory = useCallback(async () => {
-    if (!isAuthenticated || !topicId) return;
+    if (!isAuthenticated || !canCreate || !topicId) return;
     setHistoryLoading(true);
     try {
       const data = await contentApi.listTopicChatQueries(topicId);
@@ -439,37 +538,57 @@ function TopicChat({ topicId }) {
     } finally {
       setHistoryLoading(false);
     }
-  }, [isAuthenticated, topicId]);
+  }, [isAuthenticated, canCreate, topicId]);
 
   const loadSources = useCallback(async () => {
-    if (!isAuthenticated || !topicId) return;
+    if (!isAuthenticated || !canCreate || !topicId) return;
     setSourcesLoading(true);
     try {
       const data = await contentApi.listTopicChatSources(topicId);
       const rows = data.results || [];
       setSources(rows);
-      // Start unchecked so the user chooses which files to query.
-      setSelectedIds([]);
+      // Start with nothing chosen so the user picks one transcript.
+      setSelectedId(null);
     } catch {
       setSources([]);
-      setSelectedIds([]);
+      setSelectedId(null);
     } finally {
       setSourcesLoading(false);
     }
-  }, [isAuthenticated, topicId]);
+  }, [isAuthenticated, canCreate, topicId]);
 
   useEffect(() => {
     loadHistory();
     loadSources();
   }, [loadHistory, loadSources]);
 
-  if (!isAuthenticated) {
-    return (
-      <Alert severity="info" sx={{ borderRadius: 0, mb: 4 }}>
-        {t('chat.loginRequired')}
-      </Alert>
-    );
-  }
+  const showComposer = isAuthenticated && canCreate;
+
+  const onPinned = (data) => {
+    setActiveQuery((current) => (
+      current && current.id === data.id
+        ? { ...current, ...data }
+        : current
+    ));
+    setHistory((prev) => prev.map((item) => (
+      item.id === data.id
+        ? { ...item, pinned_content_ids: data.pinned_content_ids || [] }
+        : item
+    )));
+    setPublicVersion((version) => version + 1);
+  };
+
+  const onUnpinned = (queryId) => {
+    setActiveQuery((current) => (
+      current && current.id === queryId
+        ? { ...current, pinned_content_ids: [] }
+        : current
+    ));
+    setHistory((prev) => prev.map((item) => (
+      item.id === queryId ? { ...item, pinned_content_ids: [] } : item
+    )));
+    setPublicVersion((version) => version + 1);
+  };
 
   const startNewConsultation = () => {
     if (atDailyLimit) {
@@ -480,15 +599,7 @@ function TopicChat({ topicId }) {
     setComposing(true);
     setError(null);
     setInput('');
-    setSelectedIds([]);
-  };
-
-  const toggleSource = (contentId) => {
-    setSelectedIds((prev) =>
-      prev.includes(contentId)
-        ? prev.filter((id) => id !== contentId)
-        : [...prev, contentId]
-    );
+    setSelectedId(null);
   };
 
   const openConsultation = async (id) => {
@@ -517,7 +628,7 @@ function TopicChat({ topicId }) {
       setError(dailyLimitMessage(dailyLimit));
       return;
     }
-    if (selectedIds.length === 0) {
+    if (selectedId == null) {
       setError(t('chat.selectAtLeast'));
       return;
     }
@@ -527,7 +638,7 @@ function TopicChat({ topicId }) {
     try {
       const data = await contentApi.topicChat(topicId, {
         message: text,
-        contentIds: selectedIds,
+        contentIds: [selectedId],
       });
       setActiveQuery(data);
       setComposing(false);
@@ -540,7 +651,7 @@ function TopicChat({ topicId }) {
           id: data.id,
           topic_id: data.topic_id,
           question_preview: preview,
-          selected_content_ids: data.selected_content_ids || selectedIds,
+          selected_content_ids: data.selected_content_ids || [selectedId],
           created_at: data.created_at,
         };
         return [row, ...prev.filter((item) => item.id !== data.id)];
@@ -594,6 +705,13 @@ function TopicChat({ topicId }) {
         pb: 1,
       }}
     >
+      {!isAuthenticated && (
+        <Alert severity="info" sx={{ borderRadius: 0 }}>
+          {t('chat.loginRequired')}
+        </Alert>
+      )}
+
+      {showComposer && (
       <Typography variant="body2" color="text.secondary">
         {t('chat.intro')}
         {dailyLimit != null && (
@@ -604,7 +722,10 @@ function TopicChat({ topicId }) {
           </>
         )}
       </Typography>
+      )}
 
+      {showComposer && (
+      <>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Button
           variant="outlined"
@@ -651,12 +772,10 @@ function TopicChat({ topicId }) {
           }}
         >
           <Typography variant="subtitle2">{t('chat.newQuery')}</Typography>
-          <TranscriptChecklist
+          <TranscriptPicker
             sources={sources}
-            selectedIds={selectedIds}
-            onToggle={toggleSource}
-            onSelectAll={() => setSelectedIds(sources.map((row) => row.content_id))}
-            onClear={() => setSelectedIds([])}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
             disabled={loading}
             loading={sourcesLoading}
           />
@@ -675,7 +794,7 @@ function TopicChat({ topicId }) {
             <Button
               variant="contained"
               onClick={send}
-              disabled={loading || atDailyLimit || !input.trim() || selectedIds.length === 0}
+              disabled={loading || atDailyLimit || !input.trim() || selectedId == null}
               endIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
             >
               {t('chat.consult')}
@@ -683,11 +802,22 @@ function TopicChat({ topicId }) {
           </Box>
         </Box>
       ) : (
-        <ConsultationView
-          query={activeQuery}
-          topicId={topicId}
-          sourceById={sourceById}
-        />
+        <>
+          <ConsultationView
+            query={activeQuery}
+            topicId={topicId}
+            sourceById={sourceById}
+          />
+          {activeQuery && (
+            <PinControls
+              topicId={topicId}
+              query={activeQuery}
+              sources={sources}
+              onPinned={onPinned}
+              onUnpinned={onUnpinned}
+            />
+          )}
+        </>
       )}
 
       <Divider />
@@ -750,6 +880,9 @@ function TopicChat({ topicId }) {
                     {selectedCount > 0
                       ? t('chat.files', { count: selectedCount })
                       : t('chat.allFiles')}
+                    {(item.pinned_content_ids || []).length > 0
+                      ? ` · ${t('chat.pinnedBadge')}`
+                      : ''}
                   </Typography>
                 </Box>
               );
@@ -757,6 +890,12 @@ function TopicChat({ topicId }) {
           </Box>
         )}
       </Box>
+      </>
+      )}
+
+      <Divider />
+
+      <PublicConsultations key={publicVersion} topicId={topicId} showEmpty />
     </Box>
   );
 }

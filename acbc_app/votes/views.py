@@ -4,16 +4,20 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.apps import apps
 import logging
 
 from comments.models import Comment
-from content.models import Topic, Content, Publication, ContentSuggestion
+from content.models import Topic, Content, Publication, ContentSuggestion, TopicChatQuery
 from knowledge_paths.models import KnowledgePath
 from votes.models import Vote, VoteCount
-from utils.notification_utils import notify_content_upvote, notify_knowledge_path_upvote
+from utils.notification_utils import (
+    notify_content_upvote,
+    notify_knowledge_path_upvote,
+    notify_topic_consultation_upvote,
+)
 import logging
 
 # Get logger for votes app
@@ -226,6 +230,13 @@ class BaseVoteView(APIView):
                         'vote_id': created_vote.id,
                     })
                     notify_knowledge_path_upvote(created_vote)
+                elif isinstance(obj, TopicChatQuery):
+                    logger.info("Sending consultation upvote notification", extra={
+                        'user_id': user.id,
+                        'query_id': obj.id,
+                        'vote_id': created_vote.id,
+                    })
+                    notify_topic_consultation_upvote(created_vote)
             except Exception as e:
                 logger.error(f"Error sending upvote notification: {str(e)}", extra={
                     'user_id': user.id,
@@ -759,3 +770,81 @@ class ContentSuggestionVoteView(BaseGetVoteView):
                 {'error': 'An error occurred while retrieving vote information'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class TopicConsultationVoteView(BaseGetVoteView):
+    """Up and down votes on a consultation that is pinned to a text."""
+
+    model = TopicChatQuery
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def _pinned_query(self, request, topic_pk, query_pk):
+        topic = Topic.objects.filter(pk=topic_pk).first()
+        if topic is None or not topic.can_be_viewed_by(request.user) or not topic.chat_enabled:
+            return None, None
+        query = (
+            TopicChatQuery.objects.filter(pk=query_pk, topic=topic)
+            .filter(pins__isnull=False)
+            .distinct()
+            .first()
+        )
+        if query is None:
+            return None, None
+        return topic, query
+
+    def post(self, request, topic_pk, query_pk):
+        try:
+            topic, query = self._pinned_query(request, topic_pk, query_pk)
+            if query is None:
+                return Response(
+                    {'error': 'Consulta no encontrada'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            action = request.data.get('action')
+            if action not in ['upvote', 'downvote', 'remove']:
+                return Response(
+                    {'error': 'Invalid action'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            vote_count = self.perform_vote_action(request, query, action, topic)
+            user_vote = self.get_vote(request.user, query, topic)
+            return Response({
+                'vote_count': vote_count,
+                'user_vote': user_vote.value if user_vote else 0,
+            })
+        except Exception as e:
+            if "User must be authenticated" in str(e):
+                return Response(
+                    {'error': 'Authentication required to vote'},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+            logger.error("Error processing consultation vote", extra={
+                'user_id': getattr(request.user, 'id', None),
+                'topic_id': topic_pk,
+                'query_id': query_pk,
+                'action': request.data.get('action'),
+            }, exc_info=True)
+            return Response(
+                {'error': 'An error occurred while processing your vote'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def get(self, request, topic_pk, query_pk):
+        topic, query = self._pinned_query(request, topic_pk, query_pk)
+        if query is None:
+            return Response(
+                {'error': 'Consulta no encontrada'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        vote_count = self.get_vote_count(query, topic)
+        if not request.user.is_authenticated:
+            return Response({'user_vote': 0, 'vote_count': vote_count})
+        user_vote = self.get_vote(request.user, query, topic)
+        return Response({
+            'user_vote': user_vote.value if user_vote else 0,
+            'vote_count': vote_count,
+        })

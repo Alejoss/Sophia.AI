@@ -34,4 +34,9 @@ urlpatterns = [
         views.ContentSuggestionVoteView.as_view(),
         name='content-suggestion-vote'
     ),
+    path(
+        'topics/<int:topic_pk>/consultations/<int:query_pk>/vote/',
+        views.TopicConsultationVoteView.as_view(),
+        name='topic-consultation-vote',
+    ),
 ]

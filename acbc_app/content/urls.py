@@ -125,6 +125,9 @@ from .views_topic_chat import (
     TopicChatSourcesView,
     TopicChatQueryListView,
     TopicChatQueryDetailView,
+    TopicChatQueryPinView,
+    TopicChatPublicListView,
+    TopicChatPublicDetailView,
 )
 
 app_name = "content"
@@ -258,6 +261,21 @@ urlpatterns = [
         'topics/<int:pk>/chat/queries/<int:query_id>/',
         TopicChatQueryDetailView.as_view(),
         name='topic-chat-query-detail',
+    ),
+    path(
+        'topics/<int:pk>/chat/queries/<int:query_id>/pins/',
+        TopicChatQueryPinView.as_view(),
+        name='topic-chat-query-pins',
+    ),
+    path(
+        'topics/<int:pk>/chat/public/',
+        TopicChatPublicListView.as_view(),
+        name='topic-chat-public',
+    ),
+    path(
+        'topics/<int:pk>/chat/public/<int:query_id>/',
+        TopicChatPublicDetailView.as_view(),
+        name='topic-chat-public-detail',
     ),
     path('topics/<int:pk>/content-simple/', TopicContentSimpleView.as_view(), name='topic-content-simple'),
     path('topics/<int:pk>/basic/', TopicBasicView.as_view(), name='topic-basic'),
