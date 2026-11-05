@@ -971,8 +971,9 @@ class TopicChatQuery(models.Model):
         default=list,
         blank=True,
         help_text=(
-            'Content IDs the user chose for this consultation. Empty means '
-            'all indexed transcripts in the topic were eligible.'
+            'Content IDs chosen for this consultation. New consultations store '
+            'exactly one ID. Empty means a legacy consultation that searched '
+            'every indexed transcript in the topic.'
         ),
     )
     created_at = models.DateTimeField(auto_now_add=True)

@@ -1846,14 +1846,19 @@ class TopicChatRequestSerializer(serializers.Serializer):
     message = serializers.CharField(min_length=1, max_length=4000)
     content_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
-        required=False,
         allow_empty=False,
-        max_length=100,
+        min_length=1,
+        max_length=1,
         help_text=(
-            'Optional. Restrict retrieval to these topic content IDs '
-            '(must be indexed contenidos in the topic). '
-            'Omit to use all indexed contents in the topic.'
+            'Exactly one indexed content ID in the topic. '
+            'The consultation uses only that transcript.'
         ),
+        error_messages={
+            'required': 'Elige un contenido para la consulta.',
+            'empty': 'Elige un contenido para la consulta.',
+            'min_length': 'Elige un contenido para la consulta.',
+            'max_length': 'Elige un solo contenido para la consulta.',
+        },
     )
 
     def validate_message(self, value):

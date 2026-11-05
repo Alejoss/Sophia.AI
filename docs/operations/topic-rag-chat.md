@@ -81,13 +81,14 @@ Content-Type: application/json
 ```json
 {
   "message": "¿Qué dicen sobre el tamaño de los bloques?",
-  "content_ids": [46, 88]
+  "content_ids": [46]
 }
 ```
 
-- `content_ids` (optional): restrict retrieval to these indexed files.
-  Omit to search all indexed transcripts in the topic. Empty list → **400**.
-- IDs must belong to the topic and be `embedding_status=indexed`; otherwise
+- `content_ids` (required): exactly one indexed content in the topic.
+  The consultation answers from that transcript only. Missing, empty, or more
+  than one ID → **400**.
+- The ID must belong to the topic and be `embedding_status=indexed`; otherwise
   **400** with `invalid_content_ids`.
 
 Response `201`:
@@ -111,7 +112,7 @@ Response `201`:
   ],
   "retrieved_chunk_count": 4,
   "used_chunk_count": 3,
-  "selected_content_ids": [46, 88],
+  "selected_content_ids": [46],
   "created_at": "2026-07-28T18:00:00Z",
   "daily_limit": 3,
   "daily_used": 1,
@@ -120,9 +121,10 @@ Response `201`:
 }
 ```
 
-`selected_content_ids` is empty when the client omitted `content_ids` (all
-indexed files were eligible). Create and list responses include the free-tier
-quota snapshot (`daily_*`) plus `tokens_url` for the buy-tokens CTA.
+`selected_content_ids` stores the one content chosen for the consultation.
+Older rows may list several IDs, or be empty when a legacy client searched
+every indexed file. Create and list responses include the free-tier quota
+snapshot (`daily_*`) plus `tokens_url` for the buy-tokens CTA.
 
 When the daily cap is exceeded, create returns **429**:
 
@@ -262,10 +264,8 @@ Requests such as `Puedes resumir el texto?`, `Resume el documento`,
 transcript text rather than embedding the instruction and ranking chunks.
 No re-embedding or Qdrant data changes are required.
 
-- Select the intended document with the existing checklist. Multiple explicitly
-  selected documents are supported and all receive coverage. If selection is
-  omitted, the backend resolves a single available indexed transcript; ambiguous
-  requests return **400** asking the user to select a file.
+- Choose exactly one indexed transcript. A full-document summary uses that
+  transcript only. Missing or multiple IDs return **400**.
 - Only indexed VIDEO/AUDIO/TEXT in the current topic are eligible. Existing
   authentication, topic access, payment, and daily quota checks still apply.
 - Text comes from the existing canonical search/hash source resolver in Django
@@ -300,8 +300,8 @@ semantic quality of a real generated summary.
 
 ## Behaviour notes
 
-- For factual questions, retrieval is scoped to one `topic_id`, and optionally to a subset of
-  `content_ids` chosen by the user for that consultation.
+- For factual questions, retrieval is scoped to one `topic_id` and to the single
+  `content_id` chosen for that consultation.
 - Default `TOPIC_CHAT_TOP_K=4` (fetch `8`, keep at most two chunks per `content_id`).
 - Dense hits below `TOPIC_CHAT_MIN_SCORE` (default `0.30`) are dropped; if none
   remain and keyword fallback cannot help, the API returns a fixed message and
