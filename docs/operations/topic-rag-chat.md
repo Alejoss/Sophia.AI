@@ -81,13 +81,14 @@ Content-Type: application/json
 ```json
 {
   "message": "¿Qué dicen sobre el tamaño de los bloques?",
-  "content_ids": [46, 88]
+  "content_ids": [46]
 }
 ```
 
-- `content_ids` (optional): restrict retrieval to these indexed files.
-  Omit to search all indexed transcripts in the topic. Empty list → **400**.
-- IDs must belong to the topic and be `embedding_status=indexed`; otherwise
+- `content_ids` (required): exactly one indexed content in the topic.
+  The consultation answers from that transcript only. Missing, empty, or more
+  than one ID → **400**.
+- The ID must belong to the topic and be `embedding_status=indexed`; otherwise
   **400** with `invalid_content_ids`.
 
 Response `201`:
@@ -111,7 +112,7 @@ Response `201`:
   ],
   "retrieved_chunk_count": 4,
   "used_chunk_count": 3,
-  "selected_content_ids": [46, 88],
+  "selected_content_ids": [46],
   "created_at": "2026-07-28T18:00:00Z",
   "daily_limit": 3,
   "daily_used": 1,
@@ -120,9 +121,10 @@ Response `201`:
 }
 ```
 
-`selected_content_ids` is empty when the client omitted `content_ids` (all
-indexed files were eligible). Create and list responses include the free-tier
-quota snapshot (`daily_*`) plus `tokens_url` for the buy-tokens CTA.
+`selected_content_ids` stores the one content chosen for the consultation.
+Older rows may list several IDs, or be empty when a legacy client searched
+every indexed file. Create and list responses include the free-tier quota
+snapshot (`daily_*`) plus `tokens_url` for the buy-tokens CTA.
 
 When the daily cap is exceeded, create returns **429**:
 
@@ -173,7 +175,58 @@ the Consultas UI can link there when remaining is 0.
 GET /api/content/topics/{topic_id}/chat/queries/{query_id}/
 ```
 
-Same shape as the create response. Other users get **404**.
+Same shape as the create response, plus `pinned_content_ids` (empty until the author pins it). Other users get **404**.
+
+### Pin a consultation to a text
+
+Pinning publishes the consultation. It stays public while it has at least one pin. The author chooses indexed texts that this consultation used (`selected_content_ids`). When that list is empty, any indexed text in the topic is eligible.
+
+```http
+POST /api/content/topics/{topic_id}/chat/queries/{query_id}/pins/
+Authorization: Bearer <JWT>
+Content-Type: application/json
+```
+
+```json
+{ "content_ids": [46] }
+```
+
+Author only. **201** returns the public card (`pinned_content_ids`, `vote_count`, `user_vote`, `can_unpin`). A later POST replaces the pin set. **400** `invalid_content_ids` when a text is not eligible. Other users get **404**.
+
+```http
+DELETE /api/content/topics/{topic_id}/chat/queries/{query_id}/pins/
+```
+
+Author, topic creator, or moderator. **204**. The private `TopicChatQuery` remains. Votes stay stored and show again if it is pinned once more.
+
+### List pinned consultations
+
+Reading does not require Consultas purchase. The topic must be visible to the caller and `chat_enabled` must be true.
+
+```http
+GET /api/content/topics/{topic_id}/chat/public/?content_id=46&limit=50
+```
+
+`content_id` is optional. Results are ordered by net vote score, then earliest pin time.
+
+```http
+GET /api/content/topics/{topic_id}/chat/public/{query_id}/
+```
+
+**404** when the consultation has no pins, or the topic is hidden.
+
+### Vote
+
+```http
+POST /api/votes/topics/{topic_id}/consultations/{query_id}/vote/
+Authorization: Bearer <JWT>
+```
+
+```json
+{ "action": "upvote" }
+```
+
+`action` is `upvote`, `downvote`, or `remove`. Same toggle as content votes. **404** while the consultation is not pinned. `GET` on the same path returns `{ "vote_count", "user_vote" }` and allows anonymous readers (`user_vote` is 0). An upvote notifies the author. Voting on your own consultation does not.
 
 ### Errors (create)
 
@@ -211,10 +264,8 @@ Requests such as `Puedes resumir el texto?`, `Resume el documento`,
 transcript text rather than embedding the instruction and ranking chunks.
 No re-embedding or Qdrant data changes are required.
 
-- Select the intended document with the existing checklist. Multiple explicitly
-  selected documents are supported and all receive coverage. If selection is
-  omitted, the backend resolves a single available indexed transcript; ambiguous
-  requests return **400** asking the user to select a file.
+- Choose exactly one indexed transcript. A full-document summary uses that
+  transcript only. Missing or multiple IDs return **400**.
 - Only indexed VIDEO/AUDIO/TEXT in the current topic are eligible. Existing
   authentication, topic access, payment, and daily quota checks still apply.
 - Text comes from the existing canonical search/hash source resolver in Django
@@ -249,8 +300,8 @@ semantic quality of a real generated summary.
 
 ## Behaviour notes
 
-- For factual questions, retrieval is scoped to one `topic_id`, and optionally to a subset of
-  `content_ids` chosen by the user for that consultation.
+- For factual questions, retrieval is scoped to one `topic_id` and to the single
+  `content_id` chosen for that consultation.
 - Default `TOPIC_CHAT_TOP_K=4` (fetch `8`, keep at most two chunks per `content_id`).
 - Dense hits below `TOPIC_CHAT_MIN_SCORE` (default `0.30`) are dropped; if none
   remain and keyword fallback cannot help, the API returns a fixed message and

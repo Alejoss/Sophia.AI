@@ -20,6 +20,7 @@ from content.models import (
     Publication,
     TopicCreationRequest,
     TopicChatQuery,
+    TopicChatPin,
     TopicPurchase,
     UnlimitedConsultationUser,
 )
@@ -252,12 +253,25 @@ class TopicAdmin(admin.ModelAdmin):
 
 @admin.register(TopicChatQuery)
 class TopicChatQueryAdmin(admin.ModelAdmin):
-    list_display = ['id', 'topic', 'user', 'created_at']
+    list_display = ['id', 'topic', 'user', 'is_pinned', 'created_at']
     list_filter = ['created_at']
     search_fields = ['question', 'answer', 'user__username', 'topic__title']
     raw_id_fields = ['topic', 'user']
     readonly_fields = ['created_at']
     date_hierarchy = 'created_at'
+
+    @admin.display(boolean=True, description='Pinned')
+    def is_pinned(self, obj):
+        return obj.pins.exists()
+
+
+@admin.register(TopicChatPin)
+class TopicChatPinAdmin(admin.ModelAdmin):
+    list_display = ['id', 'query', 'content', 'pinned_by', 'pinned_at']
+    list_filter = ['pinned_at']
+    search_fields = ['query__question', 'pinned_by__username', 'content__original_title']
+    raw_id_fields = ['query', 'content', 'pinned_by']
+    readonly_fields = ['pinned_at']
 
 
 @admin.register(UnlimitedConsultationUser)

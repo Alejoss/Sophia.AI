@@ -6,7 +6,8 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 
 from votes.models import Vote, VoteCount
-from content.models import Content, Topic
+from content.models import Content, ContentEmbedding, Topic, TopicChatPin, TopicChatQuery
+from notifications.models import Notification
 from knowledge_paths.models import KnowledgePath
 from comments.models import Comment
 
@@ -286,3 +287,110 @@ class CommentVoteAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['user_vote'], -1)
         self.assertEqual(response.data['vote_count'], -1)
+
+
+class TopicConsultationVoteAPITests(APITestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username='voteauthor',
+            email='voteauthor@example.com',
+            password='testpass123',
+        )
+        self.voter = User.objects.create_user(
+            username='voter',
+            email='voter@example.com',
+            password='testpass123',
+        )
+        self.topic = Topic.objects.create(
+            title='Tema votable',
+            creator=self.author,
+            is_public=True,
+            chat_enabled=True,
+        )
+        self.content = Content.objects.create(
+            uploaded_by=self.author,
+            media_type='TEXT',
+            original_title='Texto',
+        )
+        self.topic.contents.add(self.content)
+        ContentEmbedding.objects.create(
+            content=self.content,
+            status=ContentEmbedding.STATUS_INDEXED,
+            model='text-embedding-3-large',
+            dims=8,
+            chunk_count=1,
+        )
+        self.query = TopicChatQuery.objects.create(
+            topic=self.topic,
+            user=self.author,
+            question='¿Cuál es la idea?',
+            answer='La idea principal.',
+            selected_content_ids=[self.content.id],
+        )
+        self.url = reverse(
+            'votes:topic-consultation-vote',
+            args=[self.topic.id, self.query.id],
+        )
+
+    def test_vote_rejected_until_pinned(self):
+        self.client.force_authenticate(user=self.voter)
+        response = self.client.post(self.url, {'action': 'upvote'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(Vote.objects.filter(object_id=self.query.id).exists())
+
+    def test_toggle_and_score_survives_unpin(self):
+        TopicChatPin.objects.create(
+            query=self.query,
+            content=self.content,
+            pinned_by=self.author,
+        )
+        self.client.force_authenticate(user=self.voter)
+        up = self.client.post(self.url, {'action': 'upvote'}, format='json')
+        self.assertEqual(up.status_code, status.HTTP_200_OK)
+        self.assertEqual(up.data['vote_count'], 1)
+        self.assertEqual(up.data['user_vote'], 1)
+
+        again = self.client.post(self.url, {'action': 'upvote'}, format='json')
+        self.assertEqual(again.data['vote_count'], 0)
+        self.assertEqual(again.data['user_vote'], 0)
+
+        down = self.client.post(self.url, {'action': 'downvote'}, format='json')
+        self.assertEqual(down.data['vote_count'], -1)
+        self.assertEqual(down.data['user_vote'], -1)
+
+        flipped = self.client.post(self.url, {'action': 'upvote'}, format='json')
+        self.assertEqual(flipped.data['vote_count'], 1)
+        self.assertEqual(flipped.data['user_vote'], 1)
+
+        self.query.pins.all().delete()
+        hidden = self.client.post(self.url, {'action': 'upvote'}, format='json')
+        self.assertEqual(hidden.status_code, status.HTTP_404_NOT_FOUND)
+
+        TopicChatPin.objects.create(
+            query=self.query,
+            content=self.content,
+            pinned_by=self.author,
+        )
+        restored = self.client.get(self.url)
+        self.assertEqual(restored.status_code, status.HTTP_200_OK)
+        self.assertEqual(restored.data['vote_count'], 1)
+        self.assertEqual(restored.data['user_vote'], 1)
+
+    def test_upvote_notifies_author_and_skips_self_vote(self):
+        TopicChatPin.objects.create(
+            query=self.query,
+            content=self.content,
+            pinned_by=self.author,
+        )
+        self.client.force_authenticate(user=self.author)
+        self.client.post(self.url, {'action': 'upvote'}, format='json')
+        self.assertFalse(
+            Notification.objects.filter(recipient=self.author, verb__icontains='consulta').exists()
+        )
+
+        self.client.force_authenticate(user=self.voter)
+        response = self.client.post(self.url, {'action': 'upvote'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        note = Notification.objects.get(recipient=self.author)
+        self.assertIn('consulta', note.verb)
+        self.assertEqual(int(note.target_object_id), self.query.id)

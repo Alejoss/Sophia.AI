@@ -913,7 +913,8 @@ const TopicDetail = () => {
             </Box>
 
             {activeTab === TOPIC_TAB_CONSULTATIONS && showConsultationsTab && (
-                needsConsultasPurchase ? (
+                <>
+                {needsConsultasPurchase && (
                     <Alert severity="info" sx={{ mb: 2 }}>
                         <Stack spacing={1.5}>
                             <Typography variant="subtitle1" fontWeight={600}>
@@ -946,9 +947,9 @@ const TopicDetail = () => {
                             )}
                         </Stack>
                     </Alert>
-                ) : (
-                    <TopicChat topicId={topicId} />
-                )
+                )}
+                <TopicChat topicId={topicId} canCreate={!needsConsultasPurchase} />
+                </>
             )}
 
             {activeTab === 'content' && (
