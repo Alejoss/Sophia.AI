@@ -375,13 +375,14 @@ describe('TopicChat component', () => {
     await user.type(screen.getByPlaceholderText(/escribe tu pregunta/i), '¿Qué es Bitcoin?');
     await user.click(screen.getByRole('button', { name: /^consultar$/i }));
 
-    const pinTarget = await screen.findByRole('checkbox', { name: /explicación en video/i });
-    await user.click(pinTarget);
-    await user.click(screen.getByRole('button', { name: /fijar en el texto/i }));
+    await user.click(await screen.findByRole('button', { name: /^fijar$/i }));
 
     await waitFor(() => {
       expect(mockPinTopicChatQuery).toHaveBeenCalledWith(5, 101, [88]);
     });
-    expect(await screen.findByText(/consulta visible en el texto/i)).toBeInTheDocument();
+    expect(await screen.findByText(/consulta fijada/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /quitar pin/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /actualizar textos/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /quitar del texto/i })).not.toBeInTheDocument();
   });
 });
