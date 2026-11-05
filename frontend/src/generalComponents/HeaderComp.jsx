@@ -226,6 +226,7 @@ const HeaderComp = () => {
     ? [
         { to: '/profiles/my_profile', label: user.username },
         { to: '/content/library_user', labelKey: 'myLibrary' },
+        { to: '/messages', labelKey: 'messages' },
         { to: '/profiles/logout', labelKey: 'logout' },
       ]
     : guestLinks;
@@ -347,6 +348,13 @@ const HeaderComp = () => {
                   onClick={handleProfileMenuClose}
                 >
                   {t('myLibrary')}
+                </MenuItem>
+                <MenuItem
+                  component={Link}
+                  to="/messages"
+                  onClick={handleProfileMenuClose}
+                >
+                  {t('messages')}
                 </MenuItem>
                 <MenuItem
                   component={Link}

@@ -26,7 +26,8 @@ import {
   Security as SecurityIcon,
   AcUnit as TopicIcon,
   LibraryBooks as LibraryIcon,
-  Toll as TollIcon
+  Toll as TollIcon,
+  MailOutline as MessagesIcon
 } from '@mui/icons-material';
 import { createMenuConfig } from '../utils/menuUtils';
 import { useTranslation } from 'react-i18next';
@@ -319,6 +320,41 @@ const ProfileVerticalNavigation = ({
             );
           })}
         </List>
+
+        {isOwnProfile && (
+          <>
+            <Divider sx={{ my: 1 }} />
+            <List sx={{ p: 0 }}>
+              <ListItem disablePadding>
+                <ListItemButton
+                  component={Link}
+                  to="/messages"
+                  sx={{
+                    borderRadius: 0.5,
+                    mx: 1,
+                    color: 'text.primary',
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ color: 'text.secondary', minWidth: 40 }}>
+                    <MessagesIcon />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={t('messages')}
+                    sx={{
+                      '& .MuiListItemText-primary': {
+                        fontWeight: 400,
+                        fontSize: '0.95rem',
+                      },
+                    }}
+                  />
+                </ListItemButton>
+              </ListItem>
+            </List>
+          </>
+        )}
       </Box>
     </Paper>
   );
