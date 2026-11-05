@@ -19,6 +19,8 @@ import contentApi from '../api/contentApi';
 import ContentSelector from '../content/ContentSelector';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 import i18n from '../i18n';
+import { useAuth } from '../context/AuthContext';
+import { isPublicationAuthor } from './publicationAccess';
 
 const schema = yup.object({
     text_content: yup
@@ -31,6 +33,7 @@ const PublicationEditForm = () => {
     const { t } = useTranslation('publications');
     const navigate = useNavigate();
     const { publicationId } = useParams();
+    const { authState } = useAuth();
     const [selectedContent, setSelectedContent] = useState(null);
     const [loadError, setLoadError] = useState('');
     const [submitError, setSubmitError] = useState('');
@@ -57,6 +60,11 @@ const PublicationEditForm = () => {
                 setIsFetching(true);
                 const publicationData = await contentApi.getPublicationDetails(publicationId);
 
+                if (!isPublicationAuthor(publicationData, authState.user)) {
+                    setLoadError(t('editForm.forbidden'));
+                    return;
+                }
+
                 reset({
                     text_content: publicationData.text_content || '',
                 });
@@ -75,7 +83,7 @@ const PublicationEditForm = () => {
         };
 
         fetchPublicationDetails();
-    }, [publicationId, reset, t]);
+    }, [publicationId, reset, t, authState.user]);
 
     const handleContentSelected = (contentProfile) => {
         setSelectedContent(contentProfile);

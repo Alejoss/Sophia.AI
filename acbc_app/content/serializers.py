@@ -758,6 +758,7 @@ class PublicationSerializer(serializers.ModelSerializer):
         allow_null=True
     )
     content = serializers.SerializerMethodField()
+    user_id = serializers.IntegerField(read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     content_profile = ContentProfileSerializer(read_only=True)
     vote_count = serializers.SerializerMethodField()
@@ -765,8 +766,19 @@ class PublicationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Publication
-        fields = ['id', 'content_profile_id', 'content_profile', 'content', 'text_content', 'status', 'published_at', 'updated_at', 'username', 'vote_count', 'user_vote']
-        read_only_fields = ['published_at', 'updated_at']
+        fields = ['id', 'user_id', 'content_profile_id', 'content_profile', 'content', 'text_content', 'status', 'published_at', 'updated_at', 'username', 'vote_count', 'user_vote']
+        read_only_fields = ['published_at', 'updated_at', 'user_id']
+
+    def validate_content_profile_id(self, content_profile):
+        if content_profile is None:
+            return content_profile
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        if user is None or not user.is_authenticated or content_profile.user_id != user.id:
+            raise serializers.ValidationError(
+                'Solo puede asociar un contenido de su propia biblioteca.'
+            )
+        return content_profile
 
     def get_content(self, instance):
         if not instance.content_profile or not instance.content_profile.content:
