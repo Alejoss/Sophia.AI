@@ -174,7 +174,12 @@ function PublicConsultations({ topicId, contentId = null, showEmpty = true }) {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-      <Typography variant="subtitle2">{t('chat.communityTitle')}</Typography>
+      <Box>
+        <Typography variant="subtitle2">{t('chat.communityTitle')}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          {t('chat.communityHelp')}
+        </Typography>
+      </Box>
       {loading && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <CircularProgress size={18} />
