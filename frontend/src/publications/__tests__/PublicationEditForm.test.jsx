@@ -36,6 +36,7 @@ describe('PublicationEditForm', () => {
     mockGetPublicationDetails.mockResolvedValue({
       text_content: 'Texto original',
       content: null,
+      user_id: 1,
     });
   });
 
@@ -87,5 +88,21 @@ describe('PublicationEditForm', () => {
       await screen.findByText(/no se pudo actualizar la publicación/i),
     ).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('does not show the editor when the signed-in user is not the author', async () => {
+    mockGetPublicationDetails.mockResolvedValue({
+      text_content: 'Texto de otra persona',
+      content: null,
+      user_id: 99,
+    });
+
+    renderWithProviders(<PublicationEditForm />);
+
+    expect(
+      await screen.findByText(/no tiene permiso para editar esta publicación/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Texto de otra persona')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /actualizar publicación/i })).not.toBeInTheDocument();
   });
 });

@@ -24,6 +24,7 @@ import AddToLibraryModal from '../components/AddToLibraryModal';
 import { getProfileById } from '../api/profilesApi';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { isPublicationAuthor } from './publicationAccess';
 
 // ContentDisplay Mode: "card" - Rich card display for publication content
 const PublicationDetail = () => {
@@ -121,6 +122,7 @@ const PublicationDetail = () => {
     );
 
     const isOwnProfile = authState.user && profile && authState.user.id === profile.user.id;
+    const canEditPublication = isPublicationAuthor(publication, authState.user);
 
     return (
         <Box sx={{ p: 3 }}>
@@ -156,13 +158,15 @@ const PublicationDetail = () => {
                             contentId={publicationId}
                             contentType="publication"
                         />
-                        <Button
-                            variant="outlined"
-                            startIcon={<EditIcon />}
-                            onClick={() => navigate(`/publications/${publicationId}/edit`)}
-                        >
-                            {t('detail.edit')}
-                        </Button>
+                        {canEditPublication && (
+                            <Button
+                                variant="outlined"
+                                startIcon={<EditIcon />}
+                                onClick={() => navigate(`/publications/${publicationId}/edit`)}
+                            >
+                                {t('detail.edit')}
+                            </Button>
+                        )}
                     </Box>
                 </Box>
 
