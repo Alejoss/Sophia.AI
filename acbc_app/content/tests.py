@@ -3141,6 +3141,169 @@ class PublicationAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['text_content'], 'Test Publication')
+        self.assertEqual(response.data['user_id'], self.user.id)
+
+    def test_owner_can_update_publication(self):
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.put(
+            url,
+            {
+                'text_content': 'Updated by author',
+                'status': 'PUBLISHED',
+                'content_profile_id': self.content_profile.id,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.publication.refresh_from_db()
+        self.assertEqual(self.publication.text_content, 'Updated by author')
+
+    def test_other_user_cannot_update_publication(self):
+        other = User.objects.create_user(
+            username='intruder',
+            email='intruder@example.com',
+            password='testpass123',
+        )
+        self.client.force_authenticate(user=other)
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.put(
+            url,
+            {
+                'text_content': 'Hacked',
+                'status': 'PUBLISHED',
+                'content_profile_id': self.content_profile.id,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.publication.refresh_from_db()
+        self.assertEqual(self.publication.text_content, 'Test Publication')
+
+    def test_anonymous_cannot_update_publication(self):
+        self.client.force_authenticate(user=None)
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.put(
+            url,
+            {'text_content': 'Hacked', 'status': 'PUBLISHED'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.publication.refresh_from_db()
+        self.assertEqual(self.publication.text_content, 'Test Publication')
+
+    def test_owner_can_delete_publication(self):
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.publication.refresh_from_db()
+        self.assertTrue(self.publication.deleted)
+
+    def test_other_user_cannot_delete_publication(self):
+        other = User.objects.create_user(
+            username='intruder',
+            email='intruder@example.com',
+            password='testpass123',
+        )
+        self.client.force_authenticate(user=other)
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.publication.refresh_from_db()
+        self.assertFalse(self.publication.deleted)
+
+    def test_owner_can_read_draft_publication(self):
+        self.publication.status = 'DRAFT'
+        self.publication.save(update_fields=['status'])
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['text_content'], 'Test Publication')
+
+    def test_deleted_publication_is_hidden(self):
+        self.publication.deleted = True
+        self.publication.save(update_fields=['deleted'])
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_other_user_cannot_read_unpublished_publication(self):
+        self.publication.status = 'DRAFT'
+        self.publication.save(update_fields=['status'])
+        other = User.objects.create_user(
+            username='reader',
+            email='reader@example.com',
+            password='testpass123',
+        )
+        self.client.force_authenticate(user=other)
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_anonymous_can_read_published_publication(self):
+        self.client.force_authenticate(user=None)
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['text_content'], 'Test Publication')
+
+    def test_anonymous_cannot_read_draft_publication(self):
+        self.publication.status = 'DRAFT'
+        self.publication.save(update_fields=['status'])
+        self.client.force_authenticate(user=None)
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_anonymous_cannot_delete_publication(self):
+        self.client.force_authenticate(user=None)
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.publication.refresh_from_db()
+        self.assertFalse(self.publication.deleted)
+
+    def test_published_publication_is_readable_by_other_users(self):
+        other = User.objects.create_user(
+            username='reader',
+            email='reader@example.com',
+            password='testpass123',
+        )
+        self.client.force_authenticate(user=other)
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['text_content'], 'Test Publication')
+
+    def test_cannot_attach_another_users_content_profile(self):
+        other = User.objects.create_user(
+            username='libraryowner',
+            email='library@example.com',
+            password='testpass123',
+        )
+        other_content = Content.objects.create(
+            uploaded_by=other,
+            media_type='TEXT',
+            original_title='Private Content',
+        )
+        other_profile = ContentProfile.objects.create(
+            content=other_content,
+            user=other,
+            title='Private Profile',
+        )
+        url = reverse('content:publication-detail', args=[self.publication.id])
+        response = self.client.put(
+            url,
+            {
+                'text_content': 'Still mine',
+                'status': 'PUBLISHED',
+                'content_profile_id': other_profile.id,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.publication.refresh_from_db()
+        self.assertEqual(self.publication.content_profile_id, self.content_profile.id)
+        self.assertEqual(self.publication.text_content, 'Test Publication')
 
     def test_vote_publication(self):
         """Test voting on a publication"""

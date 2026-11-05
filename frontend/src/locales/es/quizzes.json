@@ -38,6 +38,7 @@
     "questionCorrectRequired": "{{label}}: debe tener al menos una respuesta correcta.",
     "missingNode": "Al cuestionario le falta información del nodo",
     "loadError": "Error al cargar los datos",
+    "forbidden": "No tiene permiso para editar este cuestionario.",
     "createError": "Error al crear el cuestionario",
     "updateError": "Error al actualizar el cuestionario",
     "deleteError": "Error al eliminar el cuestionario",

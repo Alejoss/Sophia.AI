@@ -7,16 +7,14 @@ import {
   Link,
   CircularProgress,
   Alert,
-  Divider,
-  FormGroup,
   FormControlLabel,
-  Checkbox,
   RadioGroup,
   Radio,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import SendIcon from '@mui/icons-material/Send';
 import AddIcon from '@mui/icons-material/Add';
+import PushPinIcon from '@mui/icons-material/PushPin';
 import { useTranslation } from 'react-i18next';
 import contentApi from '../api/contentApi';
 import { useAuth } from '../context/AuthContext';
@@ -165,7 +163,7 @@ function SelectedTranscriptsSummary({ selectedContentIds, sourceById, topicId })
   );
 }
 
-function ConsultationView({ query, topicId, sourceById }) {
+function ConsultationView({ query, topicId, sourceById, hideQuestion = false }) {
   const { t } = useTranslation('topics');
   const { intl } = useDateLocales();
   if (!query) return null;
@@ -180,25 +178,29 @@ function ConsultationView({ query, topicId, sourceById }) {
         pb: 3,
       }}
     >
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
-        {t('chat.yourQuestion')} · {formatQueryDate(query.created_at, intl)}
-      </Typography>
-      <Box
-        sx={{
-          px: 2,
-          py: 1.75,
-          mb: 2.5,
-          bgcolor: 'action.hover',
-          border: '1px solid',
-          borderColor: 'divider',
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
-        }}
-      >
-        <Typography variant="body1" sx={{ lineHeight: 1.65 }}>
-          {query.question}
-        </Typography>
-      </Box>
+      {!hideQuestion && (
+        <>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+            {t('chat.yourQuestion')} · {formatQueryDate(query.created_at, intl)}
+          </Typography>
+          <Box
+            sx={{
+              px: 2,
+              py: 1.75,
+              mb: 2.5,
+              bgcolor: 'action.hover',
+              border: '1px solid',
+              borderColor: 'divider',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+          >
+            <Typography variant="body1" sx={{ lineHeight: 1.65 }}>
+              {query.question}
+            </Typography>
+          </Box>
+        </>
+      )}
 
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
         {t('chat.answer')}
@@ -342,128 +344,10 @@ function TranscriptPicker({
   );
 }
 
-function pinCandidates(query, sources) {
-  const byId = {};
-  sources.forEach((src) => {
-    byId[src.content_id] = src;
-  });
+function pinTargetIds(query, sources) {
   const selected = Array.isArray(query.selected_content_ids) ? query.selected_content_ids : [];
-  const ids = selected.length ? selected : sources.map((src) => src.content_id);
-  return ids.map((id) => byId[id] || { content_id: id, title: '', media_type: '' });
-}
-
-function PinControls({ topicId, query, sources, onPinned, onUnpinned }) {
-  const { t } = useTranslation('topics');
-  const pinnedKey = (query.pinned_content_ids || []).join(',');
-  const [selected, setSelected] = useState(() => query.pinned_content_ids || []);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState(null);
-  const [error, setError] = useState(null);
-  const candidates = pinCandidates(query, sources);
-  const isPinned = (query.pinned_content_ids || []).length > 0;
-
-  useEffect(() => {
-    setSelected(query.pinned_content_ids || []);
-    setMessage(null);
-    setError(null);
-  }, [query.id]);
-
-  useEffect(() => {
-    setSelected(query.pinned_content_ids || []);
-  }, [pinnedKey]);
-
-  const toggle = (contentId) => {
-    setSelected((prev) => (
-      prev.includes(contentId)
-        ? prev.filter((id) => id !== contentId)
-        : [...prev, contentId]
-    ));
-  };
-
-  const pin = async () => {
-    if (selected.length === 0) {
-      setError(t('chat.selectPinTarget'));
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const data = await contentApi.pinTopicChatQuery(topicId, query.id, selected);
-      setMessage(t('chat.pinSaved'));
-      onPinned(data);
-    } catch (err) {
-      const detail = err?.response?.data?.error;
-      setError(typeof detail === 'string' ? detail : t('chat.pinError'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const unpin = async () => {
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      await contentApi.unpinTopicChatQuery(topicId, query.id);
-      setSelected([]);
-      setMessage(t('chat.unpinSaved'));
-      onUnpinned(query.id);
-    } catch {
-      setError(t('chat.unpinError'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!candidates.length) return null;
-
-  return (
-    <Box
-      sx={{
-        border: '1px solid',
-        borderColor: 'divider',
-        px: { xs: 1.5, sm: 2.5 },
-        py: 2,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1,
-      }}
-    >
-      <Typography variant="subtitle2">{t('chat.pinTitle')}</Typography>
-      <Typography variant="caption" color="text.secondary">
-        {t('chat.pinHelp')}
-      </Typography>
-      <FormGroup>
-        {candidates.map((src) => (
-          <FormControlLabel
-            key={src.content_id}
-            control={(
-              <Checkbox
-                size="small"
-                checked={selected.includes(src.content_id)}
-                onChange={() => toggle(src.content_id)}
-                disabled={saving}
-              />
-            )}
-            label={src.title || t('chat.contentId', { id: src.content_id })}
-          />
-        ))}
-      </FormGroup>
-      {message && <Alert severity="success" sx={{ borderRadius: 0 }}>{message}</Alert>}
-      {error && <Alert severity="error" sx={{ borderRadius: 0 }}>{error}</Alert>}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-        {isPinned && (
-          <Button size="small" color="inherit" onClick={unpin} disabled={saving}>
-            {t('chat.unpin')}
-          </Button>
-        )}
-        <Button size="small" variant="contained" onClick={pin} disabled={saving || selected.length === 0}>
-          {isPinned ? t('chat.pinUpdate') : t('chat.pinAction')}
-        </Button>
-      </Box>
-    </Box>
-  );
+  if (selected.length) return selected;
+  return sources.map((src) => src.content_id);
 }
 
 /**
@@ -488,6 +372,8 @@ function TopicChat({ topicId, canCreate = true }) {
   const [dailyRemaining, setDailyRemaining] = useState(null);
   const [tokensUrl, setTokensUrl] = useState('/profiles/my_profile?section=tokens');
   const [publicVersion, setPublicVersion] = useState(0);
+  const [pinSavingId, setPinSavingId] = useState(null);
+  const [pinNotice, setPinNotice] = useState(null);
 
   const sourceById = useMemo(() => {
     const map = {};
@@ -587,6 +473,44 @@ function TopicChat({ topicId, canCreate = true }) {
       item.id === queryId ? { ...item, pinned_content_ids: [] } : item
     )));
     setPublicVersion((version) => version + 1);
+  };
+
+  const pinConsultation = async (item) => {
+    const contentIds = pinTargetIds(item, sources);
+    if (!contentIds.length) {
+      setPinNotice({ id: item.id, severity: 'error', text: t('chat.selectPinTarget') });
+      return;
+    }
+    setPinSavingId(item.id);
+    setPinNotice(null);
+    try {
+      const data = await contentApi.pinTopicChatQuery(topicId, item.id, contentIds);
+      onPinned(data);
+      setPinNotice({ id: item.id, severity: 'success', text: t('chat.pinSaved') });
+    } catch (err) {
+      const detail = err?.response?.data?.error;
+      setPinNotice({
+        id: item.id,
+        severity: 'error',
+        text: typeof detail === 'string' ? detail : t('chat.pinError'),
+      });
+    } finally {
+      setPinSavingId(null);
+    }
+  };
+
+  const unpinConsultation = async (item) => {
+    setPinSavingId(item.id);
+    setPinNotice(null);
+    try {
+      await contentApi.unpinTopicChatQuery(topicId, item.id);
+      onUnpinned(item.id);
+      setPinNotice({ id: item.id, severity: 'success', text: t('chat.unpinSaved') });
+    } catch {
+      setPinNotice({ id: item.id, severity: 'error', text: t('chat.unpinError') });
+    } finally {
+      setPinSavingId(null);
+    }
   };
 
   const startNewConsultation = () => {
@@ -704,6 +628,8 @@ function TopicChat({ topicId, canCreate = true }) {
         pb: 1,
       }}
     >
+      <PublicConsultations key={publicVersion} topicId={topicId} showEmpty />
+
       {!isAuthenticated && (
         <Alert severity="info" sx={{ borderRadius: 0 }}>
           {t('chat.loginRequired')}
@@ -725,18 +651,6 @@ function TopicChat({ topicId, canCreate = true }) {
 
       {showComposer && (
       <>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={startNewConsultation}
-          disabled={composing || atDailyLimit}
-        >
-          {t('chat.newQuery')}
-        </Button>
-      </Box>
-
       {atDailyLimit && (
         <Alert severity="warning" sx={{ borderRadius: 0 }}>
           {dailyLimitMessage(dailyLimit)}{' '}
@@ -757,7 +671,27 @@ function TopicChat({ topicId, canCreate = true }) {
         </Alert>
       )}
 
-      {composing ? (
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, mb: 1.5 }}>
+          <Box>
+            <Typography variant="subtitle2">{t('chat.historyTitle')}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {t('chat.historyHelp')}
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<AddIcon />}
+            onClick={startNewConsultation}
+            disabled={composing || atDailyLimit}
+            sx={{ flexShrink: 0 }}
+          >
+            {t('chat.newQuery')}
+          </Button>
+        </Box>
+
+      {composing && (
         <Box
           sx={{
             display: 'flex',
@@ -768,6 +702,7 @@ function TopicChat({ topicId, canCreate = true }) {
             bgcolor: 'background.paper',
             px: { xs: 1.5, sm: 2.5 },
             py: 2.5,
+            mb: 2,
           }}
         >
           <Typography variant="subtitle2">{t('chat.newQuery')}</Typography>
@@ -800,31 +735,7 @@ function TopicChat({ topicId, canCreate = true }) {
             </Button>
           </Box>
         </Box>
-      ) : (
-        <>
-          <ConsultationView
-            query={activeQuery}
-            topicId={topicId}
-            sourceById={sourceById}
-          />
-          {activeQuery && (
-            <PinControls
-              topicId={topicId}
-              query={activeQuery}
-              sources={sources}
-              onPinned={onPinned}
-              onUnpinned={onUnpinned}
-            />
-          )}
-        </>
       )}
-
-      <Divider />
-
-      <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
-          {t('chat.historyTitle')}
-        </Typography>
         {historyLoading && history.length === 0 ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CircularProgress size={18} />
@@ -846,43 +757,74 @@ function TopicChat({ topicId, canCreate = true }) {
           >
             {history.map((item) => {
               const selected = activeQuery?.id === item.id && !composing;
+              const isPinned = (item.pinned_content_ids || []).length > 0;
               const selectedCount = Array.isArray(item.selected_content_ids)
                 ? item.selected_content_ids.length
                 : 0;
+              const savingPin = pinSavingId === item.id;
               return (
                 <Box
                   key={item.id}
-                  component="button"
-                  type="button"
-                  onClick={() => openConsultation(item.id)}
-                  disabled={loading}
                   sx={{
-                    display: 'block',
-                    width: '100%',
-                    textAlign: 'left',
-                    border: 'none',
                     borderBottom: '1px solid',
                     borderColor: 'divider',
                     bgcolor: selected ? 'action.selected' : 'transparent',
-                    px: 2,
-                    py: 1.75,
-                    cursor: 'pointer',
                     '&:last-child': { borderBottom: 'none' },
-                    '&:hover': { bgcolor: 'action.hover' },
                   }}
                 >
-                  <Typography variant="body2" sx={{ fontWeight: selected ? 600 : 400 }}>
-                    {item.question_preview}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {formatQueryDate(item.created_at, intl)}
-                    {selectedCount > 0
-                      ? t('chat.files', { count: selectedCount })
-                      : t('chat.allFiles')}
-                    {(item.pinned_content_ids || []).length > 0
-                      ? ` · ${t('chat.pinnedBadge')}`
-                      : ''}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, px: 2, py: 1.5 }}>
+                    <Box
+                      component="button"
+                      type="button"
+                      onClick={() => openConsultation(item.id)}
+                      disabled={loading}
+                      sx={{
+                        flex: 1,
+                        minWidth: 0,
+                        textAlign: 'left',
+                        border: 'none',
+                        bgcolor: 'transparent',
+                        p: 0,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ fontWeight: selected ? 600 : 400 }}>
+                        {item.question_preview}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatQueryDate(item.created_at, intl)}
+                        {selectedCount > 0
+                          ? t('chat.files', { count: selectedCount })
+                          : t('chat.allFiles')}
+                        {isPinned ? ` · ${t('chat.pinnedBadge')}` : ''}
+                      </Typography>
+                    </Box>
+                    <Button
+                      size="small"
+                      variant={isPinned ? 'outlined' : 'contained'}
+                      startIcon={<PushPinIcon />}
+                      disabled={savingPin}
+                      onClick={() => (isPinned ? unpinConsultation(item) : pinConsultation(item))}
+                      sx={{ flexShrink: 0 }}
+                    >
+                      {isPinned ? t('chat.unpin') : t('chat.pin')}
+                    </Button>
+                  </Box>
+                  {pinNotice?.id === item.id && (
+                    <Alert severity={pinNotice.severity} sx={{ borderRadius: 0, mx: 2, mb: 1.5 }}>
+                      {pinNotice.text}
+                    </Alert>
+                  )}
+                  {selected && activeQuery && (
+                    <Box sx={{ px: 2, pb: 2 }}>
+                      <ConsultationView
+                        query={activeQuery}
+                        topicId={topicId}
+                        sourceById={sourceById}
+                        hideQuestion
+                      />
+                    </Box>
+                  )}
                 </Box>
               );
             })}
@@ -891,10 +833,6 @@ function TopicChat({ topicId, canCreate = true }) {
       </Box>
       </>
       )}
-
-      <Divider />
-
-      <PublicConsultations key={publicVersion} topicId={topicId} showEmpty />
     </Box>
   );
 }

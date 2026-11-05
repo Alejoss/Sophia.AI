@@ -36,6 +36,7 @@ describe('QuizForm (create mode)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetKnowledgePath.mockResolvedValue({
+      author_id: 1,
       nodes: [{ id: 10, title: 'Nodo introductorio' }],
     });
   });
@@ -89,5 +90,19 @@ describe('QuizForm (create mode)', () => {
       await screen.findByText(/no se pudo crear el cuestionario/i),
     ).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('does not show the editor when the signed-in user does not own the path', async () => {
+    mockGetKnowledgePath.mockResolvedValue({
+      author_id: 99,
+      nodes: [{ id: 10, title: 'Nodo introductorio' }],
+    });
+
+    renderWithProviders(<QuizForm />);
+
+    expect(
+      await screen.findByText(/no tiene permiso para editar este cuestionario/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/título del cuestionario/i)).not.toBeInTheDocument();
   });
 });

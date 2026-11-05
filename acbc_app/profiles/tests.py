@@ -2950,3 +2950,68 @@ class NewsletterVincentSubscriberListAPITests(APITestCase):
     def test_bad_page_is_rejected(self):
         response = self.client.get(self.url, {'page': 'no'}, **self.headers)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ProfileAndUserWriteAuthorizationTests(APITestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username='owner',
+            email='owner@example.com',
+            password='testpass123',
+        )
+        self.other = User.objects.create_user(
+            username='other',
+            email='other@example.com',
+            password='testpass123',
+        )
+        self.owner.profile.profile_description = 'Perfil del dueño'
+        self.owner.profile.save(update_fields=['profile_description'])
+        self.client.force_authenticate(user=self.other)
+
+    def test_other_user_cannot_update_profile(self):
+        url = reverse('profiles:profile-detail', args=[self.owner.id])
+        response = self.client.put(
+            url,
+            {'profile_description': 'Tomado', 'interests': 'hack'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.owner.profile.refresh_from_db()
+        self.assertEqual(self.owner.profile.profile_description, 'Perfil del dueño')
+
+    def test_other_user_cannot_delete_profile(self):
+        url = reverse('profiles:profile-detail', args=[self.owner.id])
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Profile.objects.filter(user=self.owner).exists())
+
+    def test_other_user_cannot_update_account_or_grant_staff(self):
+        url = reverse('profiles:user-detail', args=[self.owner.id])
+        response = self.client.put(
+            url,
+            {'username': 'stolen', 'is_staff': True, 'is_superuser': True},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.owner.refresh_from_db()
+        self.assertEqual(self.owner.username, 'owner')
+        self.assertFalse(self.owner.is_staff)
+        self.assertFalse(self.owner.is_superuser)
+
+    def test_user_cannot_grant_themselves_staff(self):
+        self.client.force_authenticate(user=self.owner)
+        url = reverse('profiles:user-detail', args=[self.owner.id])
+        response = self.client.put(
+            url,
+            {
+                'username': 'owner',
+                'email': 'owner@example.com',
+                'is_staff': True,
+                'is_superuser': True,
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.owner.refresh_from_db()
+        self.assertFalse(self.owner.is_staff)
+        self.assertFalse(self.owner.is_superuser)

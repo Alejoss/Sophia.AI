@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404
 from .models import Quiz, Question, Option, UserQuizAttempt, Answer
 from .serializers import QuizSerializer, QuestionSerializer, QuizCreateSerializer, QuizSubmissionSerializer, QuizAttemptResultSerializer
 from knowledge_paths.models import KnowledgePath, Node
+from utils.permissions import user_owns
 from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
@@ -31,7 +32,18 @@ class QuizCreateView(APIView):
             logger.debug(f"Creating quiz for path ID: {path_id}, node ID: {node_id}")
 
             # Get the node
-            node = get_object_or_404(Node, pk=node_id)
+            node = get_object_or_404(Node.objects.select_related('knowledge_path'), pk=node_id)
+            if not user_owns(request, node.knowledge_path.author_id):
+                logger.warning(
+                    "Quiz creation denied - Node ID: %s, User: %s, Path author: %s",
+                    node_id,
+                    request.user.username,
+                    node.knowledge_path.author_id,
+                )
+                return Response(
+                    {'error': 'Solo el autor del camino puede crear cuestionarios.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             logger.debug(f"Found node: {node.title} (ID: {node.id})")
 
             # Add the node to the quiz data
@@ -91,7 +103,20 @@ class QuizDetailView(APIView):
         logger.debug(f"Quiz update data: {request.data}")
         
         try:
-            quiz = get_object_or_404(Quiz, pk=pk)
+            quiz = get_object_or_404(
+                Quiz.objects.select_related('node__knowledge_path'),
+                pk=pk,
+            )
+            if not user_owns(request, quiz.node.knowledge_path.author_id):
+                logger.warning(
+                    "Quiz update denied - Quiz ID: %s, User: %s",
+                    pk,
+                    request.user.username,
+                )
+                return Response(
+                    {'error': 'Solo el autor del camino puede modificar este cuestionario.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             node_id = request.data.get('node')
             
             logger.debug(f"Received quiz update data: {request.data}")
@@ -99,7 +124,12 @@ class QuizDetailView(APIView):
             logger.debug(f"Type of max_attempts_per_day: {type(request.data.get('max_attempts_per_day'))}")
             
             if node_id:
-                node = get_object_or_404(Node, pk=node_id)
+                node = get_object_or_404(Node.objects.select_related('knowledge_path'), pk=node_id)
+                if not user_owns(request, node.knowledge_path.author_id):
+                    return Response(
+                        {'error': 'Solo el autor del camino puede modificar este cuestionario.'},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
                 quiz.node = node
                 logger.debug(f"Updated quiz node to: {node.title}")
             
@@ -123,7 +153,20 @@ class QuizDetailView(APIView):
         logger.info(f"Quiz deletion requested - Quiz ID: {pk}, User: {request.user.username}")
         
         try:
-            quiz = get_object_or_404(Quiz, pk=pk)
+            quiz = get_object_or_404(
+                Quiz.objects.select_related('node__knowledge_path'),
+                pk=pk,
+            )
+            if not user_owns(request, quiz.node.knowledge_path.author_id):
+                logger.warning(
+                    "Quiz deletion denied - Quiz ID: %s, User: %s",
+                    pk,
+                    request.user.username,
+                )
+                return Response(
+                    {'error': 'Solo el autor del camino puede eliminar este cuestionario.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             quiz_title = quiz.title
             quiz.delete()
             logger.info(f"Quiz deleted successfully - ID: {pk}, Title: {quiz_title}, Deleted by: {request.user.username}")
