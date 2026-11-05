@@ -27,6 +27,7 @@
   "editForm": {
     "textRequired": "El contenido de texto es requerido.",
     "loadError": "Error al cargar los detalles de la publicación",
+    "forbidden": "No tiene permiso para editar esta publicación.",
     "updateError": "Error al actualizar la publicación.",
     "deleteConfirm": "¿Está seguro de que desea eliminar esta publicación? Esta acción no se puede deshacer.",
     "deleteError": "Error al eliminar la publicación",

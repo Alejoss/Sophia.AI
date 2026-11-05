@@ -274,8 +274,8 @@ const AppContent = () => {
               <Route path=":quizId" element={<Quiz />} />
             </Route>
             <Route path="publications">
-              <Route path="create" element={<PublicationCreationForm />} />
-              <Route path=":publicationId/edit" element={<PublicationEditForm />} />
+              <Route path="create" element={<ProtectedRoute><PublicationCreationForm /></ProtectedRoute>} />
+              <Route path=":publicationId/edit" element={<ProtectedRoute><PublicationEditForm /></ProtectedRoute>} />
               <Route path=":publicationId" element={<PublicationDetail />} />
             </Route>
             <Route path="search" element={<MainSearch />} />

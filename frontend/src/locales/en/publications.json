@@ -27,6 +27,7 @@
   "editForm": {
     "textRequired": "The text content is required.",
     "loadError": "Could not load the publication details",
+    "forbidden": "You do not have permission to edit this publication.",
     "updateError": "Could not update the publication.",
     "deleteConfirm": "Are you sure you want to delete this publication? This action cannot be undone.",
     "deleteError": "Could not delete the publication",

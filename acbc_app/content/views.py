@@ -3313,16 +3313,47 @@ class PublicationListView(APIView):
 class PublicationDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [permission() for permission in self.permission_classes]
+
+    def _not_found(self):
+        return Response(
+            {'error': 'Publicacion no encontrada'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    def _visible_to(self, publication, user):
+        if publication.deleted:
+            return False
+        if publication.status != 'PUBLISHED' and (not user.is_authenticated or publication.user_id != user.id):
+            return False
+        return True
+
+    def _author_forbidden(self, request, publication):
+        if publication.user_id == request.user.id:
+            return None
+        logger.warning(
+            "Publication write forbidden publication_id=%s user=%s owner=%s",
+            publication.id,
+            request.user.username,
+            publication.user_id,
+        )
+        return Response(
+            {'error': 'Solo el autor de la publicación puede modificarla.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     def get(self, request, pk):
         try:
             publication = Publication.objects.get(id=pk)
-            serializer = PublicationSerializer(publication)
+            if not self._visible_to(publication, request.user):
+                return self._not_found()
+            serializer = PublicationSerializer(publication, context={'request': request})
             return Response(serializer.data)
         except Publication.DoesNotExist:
-            return Response(
-                {'error': 'Publicacion no encontrada'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return self._not_found()
         except Exception as e:
             return Response(
                 {'error': str(e)},
@@ -3331,6 +3362,11 @@ class PublicationDetailView(APIView):
 
     def put(self, request, pk):
         publication = get_object_or_404(Publication, pk=pk)
+        forbidden = self._author_forbidden(request, publication)
+        if forbidden is not None:
+            return forbidden
+        if publication.deleted:
+            return self._not_found()
         serializer = PublicationSerializer(publication, data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
@@ -3339,6 +3375,9 @@ class PublicationDetailView(APIView):
 
     def delete(self, request, pk):
         publication = get_object_or_404(Publication, pk=pk)
+        forbidden = self._author_forbidden(request, publication)
+        if forbidden is not None:
+            return forbidden
         publication.deleted = True
         publication.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
