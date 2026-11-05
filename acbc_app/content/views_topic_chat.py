@@ -84,10 +84,11 @@ def _serialize_chat_sources(queryset):
 
 def _resolve_selected_content_ids(topic, content_ids):
     """
-    Validate optional content_ids against indexed contents in the topic.
+    Validate the consultation's content id against indexed contents in the topic.
 
     Returns (ordered_ids_or_None, error_response).
-    None means "all indexed" (client omitted the field).
+    None means "all indexed" and is only kept for callers that omit the field.
+    The public API requires exactly one id.
     """
     if content_ids is None:
         return None, None
@@ -188,7 +189,7 @@ class TopicChatView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         message = serializer.validated_data['message']
-        content_ids = serializer.validated_data.get('content_ids')
+        content_ids = serializer.validated_data['content_ids']
         selected_ids, selection_error = _resolve_selected_content_ids(topic, content_ids)
         if selection_error:
             return selection_error

@@ -84,8 +84,8 @@ status, indexed-embedding count, and a switch to turn it on once Qdrant has
 vectors for that topic.
 
 Each chat POST is an **independent** consultation (`TopicChatQuery`). Previous
-answers are not sent to the LLM. The client may pass optional `content_ids` to
-restrict retrieval to a subset of indexed transcripts for that consultation.
+answers are not sent to the LLM. The client passes exactly one `content_ids`
+entry so retrieval uses that indexed transcript only.
 See [topic-rag-chat.md](../operations/topic-rag-chat.md).
 
 The author can pin that consultation onto one or more of those texts

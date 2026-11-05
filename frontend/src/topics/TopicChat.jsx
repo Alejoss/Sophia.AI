@@ -11,6 +11,8 @@ import {
   FormGroup,
   FormControlLabel,
   Checkbox,
+  RadioGroup,
+  Radio,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import SendIcon from '@mui/icons-material/Send';
@@ -123,7 +125,9 @@ function SelectedTranscriptsSummary({ selectedContentIds, sourceById, topicId })
   return (
     <Box sx={{ mt: 1.5, px: 0.5 }}>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
-        {t('chat.selectedFiles', { count: selectedContentIds.length })}
+        {selectedContentIds.length === 1
+          ? t('chat.selectedFile')
+          : t('chat.selectedFiles', { count: selectedContentIds.length })}
       </Typography>
       <Box
         component="ul"
@@ -237,12 +241,10 @@ function ConsultationView({ query, topicId, sourceById }) {
   );
 }
 
-function TranscriptChecklist({
+function TranscriptPicker({
   sources,
-  selectedIds,
-  onToggle,
-  onSelectAll,
-  onClear,
+  selectedId,
+  onSelect,
   disabled,
   loading,
 }) {
@@ -266,45 +268,21 @@ function TranscriptChecklist({
     );
   }
 
-  const allSelected = selectedIds.length === sources.length;
-  const showAllSelectedWarning = allSelected && sources.length > 1;
-
   return (
     <Box>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 1,
-          flexWrap: 'wrap',
-          mb: 1,
-        }}
-      >
-        <Typography variant="subtitle2">
-          {t('chat.contentsCount', { selected: selectedIds.length, total: sources.length })}
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button size="small" onClick={onSelectAll} disabled={disabled || allSelected}>
-            {t('chat.all')}
-          </Button>
-          <Button size="small" onClick={onClear} disabled={disabled || selectedIds.length === 0}>
-            {t('chat.none')}
-          </Button>
-        </Box>
-      </Box>
+      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+        {t('chat.contentsCount')}
+      </Typography>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
         {t('chat.markFiles')}
       </Typography>
-      {showAllSelectedWarning && (
-        <Alert severity="warning" sx={{ borderRadius: 0, mb: 1 }}>
-          {t('chat.tooMuchContent')}
-        </Alert>
-      )}
-      <FormGroup
+      <RadioGroup
+        name="consultation-content"
+        value={selectedId == null ? '' : String(selectedId)}
+        onChange={(event) => onSelect(Number(event.target.value))}
         sx={{
-          // One column + vertical scroll. FormGroup defaults to column + wrap,
-          // which fills sideways under maxHeight and creates a horizontal scrollbar.
+          // One column + vertical scroll. The default wrap fills sideways
+          // under maxHeight and creates a horizontal scrollbar.
           flexWrap: 'nowrap',
           maxHeight: 380,
           overflowY: 'auto',
@@ -316,7 +294,7 @@ function TranscriptChecklist({
         }}
       >
         {sources.map((src) => {
-          const checked = selectedIds.includes(src.content_id);
+          const checked = selectedId === src.content_id;
           const label = (
             <Box sx={{ py: 0.25, minWidth: 0 }}>
               <Typography
@@ -343,14 +321,8 @@ function TranscriptChecklist({
           return (
             <FormControlLabel
               key={src.content_id}
-              control={
-                <Checkbox
-                  checked={checked}
-                  onChange={() => onToggle(src.content_id)}
-                  disabled={disabled}
-                  size="small"
-                />
-              }
+              value={String(src.content_id)}
+              control={<Radio disabled={disabled} size="small" />}
               label={label}
               sx={{
                 alignItems: 'flex-start',
@@ -366,7 +338,7 @@ function TranscriptChecklist({
             />
           );
         })}
-      </FormGroup>
+      </RadioGroup>
     </Box>
   );
 }
@@ -512,7 +484,7 @@ function TopicChat({ topicId, canCreate = true }) {
   const [activeQuery, setActiveQuery] = useState(null);
   const [composing, setComposing] = useState(true);
   const [sources, setSources] = useState([]);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
   const [dailyLimit, setDailyLimit] = useState(null);
   const [dailyRemaining, setDailyRemaining] = useState(null);
   const [tokensUrl, setTokensUrl] = useState('/profiles/my_profile?section=tokens');
@@ -575,11 +547,11 @@ function TopicChat({ topicId, canCreate = true }) {
       const data = await contentApi.listTopicChatSources(topicId);
       const rows = data.results || [];
       setSources(rows);
-      // Start unchecked so the user chooses which files to query.
-      setSelectedIds([]);
+      // Start with nothing chosen so the user picks one transcript.
+      setSelectedId(null);
     } catch {
       setSources([]);
-      setSelectedIds([]);
+      setSelectedId(null);
     } finally {
       setSourcesLoading(false);
     }
@@ -627,15 +599,7 @@ function TopicChat({ topicId, canCreate = true }) {
     setComposing(true);
     setError(null);
     setInput('');
-    setSelectedIds([]);
-  };
-
-  const toggleSource = (contentId) => {
-    setSelectedIds((prev) =>
-      prev.includes(contentId)
-        ? prev.filter((id) => id !== contentId)
-        : [...prev, contentId]
-    );
+    setSelectedId(null);
   };
 
   const openConsultation = async (id) => {
@@ -664,7 +628,7 @@ function TopicChat({ topicId, canCreate = true }) {
       setError(dailyLimitMessage(dailyLimit));
       return;
     }
-    if (selectedIds.length === 0) {
+    if (selectedId == null) {
       setError(t('chat.selectAtLeast'));
       return;
     }
@@ -674,7 +638,7 @@ function TopicChat({ topicId, canCreate = true }) {
     try {
       const data = await contentApi.topicChat(topicId, {
         message: text,
-        contentIds: selectedIds,
+        contentIds: [selectedId],
       });
       setActiveQuery(data);
       setComposing(false);
@@ -687,7 +651,7 @@ function TopicChat({ topicId, canCreate = true }) {
           id: data.id,
           topic_id: data.topic_id,
           question_preview: preview,
-          selected_content_ids: data.selected_content_ids || selectedIds,
+          selected_content_ids: data.selected_content_ids || [selectedId],
           created_at: data.created_at,
         };
         return [row, ...prev.filter((item) => item.id !== data.id)];
@@ -808,12 +772,10 @@ function TopicChat({ topicId, canCreate = true }) {
           }}
         >
           <Typography variant="subtitle2">{t('chat.newQuery')}</Typography>
-          <TranscriptChecklist
+          <TranscriptPicker
             sources={sources}
-            selectedIds={selectedIds}
-            onToggle={toggleSource}
-            onSelectAll={() => setSelectedIds(sources.map((row) => row.content_id))}
-            onClear={() => setSelectedIds([])}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
             disabled={loading}
             loading={sourcesLoading}
           />
@@ -832,7 +794,7 @@ function TopicChat({ topicId, canCreate = true }) {
             <Button
               variant="contained"
               onClick={send}
-              disabled={loading || atDailyLimit || !input.trim() || selectedIds.length === 0}
+              disabled={loading || atDailyLimit || !input.trim() || selectedId == null}
               endIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
             >
               {t('chat.consult')}

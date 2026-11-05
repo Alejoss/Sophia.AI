@@ -5999,7 +5999,14 @@ class TopicChatAPITests(APITestCase):
             original_title='Video citado',
         )
         self.topic.contents.add(self.video)
+        self._index_transcript(self.video)
         self.client.force_authenticate(user=self.user)
+
+    def _chat_body(self, message, content_id=None):
+        return {
+            'message': message,
+            'content_ids': [self.video.id if content_id is None else content_id],
+        }
 
     def test_requires_auth(self):
         self.client.force_authenticate(user=None)
@@ -6032,7 +6039,7 @@ class TopicChatAPITests(APITestCase):
     def test_unavailable_without_openai(self):
         response = self.client.post(
             f'/api/content/topics/{self.topic.id}/chat/',
-            {'message': 'Que es Bitcoin?'},
+            self._chat_body('Que es Bitcoin?'),
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -6058,7 +6065,7 @@ class TopicChatAPITests(APITestCase):
         }
         response = self.client.post(
             f'/api/content/topics/{self.topic.id}/chat/',
-            {'message': 'Que dicen del tamano?'},
+            self._chat_body('Que dicen del tamano?'),
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -6073,8 +6080,8 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(kwargs['topic_id'], self.topic.id)
         self.assertEqual(kwargs['message'], 'Que dicen del tamano?')
         self.assertIn(kwargs.get('history'), (None, []))
-        self.assertIsNone(kwargs.get('content_ids'))
-        self.assertEqual(response.data.get('selected_content_ids'), [])
+        self.assertEqual(kwargs.get('content_ids'), [self.video.id])
+        self.assertEqual(response.data.get('selected_content_ids'), [self.video.id])
 
         list_response = self.client.get(
             f'/api/content/topics/{self.topic.id}/chat/queries/',
@@ -6123,7 +6130,7 @@ class TopicChatAPITests(APITestCase):
         for i in range(limit):
             response = self.client.post(
                 f'/api/content/topics/{self.topic.id}/chat/',
-                {'message': f'Pregunta {i}'},
+                self._chat_body(f'Pregunta {i}'),
                 format='json',
             )
             self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
@@ -6133,7 +6140,7 @@ class TopicChatAPITests(APITestCase):
 
         blocked = self.client.post(
             f'/api/content/topics/{self.topic.id}/chat/',
-            {'message': 'Pregunta de más'},
+            self._chat_body('Pregunta de más'),
             format='json',
         )
         self.assertEqual(blocked.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
@@ -6160,7 +6167,7 @@ class TopicChatAPITests(APITestCase):
         self.client.force_authenticate(user=other)
         other_ok = self.client.post(
             f'/api/content/topics/{self.topic.id}/chat/',
-            {'message': 'Pregunta de otro usuario'},
+            self._chat_body('Pregunta de otro usuario'),
             format='json',
         )
         self.assertEqual(other_ok.status_code, status.HTTP_201_CREATED)
@@ -6180,7 +6187,7 @@ class TopicChatAPITests(APITestCase):
         for i in range(limit + 2):
             response = self.client.post(
                 f'/api/content/topics/{self.topic.id}/chat/',
-                {'message': f'Ilimitada {i}'},
+                self._chat_body(f'Ilimitada {i}'),
                 format='json',
             )
             self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
@@ -6210,6 +6217,7 @@ class TopicChatAPITests(APITestCase):
             is_public=True,
             chat_enabled=True,
         )
+        other_topic.contents.add(self.video)
         limit = TopicChatQuery.MAX_PER_USER_PER_DAY
         for i in range(limit):
             topic = self.topic if i % 2 == 0 else other_topic
@@ -6222,14 +6230,14 @@ class TopicChatAPITests(APITestCase):
             }
             response = self.client.post(
                 f'/api/content/topics/{topic.id}/chat/',
-                {'message': f'Pregunta {i}'},
+                self._chat_body(f'Pregunta {i}'),
                 format='json',
             )
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         blocked = self.client.post(
             f'/api/content/topics/{other_topic.id}/chat/',
-            {'message': 'Una más'},
+            self._chat_body('Una más'),
             format='json',
         )
         self.assertEqual(blocked.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
@@ -6257,7 +6265,7 @@ class TopicChatAPITests(APITestCase):
 
         response = self.client.post(
             f'/api/content/topics/{self.topic.id}/chat/',
-            {'message': 'Hoy permitido'},
+            self._chat_body('Hoy permitido'),
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -6265,10 +6273,12 @@ class TopicChatAPITests(APITestCase):
         self.assertEqual(response.data['daily_remaining'], limit - 1)
 
     def _index_transcript(self, content, text='Texto indexado de prueba.'):
-        transcript = ContentTranscript.objects.create(
+        transcript, _created = ContentTranscript.objects.update_or_create(
             content=content,
-            processed_plain=text,
-            language='es',
+            defaults={
+                'processed_plain': text,
+                'language': 'es',
+            },
         )
         ContentEmbedding.objects.update_or_create(
             content=content,
@@ -6351,12 +6361,33 @@ class TopicChatAPITests(APITestCase):
             f'/api/content/topics/{self.topic.id}/chat/',
             {
                 'message': 'Hola',
-                'content_ids': [self.video.id, video_b.id],
+                'content_ids': [video_b.id],
             },
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn(video_b.id, response.data.get('invalid_content_ids', []))
+
+    def test_chat_rejects_more_than_one_content_id(self):
+        video_b = Content.objects.create(
+            uploaded_by=self.user,
+            media_type='VIDEO',
+            original_title='Segundo video',
+        )
+        self.topic.contents.add(video_b)
+        self._index_transcript(video_b, 'Otro texto indexado')
+
+        response = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {
+                'message': 'Hola',
+                'content_ids': [self.video.id, video_b.id],
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('content_ids', response.data)
+        self.assertFalse(TopicChatQuery.objects.filter(topic=self.topic).exists())
 
     def test_chat_rejects_empty_content_ids(self):
         response = self.client.post(
@@ -6499,21 +6530,12 @@ class TopicChatAPITests(APITestCase):
     def test_keyword_fallback_injects_adam_back_when_dense_misses(self, mock_qdrant_cls, mock_openai_cls):
         from content.topic_chat import run_topic_chat
 
-        transcript = ContentTranscript.objects.create(
-            content=self.video,
-            processed_plain=(
+        self._index_transcript(
+            self.video,
+            (
                 'Hoy hablamos con Adam Back, cofundador de Blockstream, '
                 'sobre Hashcash y la prueba de trabajo.'
             ),
-            language='es',
-        )
-        ContentEmbedding.objects.update_or_create(
-            content=self.video,
-            defaults={
-                'status': ContentEmbedding.STATUS_INDEXED,
-                'source_hash': transcript.text_hash,
-                'chunk_count': 2,
-            },
         )
 
         openai = mock_openai_cls.return_value
@@ -6554,18 +6576,7 @@ class TopicChatAPITests(APITestCase):
     def test_empty_retrieval_explains_miss_when_postgres_has_entity(self, mock_qdrant_cls, mock_openai_cls):
         from content.topic_chat import RETRIEVAL_MISS_ANSWER, run_topic_chat
 
-        transcript = ContentTranscript.objects.create(
-            content=self.video,
-            processed_plain='Mención a Adam Back en el documental.',
-            language='es',
-        )
-        ContentEmbedding.objects.update_or_create(
-            content=self.video,
-            defaults={
-                'status': ContentEmbedding.STATUS_INDEXED,
-                'source_hash': transcript.text_hash,
-            },
-        )
+        self._index_transcript(self.video, 'Mención a Adam Back en el documental.')
 
         openai = mock_openai_cls.return_value
         openai.embed.return_value = [0.1] * 8
@@ -6745,7 +6756,7 @@ class TopicChatAPITests(APITestCase):
 
         response = self.client.post(
             f'/api/content/topics/{self.topic.id}/chat/',
-            {'message': 'Qué hizo el Digital Currency Group?'},
+            self._chat_body('Qué hizo el Digital Currency Group?'),
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
@@ -6787,7 +6798,7 @@ class TopicChatAPITests(APITestCase):
         }
         response = self.client.post(
             f'/api/content/topics/{self.topic.id}/chat/',
-            {'message': 'Qué hizo el Digital Currency Group?'},
+            self._chat_body('Qué hizo el Digital Currency Group?'),
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
