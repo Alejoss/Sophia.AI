@@ -31,10 +31,10 @@ const FeaturedEventBanner = () => {
   if (!featured) return null;
 
   const start = featured.date_start
-    ? formatEventWhen(featured.date_start, featured.date_start_has_time !== false, intl, { month: 'short' })
+    ? formatEventWhen(featured.date_start, false, intl, { month: 'short' })
     : '';
   const end = featured.date_end
-    ? formatEventWhen(featured.date_end, featured.date_end_has_time !== false, intl, { month: 'short' })
+    ? formatEventWhen(featured.date_end, false, intl, { month: 'short' })
     : '';
   const when = [start, end].filter(Boolean).join(' – ');
 

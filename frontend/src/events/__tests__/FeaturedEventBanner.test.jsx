@@ -22,9 +22,9 @@ describe('FeaturedEventBanner', () => {
       mobile_image: 'http://localhost/banner-mobile.jpg',
       path: '/events/2',
       date_start: '2026-11-16T12:00:00Z',
-      date_start_has_time: false,
+      date_start_has_time: true,
       date_end: '2027-01-11T12:00:00Z',
-      date_end_has_time: false,
+      date_end_has_time: true,
     });
 
     renderWithProviders(<FeaturedEventBanner />);
@@ -33,7 +33,9 @@ describe('FeaturedEventBanner', () => {
     expect(link).toHaveAttribute('href', '/events/2');
     expect(screen.queryByText(/próximo evento/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Curso ligado a la landing')).not.toBeInTheDocument();
-    expect(screen.getByText(/16 nov 2026/i)).toBeInTheDocument();
+    const badge = screen.getByText(/16 nov 2026/i);
+    expect(badge).toHaveTextContent(/11 ene 2027/i);
+    expect(badge.textContent).not.toMatch(/\d{1,2}:\d{2}/);
     expect(link.querySelector('img')).toHaveAttribute('src', 'http://localhost/banner-desktop.jpg');
     const mobileSource = link.querySelector('picture source');
     expect(mobileSource).toHaveAttribute('srcset', 'http://localhost/banner-mobile.jpg');
