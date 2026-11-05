@@ -236,7 +236,7 @@ const AppContent = () => {
               <Route path="collections" element={<CollectionsUser />} />
               <Route path="collections/create" element={<CreateCollectionForm />} />
               <Route path="collections/:collectionId" element={<Collection />} />
-              <Route path="collections/:collectionId/edit" element={<CollectionEditContent />} />
+              <Route path="collections/:collectionId/edit" element={<ProtectedRoute><CollectionEditContent /></ProtectedRoute>} />
               <Route path="create_topic" element={<ProtectedRoute><TopicCreationForm /></ProtectedRoute>} />
               <Route path="topics/:topicId/edit" element={<ProtectedRoute><TopicEdit /></ProtectedRoute>} />
               <Route path="topics" element={<TopicList />} />
@@ -269,8 +269,8 @@ const AppContent = () => {
             </Route>
 
             <Route path="quizzes">
-              <Route path=":pathId/create" element={<QuizForm mode="create" />} />
-              <Route path=":quizId/edit" element={<QuizForm mode="edit" />} />
+              <Route path=":pathId/create" element={<ProtectedRoute><QuizForm mode="create" /></ProtectedRoute>} />
+              <Route path=":quizId/edit" element={<ProtectedRoute><QuizForm mode="edit" /></ProtectedRoute>} />
               <Route path=":quizId" element={<Quiz />} />
             </Route>
             <Route path="publications">
