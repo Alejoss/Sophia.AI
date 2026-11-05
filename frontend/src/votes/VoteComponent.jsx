@@ -81,6 +81,9 @@ const VoteComponent = ({ type, ids, initialVoteCount = 0, initialUserVote = 0 })
         case 'content_suggestion':
           response = await votesApi.voteContentSuggestion(ids.suggestionId, action);
           break;
+        case 'consultation':
+          response = await votesApi.voteConsultation(ids.topicId, ids.queryId, action);
+          break;
         default:
           throw new Error('Invalid vote type');
       }
@@ -168,7 +171,7 @@ const VoteComponent = ({ type, ids, initialVoteCount = 0, initialUserVote = 0 })
 };
 
 VoteComponent.propTypes = {
-  type: PropTypes.oneOf(['content', 'comment', 'knowledge_path', 'publication', 'content_suggestion']).isRequired,
+  type: PropTypes.oneOf(['content', 'comment', 'knowledge_path', 'publication', 'content_suggestion', 'consultation']).isRequired,
   ids: PropTypes.object.isRequired,
   initialVoteCount: PropTypes.number,
   initialUserVote: PropTypes.number

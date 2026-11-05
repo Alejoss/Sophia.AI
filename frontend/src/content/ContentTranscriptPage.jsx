@@ -22,6 +22,7 @@ import { useDateLocales } from '../hooks/useDateLocales';
 import { AuthContext } from '../context/AuthContext';
 import { getTopicContentPath } from '../utils/urlUtils';
 import ContentBitcoinAnchor from './ContentBitcoinAnchor';
+import PublicConsultations from '../topics/PublicConsultations';
 
 export const formatMs = (ms) => {
   if (ms == null || Number.isNaN(Number(ms))) return '';
@@ -320,6 +321,12 @@ const ContentTranscriptPage = () => {
         )}
 
       </Paper>
+
+      {context === 'topic' && topicId && (
+        <Box sx={{ mt: 3 }}>
+          <PublicConsultations topicId={topicId} contentId={contentId} showEmpty={false} />
+        </Box>
+      )}
     </Container>
   );
 };

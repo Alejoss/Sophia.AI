@@ -71,7 +71,8 @@ const Notifications = ({
       return notification.description;
     } else if (
       verbIs(notification.verb, 'votó positivamente tu contenido') ||
-      verbIs(notification.verb, 'votó a favor de tu contenido')
+      verbIs(notification.verb, 'votó a favor de tu contenido') ||
+      verbIs(notification.verb, 'votó positivamente tu consulta')
     ) {
       return notification.description;
     } else if (

@@ -12,7 +12,7 @@ from content.models import (
     TopicTimelineEntrySuggestionContent, TopicTimelineEntryContentSuggestion,
     TopicTimelineEntryContent, Publication,
     TopicModeratorInvitation, FileSuggestion, ContentSuggestion, ContentTranscript,
-    TopicCreationRequest, TopicChatQuery, TranscriptAnchor, ContentEmbedding,
+    TopicCreationRequest, TopicChatQuery, TopicChatPin, TranscriptAnchor, ContentEmbedding,
     UnlimitedConsultationUser,
 )
 from knowledge_paths.models import KnowledgePath, Node
@@ -7187,3 +7187,206 @@ class TranscriptAnchorAPITests(APITestCase):
         self.assertEqual(response.data['error'], FEE_TOO_HIGH_MESSAGE)
         pending.refresh_from_db()
         self.assertEqual(pending.status, TranscriptAnchor.STATUS_PENDING)
+
+
+class TopicChatPinAPITests(APITestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username='pinauthor',
+            email='pinauthor@example.com',
+            password='testpass123',
+        )
+        self.reader = User.objects.create_user(
+            username='pinreader',
+            email='pinreader@example.com',
+            password='testpass123',
+        )
+        self.moderator = User.objects.create_user(
+            username='pinmod',
+            email='pinmod@example.com',
+            password='testpass123',
+        )
+        self.topic = Topic.objects.create(
+            title='Tema con consultas fijadas',
+            creator=self.author,
+            is_public=True,
+            chat_enabled=True,
+        )
+        self.topic.moderators.add(self.moderator)
+        self.video = Content.objects.create(
+            uploaded_by=self.author,
+            media_type='VIDEO',
+            original_title='Video citado',
+        )
+        self.other = Content.objects.create(
+            uploaded_by=self.author,
+            media_type='TEXT',
+            original_title='Otro texto',
+        )
+        self.topic.contents.add(self.video, self.other)
+        ContentEmbedding.objects.create(
+            content=self.video,
+            status=ContentEmbedding.STATUS_INDEXED,
+            model='text-embedding-3-large',
+            dims=8,
+            chunk_count=2,
+            source_hash='abc',
+        )
+        ContentEmbedding.objects.create(
+            content=self.other,
+            status=ContentEmbedding.STATUS_INDEXED,
+            model='text-embedding-3-large',
+            dims=8,
+            chunk_count=1,
+            source_hash='def',
+        )
+        self.query = TopicChatQuery.objects.create(
+            topic=self.topic,
+            user=self.author,
+            question='¿Qué dicen del tamaño?',
+            answer='El video habla del tamaño [1].',
+            sources=[{'index': 1, 'content_id': self.video.id, 'title': 'Video citado'}],
+            selected_content_ids=[self.video.id],
+        )
+        self.client.force_authenticate(user=self.author)
+
+    def _pin(self, content_ids=None, user=None):
+        if user is not None:
+            self.client.force_authenticate(user=user)
+        return self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/queries/{self.query.id}/pins/',
+            {'content_ids': content_ids if content_ids is not None else [self.video.id]},
+            format='json',
+        )
+
+    def test_author_pin_publishes_and_stranger_private_detail_stays_hidden(self):
+        response = self._pin()
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data['pinned_content_ids'], [self.video.id])
+        self.assertEqual(response.data['author_username'], self.author.username)
+        self.assertEqual(response.data['vote_count'], 0)
+        self.assertTrue(response.data['can_unpin'])
+        self.assertTrue(TopicChatPin.objects.filter(query=self.query, content=self.video).exists())
+
+        self.client.force_authenticate(user=self.reader)
+        hidden = self.client.get(
+            f'/api/content/topics/{self.topic.id}/chat/queries/{self.query.id}/',
+        )
+        self.assertEqual(hidden.status_code, status.HTTP_404_NOT_FOUND)
+
+        public = self.client.get(
+            f'/api/content/topics/{self.topic.id}/chat/public/',
+        )
+        self.assertEqual(public.status_code, status.HTTP_200_OK)
+        self.assertEqual(public.data['count'], 1)
+        self.assertEqual(public.data['results'][0]['id'], self.query.id)
+        self.assertFalse(public.data['results'][0]['can_unpin'])
+
+        by_text = self.client.get(
+            f'/api/content/topics/{self.topic.id}/chat/public/?content_id={self.video.id}',
+        )
+        self.assertEqual(by_text.data['count'], 1)
+        other_text = self.client.get(
+            f'/api/content/topics/{self.topic.id}/chat/public/?content_id={self.other.id}',
+        )
+        self.assertEqual(other_text.data['count'], 0)
+
+    def test_guest_can_read_public_consultation_on_public_topic(self):
+        self._pin()
+        self.client.force_authenticate(user=None)
+        response = self.client.get(
+            f'/api/content/topics/{self.topic.id}/chat/public/{self.query.id}/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['question'], self.query.question)
+        self.assertEqual(response.data['user_vote'], 0)
+
+    def test_private_topic_hides_pinned_consultation_from_guests(self):
+        self.topic.is_public = False
+        self.topic.save(update_fields=['is_public'])
+        self._pin()
+        self.client.force_authenticate(user=None)
+        response = self.client.get(
+            f'/api/content/topics/{self.topic.id}/chat/public/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_rejects_text_outside_the_consultation(self):
+        response = self._pin(content_ids=[self.other.id])
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(self.other.id, response.data['invalid_content_ids'])
+        self.assertFalse(TopicChatPin.objects.filter(query=self.query).exists())
+
+    def test_non_owner_cannot_pin(self):
+        response = self._pin(user=self.reader)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(TopicChatPin.objects.filter(query=self.query).exists())
+
+    def test_replace_pin_set_and_author_unpin(self):
+        self.query.selected_content_ids = [self.video.id, self.other.id]
+        self.query.save(update_fields=['selected_content_ids'])
+        created = self._pin(content_ids=[self.video.id, self.other.id])
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+        self.assertCountEqual(
+            created.data['pinned_content_ids'],
+            [self.video.id, self.other.id],
+        )
+
+        replaced = self._pin(content_ids=[self.other.id])
+        self.assertEqual(replaced.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(replaced.data['pinned_content_ids'], [self.other.id])
+
+        removed = self.client.delete(
+            f'/api/content/topics/{self.topic.id}/chat/queries/{self.query.id}/pins/',
+        )
+        self.assertEqual(removed.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(TopicChatPin.objects.filter(query=self.query).exists())
+        self.query.refresh_from_db()
+        self.assertEqual(self.query.question, '¿Qué dicen del tamaño?')
+
+        self.client.force_authenticate(user=None)
+        hidden = self.client.get(
+            f'/api/content/topics/{self.topic.id}/chat/public/{self.query.id}/',
+        )
+        self.assertEqual(hidden.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_moderator_can_unpin(self):
+        self._pin()
+        self.client.force_authenticate(user=self.moderator)
+        response = self.client.delete(
+            f'/api/content/topics/{self.topic.id}/chat/queries/{self.query.id}/pins/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(self.query.pins.exists())
+
+    def test_stranger_cannot_unpin(self):
+        self._pin()
+        self.client.force_authenticate(user=self.reader)
+        response = self.client.delete(
+            f'/api/content/topics/{self.topic.id}/chat/queries/{self.query.id}/pins/',
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(self.query.pins.exists())
+
+    def test_paid_topic_allows_reading_without_purchase(self):
+        self.topic.reference_price = 10
+        self.topic.save(update_fields=['reference_price'])
+        self._pin()
+        self.client.force_authenticate(user=self.reader)
+        public = self.client.get(f'/api/content/topics/{self.topic.id}/chat/public/')
+        self.assertEqual(public.status_code, status.HTTP_200_OK)
+        self.assertEqual(public.data['count'], 1)
+
+        blocked = self.client.post(
+            f'/api/content/topics/{self.topic.id}/chat/',
+            {'message': 'Una pregunta nueva'},
+            format='json',
+        )
+        self.assertEqual(blocked.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unindexed_content_cannot_be_pinned(self):
+        self.video.embedding.status = ContentEmbedding.STATUS_PENDING
+        self.video.embedding.save(update_fields=['status'])
+        response = self._pin()
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(self.video.id, response.data['invalid_content_ids'])

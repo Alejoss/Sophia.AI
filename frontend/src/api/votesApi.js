@@ -157,7 +157,15 @@ const votesApi = {
 
     downvoteContentSuggestion: async (suggestionId) => {
         return votesApi.voteContentSuggestion(suggestionId, 'downvote');
-    }
+    },
+
+    voteConsultation: async (topicId, queryId, action) => {
+        const response = await axiosInstance.post(
+            `/votes/topics/${topicId}/consultations/${queryId}/vote/`,
+            { action }
+        );
+        return response.data;
+    },
 };
 
 export default votesApi; 

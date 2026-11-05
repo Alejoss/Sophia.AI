@@ -88,6 +88,12 @@ answers are not sent to the LLM. The client may pass optional `content_ids` to
 restrict retrieval to a subset of indexed transcripts for that consultation.
 See [topic-rag-chat.md](../operations/topic-rag-chat.md).
 
+The author can pin that consultation onto one or more of those texts
+(`TopicChatPin`). A pinned consultation is readable by anyone who can view the
+topic, including guests on a public topic, and can be voted up or down. Reading
+a pin does not require a Consultas purchase. Unpinning hides it again. Pinned
+answers are not written back into Qdrant.
+
 ---
 
 ## Models and code locations
@@ -103,6 +109,8 @@ See [topic-rag-chat.md](../operations/topic-rag-chat.md).
 | Qdrant search client | `acbc_app/utils/qdrant_client.py` |
 | Qdrant connectivity CLI | `acbc_app/content/management/commands/check_qdrant.py` |
 | Frontend chat UI | `frontend/src/topics/TopicChat.jsx` |
+| Pinned consultations | `TopicChatPin` in `acbc_app/content/models.py`; public list in `views_topic_chat.py` |
+| Consultation votes | `votes.TopicConsultationVoteView` |
 
 ---
 
