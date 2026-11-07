@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Card, Typography, Box, Button, Alert } from '@mui/material';
+import { Link as RouterLink, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Card, Typography, Box, Button, Alert, Link } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useTranslation } from 'react-i18next';
@@ -145,9 +145,19 @@ const ContentDetailsLibrary = () => {
     };
 
     return (
-        <Box sx={{ maxWidth: 800, margin: '0 auto', padding: 2, pt: 12 }}>
+        <Box sx={{ maxWidth: 800, margin: '0 auto', padding: 2 }}>
+            <Link
+                component={RouterLink}
+                to="/como-funciona/archivo-y-preservacion"
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="caption"
+                sx={{ display: 'inline-block', mb: 2 }}
+            >
+                {t('detailsLibrary.whyDownload')}
+            </Link>
             {/* Action Buttons */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 2 }}>
                 {isInUserLibrary ? (
                     // Owner actions
                     <>

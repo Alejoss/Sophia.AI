@@ -220,6 +220,7 @@
   "list": {
     "title": "Temas",
     "requestTopic": "Solicitar tema",
+    "whyNoAlgorithm": "¿Por qué no navegar siguiendo un algoritmo?",
     "loadError": "Error al cargar los temas.",
     "loadFailed": "Error al cargar los temas",
     "empty": "Aún no se han creado temas",

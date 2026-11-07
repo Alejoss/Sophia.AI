@@ -166,6 +166,9 @@ ucronia_thumbnails/
 # Cloudflare analytics reports (local snapshots; never commit)
 reports/cloudflare/
 
+# Local guide clips served from frontend/public (large source files; not hosted)
+frontend/public/videos/*.mp4
+
 # YouTube migration (local downloads + logs; commit manifest JSON for server linking)
 acbc_app/youtube_downloads/
 acbc_app/youtube_migration/*

@@ -86,6 +86,7 @@
     "bchDirect": "Direct Bitcoin Cash (BCH)",
     "payMonero": "Pay with Monero",
     "noMethods": "No payment methods are configured on the server.",
+    "whyCrypto": "Why do we accept cryptocurrency?",
     "tokensTitle": "Pay with tokens",
     "tokenDeduct": "{{count}} tokens will be deducted from your balance ({{balance}}).",
     "bchTitle": "Bitcoin Cash payment",

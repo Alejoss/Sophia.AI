@@ -53,6 +53,27 @@
         }
       ],
       "takeaway": "La plataforma ofrece rutas para explorar; la dirección de tu aprendizaje sigue siendo tuya."
+    },
+    "aceptamos-criptomonedas": {
+      "shortTitle": "Aceptamos Criptomonedas",
+      "eyebrow": "TRABAJO, EMISIÓN Y ESTADO",
+      "title": "Usar criptomonedas es separar la economía del Estado.",
+      "introduction": "En Academia Blockchain puedes pagar con criptomonedas. Cada vez que utilizas una moneda del Estado entregas tu energía y tu tiempo. Literalmente.",
+      "sections": [
+        {
+          "title": "Imprimir es diluir el trabajo",
+          "body": "Trabajamos e intercambiamos ese trabajo por dinero. Lo gastamos o lo ahorramos. El activo que hace posible el intercambio no aparece por sí mismo: lo produce el banco central. Mientras más gente lo demanda, más valor alcanza. Y mientras más valor tiene, más billetes se pueden 'imprimir' sin que nadie lo advierta, es decir, sin que la emisión se presente todavía como inflación. Imprimir diluye el valor que las personas ya habían dado a los billetes existentes al cambiar por ellos su trabajo. Es un robo sigiloso."
+        },
+        {
+          "title": "El dinero podría valer más",
+          "body": "Si no existiera la política de crear dinero de la nada de manera continua, el dinero aumentaría de valor. Habría ahorro, y los precios bajarían en lugar de subir: cuando el dinero vale más, las cosas valen menos medidas en dinero. En las universidades, sin embargo, se enseña a los economistas a temer la deflación."
+        },
+        {
+          "title": "Separar la economía del Estado",
+          "body": "Usar dinero del Estado es también pagar impuestos. Conviene entregar la menor cantidad de recursos a un poder que no te representa y cuya corrupción conoces. Pagar con criptomonedas es un esfuerzo por salir de una economía maniatada por burócratas que no entienden lo que hacen, pero creen que pueden dictar el precio de las cosas. Y el asunto no se agota en ellos. Quienes fijan la tasa de interés y controlan el banco central generan crisis a propósito: Usar criptomonedas es salirse de su economía. Es separar la economía del Estado."
+        }
+      ],
+      "takeaway": "Cada pago en moneda fiat estatal es una aceptación implícita de un sistema de opresión y vigilancia. Por suerte, hay una salida: utilizar criptomonedas."
     }
   }
 }

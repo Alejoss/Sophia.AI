@@ -350,6 +350,7 @@
     "acceptError": "No se pudo aceptar la sugerencia.",
     "rejectError": "No se pudo rechazar la sugerencia.",
     "goToLibrary": "Ir a tu biblioteca",
+    "whyDownload": "¿Por qué puedes descargarte el archivo?",
     "editProfile": "Editar perfil de contenido",
     "editThumbnailLater": "Luego podrás editar la imagen miniatura",
     "pendingSuggestions": "Sugerencias de archivo pendientes",

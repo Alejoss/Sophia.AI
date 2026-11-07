@@ -53,6 +53,27 @@
         }
       ],
       "takeaway": "The platform offers routes to explore; the direction of your learning remains yours."
+    },
+    "aceptamos-criptomonedas": {
+      "shortTitle": "We accept cryptocurrency",
+      "eyebrow": "WORK, ISSUANCE, AND THE STATE",
+      "title": "Using cryptocurrency separates the economy from the State.",
+      "introduction": "On Academia Blockchain you can pay with cryptocurrency. Every time you use a State currency you hand over your energy and your time. Literally.",
+      "sections": [
+        {
+          "title": "Printing dilutes work",
+          "body": "We work and exchange that work for money. We spend it or we save it. The asset that makes exchange possible does not appear on its own: a central bank produces it. The more people demand it, the more value it gains. And the more value it has, the more notes can be 'printed' before anyone notices, that is, before the new issue shows up as inflation. Printing dilutes the value people had already given to the existing notes by exchanging their work for them. It is a quiet theft."
+        },
+        {
+          "title": "Money could be worth more",
+          "body": "If there were no standing policy of creating money out of nothing, money would gain value. People could save, and prices would fall rather than rise: when money is worth more, things are worth less in terms of money. Universities nevertheless teach economists to fear deflation."
+        },
+        {
+          "title": "Separating the economy from the State",
+          "body": "To use State money is also to pay taxes. It is better to hand over as few resources as possible to a power that does not represent you and whose corruption you know. Paying with cryptocurrency is an effort to leave an economy shackled by bureaucrats who do not understand what they are doing, but believe they can dictate the price of things. And the matter does not end with them. Those who set the interest rate and control the central bank create crises on purpose: To use cryptocurrency is to step out of their economy. It is to separate the economy from the State."
+        }
+      ],
+      "takeaway": "Every payment in state fiat currency is an implicit acceptance of a system of oppression and surveillance. Fortunately, there is a way out: use cryptocurrency."
     }
   }
 }
