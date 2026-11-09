@@ -93,6 +93,31 @@ describe('MessageThread form', () => {
     ).toBeInTheDocument();
   });
 
+  it('scrolls the message log itself and does not scroll the page', async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    mockFetchMessages.mockResolvedValue({
+      data: [
+        receivedMessage,
+        { ...receivedMessage, id: 2, text: 'Segundo mensaje' },
+      ],
+    });
+
+    renderWithProviders(<MessageThread />);
+
+    const log = await screen.findByRole('log', { name: /mensajes de la conversación/i });
+    const form = screen.getByRole('button', { name: /^enviar$/i }).closest('form');
+    const styles = window.getComputedStyle(log);
+
+    expect(log.parentElement).toBe(form.parentElement);
+    expect(log.contains(form)).toBe(false);
+    expect(styles.overflowY).toBe('auto');
+    expect(styles.maxHeight).not.toBe('400px');
+    expect(styles.overscrollBehaviorY === 'contain' || styles.overscrollBehavior === 'contain').toBe(true);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    scrollIntoView.mockRestore();
+  });
+
   it('keeps received message text readable in dark mode', async () => {
     mockFetchMessages.mockResolvedValue({ data: [receivedMessage] });
     const darkTheme = createTheme(createThemeConfig('dark'));

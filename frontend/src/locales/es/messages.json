@@ -17,6 +17,8 @@
     "loadFailed": "Error al cargar los mensajes.",
     "sendFailed": "Error al enviar el mensaje.",
     "notFound": "No se encontró el hilo.",
+    "back": "Volver",
+    "logLabel": "Mensajes de la conversación",
     "withUser": "Conversación con",
     "unknownUser": "Usuario",
     "empty": "Aún no hay mensajes.",
