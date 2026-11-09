@@ -1453,7 +1453,7 @@ class AdminTopicsConsultationsView(APIView):
     )
 
     def get(self, request):
-        queryset = Topic.objects.annotate(
+        queryset = Topic.objects.select_related('creator').annotate(
             _indexed_transcript_count=Count(
                 'contents',
                 filter=self.INDEXED_Q,
@@ -2087,6 +2087,24 @@ def get_topic_content_profile_for_display(
 
 
 # Topic Views
+def _topics_listing_queryset(queryset):
+    """Load creator and indexed-transcript counts with the topic rows.
+
+    TopicBasicSerializer reads creator.username plus the indexed count twice.
+    Without this, GET /api/content/topics/ issues one auth_user lookup and two
+    content COUNTs per topic (Sentry PYTHON-DJANGO-18).
+    """
+    return queryset.select_related('creator').annotate(
+        _indexed_transcript_count=Count(
+            'contents',
+            filter=Q(
+                contents__embedding__status=ContentEmbedding.STATUS_INDEXED,
+            ),
+            distinct=True,
+        ),
+    )
+
+
 class TopicView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -2096,7 +2114,9 @@ class TopicView(APIView):
         return [permission() for permission in self.permission_classes]
 
     def get(self, request):
-        topics = Topic.objects.filter(is_public=True).order_by('-activity_score', '-created_at')
+        topics = _topics_listing_queryset(
+            Topic.objects.filter(is_public=True)
+        ).order_by('-activity_score', '-created_at')
         serializer = TopicBasicSerializer(topics, many=True, context={'request': request})
         return Response(serializer.data)
 
@@ -3187,7 +3207,8 @@ class UserTopicsView(APIView):
             topics = Topic.objects.filter(
                 Q(creator=request.user) | Q(moderators=request.user)
             ).distinct().order_by('-created_at')
-        
+
+        topics = _topics_listing_queryset(topics)
         serializer = TopicBasicSerializer(topics, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 

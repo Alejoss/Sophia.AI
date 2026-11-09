@@ -18,7 +18,8 @@ from content.models import (
 from knowledge_paths.models import KnowledgePath, Node
 from django.utils import timezone
 from datetime import timedelta
-from django.db import IntegrityError
+from django.db import IntegrityError, connection
+from django.test.utils import CaptureQueriesContext
 import json
 import os
 from unittest.mock import patch, Mock
@@ -1616,6 +1617,66 @@ class TopicAPITests(APITestCase):
         topic_ids = {item['id'] for item in response.data}
         self.assertIn(self.topic.id, topic_ids)
         self.assertNotIn(hidden_topic.id, topic_ids)
+
+    def test_public_topic_list_does_not_query_per_topic(self):
+        """Creator and indexed-transcript lookups stay in the listing query."""
+        indexed_topic = None
+        for index in range(4):
+            creator = User.objects.create_user(
+                username=f'listcreator{index}',
+                email=f'listcreator{index}@example.com',
+                password='pass12345',
+            )
+            topic = Topic.objects.create(
+                title=f'Listed topic {index}',
+                creator=creator,
+                is_public=True,
+            )
+            content = Content.objects.create(
+                uploaded_by=creator,
+                media_type='VIDEO',
+                original_title=f'Indexed clip {index}',
+            )
+            topic.contents.add(content)
+            ContentEmbedding.objects.create(
+                content=content,
+                status=ContentEmbedding.STATUS_INDEXED,
+            )
+            if index == 0:
+                second = Content.objects.create(
+                    uploaded_by=creator,
+                    media_type='TEXT',
+                    original_title='Second indexed clip',
+                )
+                topic.contents.add(second)
+                ContentEmbedding.objects.create(
+                    content=second,
+                    status=ContentEmbedding.STATUS_INDEXED,
+                )
+                indexed_topic = topic
+
+        self.client.force_authenticate(user=None)
+        with CaptureQueriesContext(connection) as captured:
+            response = self.client.get(reverse('content:topics'))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        by_id = {item['id']: item for item in response.data}
+        self.assertEqual(by_id[indexed_topic.id]['creator_username'], 'listcreator0')
+        self.assertEqual(by_id[indexed_topic.id]['indexed_transcript_count'], 2)
+        self.assertTrue(by_id[indexed_topic.id]['chat_can_enable'])
+        self.assertEqual(by_id[self.topic.id]['indexed_transcript_count'], 0)
+        self.assertFalse(by_id[self.topic.id]['chat_can_enable'])
+
+        per_topic_user = []
+        per_topic_counts = []
+        for query in captured.captured_queries:
+            sql = ' '.join(query['sql'].split())
+            if 'FROM "auth_user"' in sql and 'WHERE "auth_user"."id"' in sql:
+                per_topic_user.append(sql)
+            if 'COUNT' in sql and 'FROM "content_content"' in sql:
+                per_topic_counts.append(sql)
+        self.assertEqual(per_topic_user, [])
+        self.assertEqual(per_topic_counts, [])
 
     def test_hidden_topic_detail_visible_to_creator(self):
         self.topic.is_public = False
