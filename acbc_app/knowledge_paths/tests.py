@@ -186,6 +186,21 @@ class NodeAPITests(APITestCase):
         self.assertEqual(Node.objects.count(), 1)
         self.assertEqual(response.data['title'], 'New Node')
 
+    def test_other_user_cannot_create_node(self):
+        intruder = User.objects.create_user(
+            username='intruder',
+            email='intruder@example.com',
+            password='testpass123',
+        )
+        self.client.force_authenticate(user=intruder)
+        url = reverse('knowledge_paths:node-create', args=[self.knowledge_path.id])
+        response = self.client.post(url, {
+            'content_profile_id': self.content_profile.id,
+            'title': 'Stolen node',
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Node.objects.count(), 0)
+
     def test_node_completion(self):
         """Test marking a node as completed"""
         node = Node.objects.create(

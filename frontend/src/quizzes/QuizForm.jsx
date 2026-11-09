@@ -39,6 +39,8 @@ import { useTranslation } from 'react-i18next';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import quizApi from '../api/quizzesApi';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
+import { isOwnedByUser } from '../utils/ownership';
+import { useAuth } from '../context/AuthContext';
 import i18n from '../i18n';
 
 const schema = yup.object({
@@ -105,6 +107,7 @@ const QuizForm = () => {
   const { t } = useTranslation('quizzes');
   const navigate = useNavigate();
   const { pathId: initialPathId, quizId } = useParams();
+  const { authState } = useAuth();
   const mode = quizId ? 'edit' : 'create';
 
   const [nodes, setNodes] = useState([]);
@@ -177,6 +180,10 @@ const QuizForm = () => {
         }
 
         const pathData = await knowledgePathsApi.getKnowledgePath(pathIdToUse);
+        if (!isOwnedByUser(pathData.author_id, authState.user)) {
+          setLoadError(t('form.forbidden'));
+          return;
+        }
         setNodes(pathData.nodes || []);
       } catch (err) {
         console.error('Form initialization error:', err);
@@ -191,7 +198,7 @@ const QuizForm = () => {
     };
 
     initializeForm();
-  }, [quizId, initialPathId, mode, reset, t]);
+  }, [quizId, initialPathId, mode, reset, t, authState.user]);
 
   const onSubmit = async (formValues) => {
     setSubmitError(null);
@@ -351,6 +358,14 @@ const QuizForm = () => {
     );
   }
 
+  if (loadError) {
+    return (
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Alert severity="error">{loadError}</Alert>
+      </Container>
+    );
+  }
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Stack spacing={3}>
@@ -366,10 +381,6 @@ const QuizForm = () => {
             {mode === 'create' ? t('form.createTitle') : t('form.editTitle')}
           </Typography>
         </Box>
-
-        {loadError && (
-          <Alert severity="error">{loadError}</Alert>
-        )}
 
         {submitError && (
           <Alert severity="error" sx={{ whiteSpace: 'pre-line' }}>

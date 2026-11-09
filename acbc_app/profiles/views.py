@@ -36,6 +36,7 @@ from profiles.serializers import UserSerializer, ProfileSerializer, UserRegistra
 from profiles.models import NewsletterSubscription, Profile, CryptoCurrency, AcceptedCrypto, Suggestion
 from profiles.email_service import EmailService, EmailServiceError
 from content.permissions import VincentMachinePermission
+from utils.permissions import user_owns
 from profiles.newsletter import (
     NEWSLETTER_RATE_LIMIT_MESSAGE,
     NEWSLETTER_SUBSCRIBED_EMAIL_SESSION_KEY,
@@ -736,6 +737,11 @@ class UserDetailView(APIView):
         try:
             # Obtén un usuario específico por su pk (ID)
             user = get_object_or_404(User, pk=pk)
+            if not user_owns(request, user.id):
+                return Response(
+                    {'error': 'Solo puede modificar su propio usuario.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             # Serializa los datos del usuario con los datos actualizados
             serializer = UserSerializer(user, data=request.data,
                                         partial=True)  # `partial=True` para permitir actualizaciones parciales
@@ -778,6 +784,11 @@ class ProfileDetail(APIView):
         try:
             # Update to also use user_id
             profile = get_object_or_404(Profile, user_id=pk)
+            if not user_owns(request, profile.user_id):
+                return Response(
+                    {'error': 'Solo puede modificar su propio perfil.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             serializer = ProfileSerializer(profile, data=request.data, context={'request': request})
             if serializer.is_valid():
                 updated_profile = serializer.save()
@@ -799,6 +810,11 @@ class ProfileDetail(APIView):
         try:
             # Update to also use user_id
             profile = get_object_or_404(Profile, user_id=pk)
+            if not user_owns(request, profile.user_id):
+                return Response(
+                    {'error': 'Solo puede eliminar su propio perfil.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             profile.delete()
             logger.info(f"Profile deleted successfully - User ID: {pk}, Deleted by: {request.user.username}")
             return Response(status=status.HTTP_204_NO_CONTENT)

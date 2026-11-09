@@ -162,6 +162,35 @@ class QuizAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_other_user_cannot_update_or_delete_quiz(self):
+        intruder = User.objects.create_user(username='intruder', password='apipass')
+        self.client.force_authenticate(user=intruder)
+        url = reverse('quizzes:quiz-detail', args=[self.quiz.id])
+        update = self.client.put(url, {'title': 'Hacked quiz', 'node': self.node.id}, format='json')
+        self.assertEqual(update.status_code, status.HTTP_403_FORBIDDEN)
+        self.quiz.refresh_from_db()
+        self.assertEqual(self.quiz.title, 'API Quiz')
+
+        delete = self.client.delete(url)
+        self.assertEqual(delete.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Quiz.objects.filter(id=self.quiz.id).exists())
+
+    def test_other_user_cannot_create_quiz_on_foreign_path(self):
+        intruder = User.objects.create_user(username='intruder', password='apipass')
+        self.client.force_authenticate(user=intruder)
+        url = reverse('quizzes:quiz-create')
+        response = self.client.post(url, {
+            'path_id': self.path.id,
+            'node_id': self.node.id,
+            'quiz': {
+                'title': 'Stolen quiz',
+                'max_attempts_per_day': 2,
+                'questions': [],
+            },
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(Quiz.objects.filter(title='Stolen quiz').exists())
+
 class QuizIntegrationTests(APITestCase):
     """Integration tests for quiz progress and knowledge path."""
 

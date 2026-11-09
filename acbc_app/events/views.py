@@ -21,6 +21,7 @@ from events.serializers import (EventSerializer,
                                 EventRegistrationSerializer,
                                 EventRegistrationListSerializer)
 from utils.notification_utils import notify_event_registration, notify_payment_accepted, notify_certificate_sent
+from utils.permissions import user_owns
 from payments.services import is_payments_gateway_configured
 
 logger = logging.getLogger(__name__)
@@ -133,6 +134,17 @@ class EventDetail(APIView):
         
         try:
             event = self.get_object(pk)
+            if not user_owns(request, event.owner_id):
+                logger.warning(
+                    "Event update denied - Event ID: %s, User: %s, Owner ID: %s",
+                    pk,
+                    request.user.username,
+                    event.owner_id,
+                )
+                return Response(
+                    {'error': 'Solo el organizador del evento puede modificarlo.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             
             serializer = EventSerializer(event, data=request.data, context={'request': request})
             if serializer.is_valid():
@@ -156,6 +168,17 @@ class EventDetail(APIView):
         
         try:
             event = self.get_object(pk)
+            if not user_owns(request, event.owner_id):
+                logger.warning(
+                    "Event deletion denied - Event ID: %s, User: %s, Owner ID: %s",
+                    pk,
+                    request.user.username,
+                    event.owner_id,
+                )
+                return Response(
+                    {'error': 'Solo el organizador del evento puede eliminarlo.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             event_title = event.title
             event.delete()
             

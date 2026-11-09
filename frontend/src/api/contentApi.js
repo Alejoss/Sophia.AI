@@ -1,5 +1,8 @@
 import axiosInstance from './axiosConfig';
 
+// Consultas block on the model. Keep this above the shared 30s Axios limit.
+const TOPIC_CHAT_TIMEOUT_MS = 120000;
+
 const contentApi = {
   getUserContent: async () => {
     try {
@@ -677,7 +680,11 @@ const contentApi = {
     if (Array.isArray(contentIds)) {
       body.content_ids = contentIds;
     }
-    const response = await axiosInstance.post(`/content/topics/${topicId}/chat/`, body);
+    const response = await axiosInstance.post(
+      `/content/topics/${topicId}/chat/`,
+      body,
+      { timeout: TOPIC_CHAT_TIMEOUT_MS },
+    );
     return response.data;
   },
 

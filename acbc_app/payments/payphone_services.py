@@ -230,22 +230,8 @@ def _release_other_rails(
         now_kwargs['course_purchase'] = course_purchase
     if transcript_generation is not None:
         now_kwargs['transcript_generation'] = transcript_generation
-    # Event registrations only use NOWPayments (no BCH rail).
     if event_registration is not None:
-        from payments.models import CryptoPayment
-        from payments.services import IN_FLIGHT_NOWPAYMENTS_STATUSES, SWITCHABLE_NOWPAYMENTS_STATUSES
-        if CryptoPayment.objects.filter(
-            event_registration=event_registration,
-            payment_status__in=IN_FLIGHT_NOWPAYMENTS_STATUSES,
-        ).exists():
-            raise ValueError(
-                'Hay un pago NOWPayments en confirmación. Espera a que termine o expire.'
-            )
-        CryptoPayment.objects.filter(
-            event_registration=event_registration,
-            payment_status__in=SWITCHABLE_NOWPAYMENTS_STATUSES,
-        ).update(payment_status='expired')
-        return
+        now_kwargs['event_registration'] = event_registration
 
     if now_kwargs and has_in_flight_nowpayments(**now_kwargs):
         raise ValueError(
@@ -255,7 +241,9 @@ def _release_other_rails(
         abandon_waiting_nowpayments(**now_kwargs)
 
     bch_q = Q()
-    if path_purchase is not None:
+    if event_registration is not None:
+        bch_q = Q(event_registration=event_registration)
+    elif path_purchase is not None:
         bch_q = Q(path_purchase=path_purchase)
     elif topic_purchase is not None:
         bch_q = Q(topic_purchase=topic_purchase)

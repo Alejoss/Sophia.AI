@@ -316,7 +316,6 @@ function TranscriptPicker({
               >
                 {mediaTypeLabel(src.media_type, t)}
                 {src.original_author ? ` · ${src.original_author}` : ''}
-                {typeof src.chunk_count === 'number' ? t('chat.fragments', { count: src.chunk_count }) : ''}
               </Typography>
             </Box>
           );

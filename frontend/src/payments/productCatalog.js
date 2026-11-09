@@ -69,7 +69,7 @@ export const PRODUCT_CATALOG = Object.freeze({
       nowpayments: 'gateway',
       payphone: false,
       card: true,
-      bch: false,
+      bch: 'gateway',
       monero: true,
       platform_tokens: false,
     }),

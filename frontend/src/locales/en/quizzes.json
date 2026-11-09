@@ -38,6 +38,7 @@
     "questionCorrectRequired": "{{label}}: must have at least one correct answer.",
     "missingNode": "The quiz is missing node information",
     "loadError": "Could not load the data",
+    "forbidden": "You do not have permission to edit this quiz.",
     "createError": "Could not create the quiz",
     "updateError": "Could not update the quiz",
     "deleteError": "Could not delete the quiz",

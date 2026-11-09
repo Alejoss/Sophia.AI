@@ -21,7 +21,7 @@
 .brand-button-primary:hover { background: var(--brand-orange-dark) !important; transform: translateY(-2px); }
 .brand-button-secondary { color: #fff !important; }
 .brand-button-secondary:hover { background: rgba(255,255,255,.1) !important; }
-.brand-hero-note { margin: 22px 0 0 !important; color: rgba(255,255,255,.7) !important; font-size: .91rem !important; }
+.brand-hero-note { margin: 22px 0 0 !important; color: rgba(255,255,255,.7) !important; font-size: .91rem !important; font-style: italic !important; }
 .brand-hero-visual { display: none; }
 .brand-orbit { position: absolute; border: 1px solid rgba(240,100,0,.34); border-radius: 50%; }
 .brand-orbit-one { width: 360px; height: 360px; right: 9%; top: 22%; }

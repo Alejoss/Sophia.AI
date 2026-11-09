@@ -282,6 +282,18 @@ class EventDetailAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Event.objects.filter(pk=self.event.pk).exists())
 
+    def test_other_user_cannot_update_or_delete_event(self):
+        intruder = UserFactory()
+        self.client.force_authenticate(user=intruder)
+        update = self.client.put(self.url, {'title': 'Hacked event'}, format='json')
+        self.assertEqual(update.status_code, status.HTTP_403_FORBIDDEN)
+        self.event.refresh_from_db()
+        self.assertNotEqual(self.event.title, 'Hacked event')
+
+        delete = self.client.delete(self.url)
+        self.assertEqual(delete.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Event.objects.filter(pk=self.event.pk).exists())
+
 
 class EventRegistrationAPITest(TestCase):
     """Test cases for EventRegistration API endpoint."""

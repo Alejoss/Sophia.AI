@@ -12,15 +12,18 @@ Cubre estos productos cuando tienen precio y la venta está activa
 - Consultas de un tema con `reference_price > 0` y `sales_enabled`
 - Paquetes de tokens de plataforma (siempre, si hay dirección BCH)
 - Cursos fijos (`CoursePurchase`, si hay dirección BCH y el curso está a la venta)
+- Registros de eventos de pago (`EventRegistration`, si hay dirección BCH y `reference_price > 0`)
 
 Cuando un camino/tema está **en venta**, el checkout ofrece NOWPayments (si está
 configurado), Bitcoin Cash (si el servidor tiene dirección BCH) y Monero por
 mensaje. El toggle del dashboard ya no activa BCH por producto: activa o pausa
 la venta del contenido.
 
-Eventos siguen en NOWPayments. Un camino de pago también puede seguir cobrando
-por NOWPayments. El usuario puede cambiar de método mientras el invoice
-NOWPayments sigue en `waiting` (aún no hay fondos en camino).
+El checkout de un evento usa el mismo modelo que un curso: tarjeta, NOWPayments,
+Bitcoin Cash directo (si el servidor tiene dirección BCH) y Monero. Un camino de
+pago también puede seguir cobrando por NOWPayments. El usuario puede cambiar de
+método mientras el invoice NOWPayments sigue en `waiting` (aún no hay fondos en
+camino).
 
 Índice de pagos: [README.md](README.md).
 
@@ -293,6 +296,8 @@ verificar**, no crear la orden.
 | POST | `/api/payments/topic-purchase/<id>/bch/verify/` | Comprador o moderador | Auto-verify (`{}`) o fallback `{ "txid": "…" }` → `{ payment, purchase }` |
 | GET/POST | `/api/payments/course-purchase/<id>/bch/` | Comprador (POST) | Orden BCH del curso |
 | POST | `/api/payments/course-purchase/<id>/bch/verify/` | Comprador o staff | Auto-verify (`{}`) o fallback `{ "txid": "…" }` → `{ payment, purchase }` |
+| GET/POST | `/api/payments/registration/<id>/bch/` | Participante (POST) | Orden BCH del registro de evento |
+| POST | `/api/payments/registration/<id>/bch/verify/` | Participante, dueño del evento o staff | Auto-verify (`{}`) o fallback `{ "txid": "…" }` → `{ payment, registration }` |
 
 ### Serializer (`BchDirectPayment`)
 

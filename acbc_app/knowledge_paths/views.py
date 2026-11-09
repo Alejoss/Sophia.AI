@@ -21,7 +21,7 @@ from .serializers import (
     KnowledgePathListSerializer,
     KnowledgePathEngagedSerializer,
 )
-from utils.permissions import IsAuthor
+from utils.permissions import IsAuthor, user_owns
 from content.models import Content, ContentProfile
 from django.db import IntegrityError, transaction
 from django.db import models
@@ -597,8 +597,22 @@ class NodeCreateView(APIView):
     def post(self, request, path_id):
         try:
             knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
+            if not user_owns(request, knowledge_path.author_id):
+                knowledge_paths_logger.warning("Unauthorized node creation attempt", extra={
+                    'user_id': request.user.id,
+                    'knowledge_path_id': path_id,
+                    'author_id': knowledge_path.author_id,
+                })
+                return Response(
+                    {'error': 'Solo el autor del camino puede agregar nodos.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             content_profile_id = request.data.get('content_profile_id')
-            content_profile = get_object_or_404(ContentProfile, pk=content_profile_id)
+            content_profile = get_object_or_404(
+                ContentProfile,
+                pk=content_profile_id,
+                user=request.user,
+            )
             
             knowledge_paths_logger.info("Node creation request", extra={
                 'user_id': request.user.id,
@@ -670,6 +684,18 @@ class NodeDeleteView(APIView):
         try:
             knowledge_path = get_object_or_404(KnowledgePath, pk=path_id)
             node = get_object_or_404(Node, pk=node_id, knowledge_path=knowledge_path)
+
+            if not user_owns(request, knowledge_path.author_id):
+                knowledge_paths_logger.warning("Unauthorized node deletion attempt", extra={
+                    'user_id': request.user.id,
+                    'knowledge_path_id': path_id,
+                    'node_id': node_id,
+                    'author_id': knowledge_path.author_id,
+                })
+                return Response(
+                    {'error': 'Solo el autor del camino puede eliminar nodos.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             
             knowledge_paths_logger.info("Node deletion request", extra={
                 'user_id': request.user.id,
@@ -677,10 +703,6 @@ class NodeDeleteView(APIView):
                 'node_id': node_id,
                 'node_title': node.title,
             })
-            
-            # Optional: Add permission check if needed
-            # if knowledge_path.author != request.user:
-            #     return Response(status=status.HTTP_403_FORBIDDEN)
             
             node.delete()
             

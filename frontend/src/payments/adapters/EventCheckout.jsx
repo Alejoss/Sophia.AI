@@ -1,9 +1,13 @@
 import React, { useRef } from 'react';
 import ProductPaymentCheckout from '../ProductPaymentCheckout';
+import {
+  createRegistrationBchPayment,
+  verifyRegistrationBchPayment,
+} from '../../api/paymentsApi';
 import { PRODUCT_KINDS } from '../productCatalog';
 
 /**
- * Event registration checkout adapter (NOWPayments + Monero; no BCH).
+ * Event registration checkout: card, NOWPayments, direct BCH, and Monero.
  */
 const EventCheckout = ({
   open,
@@ -25,6 +29,16 @@ const EventCheckout = ({
       priceUsd={priceUsd}
       productKind={PRODUCT_KINDS.EVENT}
       productFlags={{}}
+      createBchPayment={
+        activeRegistrationId != null
+          ? () => createRegistrationBchPayment(activeRegistrationId)
+          : undefined
+      }
+      verifyBchPayment={
+        activeRegistrationId != null
+          ? (txid) => verifyRegistrationBchPayment(activeRegistrationId, txid)
+          : undefined
+      }
       paymentTarget={
         activeRegistrationId != null
           ? { kind: PRODUCT_KINDS.EVENT, purchaseId: activeRegistrationId }
