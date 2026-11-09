@@ -153,23 +153,46 @@ def _should_fulfill_payment(status: str, payload: dict, crypto_payment: CryptoPa
     return True
 
 
-def _mark_event_registration_paid_if_needed(crypto_payment: CryptoPayment) -> None:
-    with transaction.atomic():
-        registration = EventRegistration.objects.select_for_update().get(
-            pk=crypto_payment.event_registration_id
-        )
-        if registration.payment_status == 'PAID':
-            return
-        registration.payment_status = 'PAID'
-        registration.save(update_fields=['payment_status'])
+def mark_event_registration_paid(
+    event_registration: EventRegistration,
+    *,
+    source: str = '',
+) -> tuple[EventRegistration, bool]:
+    """Mark an event registration PAID (idempotent). Shared by NOWPayments and BCH.
 
+    Returns the registration and whether this call performed the transition.
+    """
+    newly_paid = False
+    with transaction.atomic():
+        registration = EventRegistration.objects.select_for_update().get(pk=event_registration.pk)
+        if registration.payment_status != 'PAID':
+            registration.payment_status = 'PAID'
+            registration.save(update_fields=['payment_status'])
+            newly_paid = True
     registration = EventRegistration.objects.select_related('event', 'event__owner', 'user').get(
-        pk=crypto_payment.event_registration_id
+        pk=event_registration.pk
+    )
+    if not newly_paid:
+        return registration, False
+    logger.info(
+        'Event registration %s marked PAID (source=%s)',
+        registration.pk,
+        source or 'unknown',
     )
     try:
         notify_payment_accepted(registration)
     except Exception as exc:
         logger.error('Payment notification failed for registration %s: %s', registration.id, exc)
+    return registration, True
+
+
+def _mark_event_registration_paid_if_needed(crypto_payment: CryptoPayment) -> None:
+    registration, newly_paid = mark_event_registration_paid(
+        EventRegistration.objects.get(pk=crypto_payment.event_registration_id),
+        source='nowpayments',
+    )
+    if not newly_paid:
+        return
     try:
         on_crypto_payment_completed(crypto_payment, event_registration=registration)
     except Exception as exc:
@@ -552,6 +575,7 @@ def nowpayments_queryset(
     token_purchase=None,
     course_purchase=None,
     transcript_generation=None,
+    event_registration=None,
 ):
     if anchor_request is not None:
         return CryptoPayment.objects.filter(anchor_request=anchor_request)
@@ -563,6 +587,8 @@ def nowpayments_queryset(
         return CryptoPayment.objects.filter(course_purchase=course_purchase)
     if transcript_generation is not None:
         return CryptoPayment.objects.filter(transcript_generation=transcript_generation)
+    if event_registration is not None:
+        return CryptoPayment.objects.filter(event_registration=event_registration)
     return CryptoPayment.objects.none()
 
 
@@ -573,6 +599,7 @@ def has_in_flight_nowpayments(
     token_purchase=None,
     course_purchase=None,
     transcript_generation=None,
+    event_registration=None,
 ) -> bool:
     return nowpayments_queryset(
         anchor_request=anchor_request,
@@ -580,6 +607,7 @@ def has_in_flight_nowpayments(
         token_purchase=token_purchase,
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
+        event_registration=event_registration,
     ).filter(payment_status__in=IN_FLIGHT_NOWPAYMENTS_STATUSES).exists()
 
 
@@ -590,6 +618,7 @@ def abandon_waiting_nowpayments(
     token_purchase=None,
     course_purchase=None,
     transcript_generation=None,
+    event_registration=None,
 ) -> int:
     """Mark unused hosted invoices expired so the user can switch to BCH."""
     return nowpayments_queryset(
@@ -598,6 +627,7 @@ def abandon_waiting_nowpayments(
         token_purchase=token_purchase,
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
+        event_registration=event_registration,
     ).filter(payment_status__in=SWITCHABLE_NOWPAYMENTS_STATUSES).update(
         payment_status='expired',
     )

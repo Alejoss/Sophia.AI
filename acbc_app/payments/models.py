@@ -287,7 +287,7 @@ class CoursePurchase(models.Model):
 
 class BchDirectPayment(models.Model):
     """
-    Self-custody BCH payment for anchors, paths, topics, token packages, or courses.
+    Self-custody BCH payment for anchors, paths, topics, token packages, courses, or events.
 
     Unique amount (sats) on a single receive address; verify accepts payments
     within ``BCH_AMOUNT_TOLERANCE_USD`` of ``expected_amount_sats`` at the
@@ -347,6 +347,13 @@ class BchDirectPayment(models.Model):
         null=True,
         blank=True,
     )
+    event_registration = models.ForeignKey(
+        'events.EventRegistration',
+        on_delete=models.CASCADE,
+        related_name='bch_direct_payments',
+        null=True,
+        blank=True,
+    )
     address = models.CharField(max_length=128)
     expected_amount_sats = models.BigIntegerField(
         help_text='Target amount in satoshis; verify allows BCH_AMOUNT_TOLERANCE_USD variance.',
@@ -386,6 +393,7 @@ class BchDirectPayment(models.Model):
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
                         transcript_generation__isnull=True,
+                        event_registration__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
@@ -394,6 +402,7 @@ class BchDirectPayment(models.Model):
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
                         transcript_generation__isnull=True,
+                        event_registration__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
@@ -402,6 +411,7 @@ class BchDirectPayment(models.Model):
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
                         transcript_generation__isnull=True,
+                        event_registration__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
@@ -410,6 +420,7 @@ class BchDirectPayment(models.Model):
                         token_purchase__isnull=False,
                         course_purchase__isnull=True,
                         transcript_generation__isnull=True,
+                        event_registration__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
@@ -418,6 +429,7 @@ class BchDirectPayment(models.Model):
                         token_purchase__isnull=True,
                         course_purchase__isnull=False,
                         transcript_generation__isnull=True,
+                        event_registration__isnull=True,
                     )
                     | Q(
                         anchor_request__isnull=True,
@@ -426,6 +438,16 @@ class BchDirectPayment(models.Model):
                         token_purchase__isnull=True,
                         course_purchase__isnull=True,
                         transcript_generation__isnull=False,
+                        event_registration__isnull=True,
+                    )
+                    | Q(
+                        anchor_request__isnull=True,
+                        path_purchase__isnull=True,
+                        topic_purchase__isnull=True,
+                        token_purchase__isnull=True,
+                        course_purchase__isnull=True,
+                        transcript_generation__isnull=True,
+                        event_registration__isnull=False,
                     )
                 ),
                 name='bchdirectpayment_exactly_one_target',
@@ -461,6 +483,8 @@ class BchDirectPayment(models.Model):
             return self.course_purchase.user
         if self.transcript_generation_id:
             return self.transcript_generation.requester
+        if self.event_registration_id:
+            return self.event_registration.user
         return None
 
     def mark_expired_if_needed(self):

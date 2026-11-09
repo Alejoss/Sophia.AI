@@ -162,6 +162,8 @@
     "retrieved": " / recuperados: {{count}}",
     "communityTitle": "Consultas fijadas",
     "communityHelp": "Consultas que alguien fijó para que todos las vean en este tema.",
+    "communityCount_one": "{{count}} consulta",
+    "communityCount_other": "{{count}} consultas",
     "communityEmpty": "Nadie ha fijado una consulta en este tema todavía.",
     "communityLoading": "Cargando consultas fijadas…",
     "communityLoadError": "No se pudieron cargar las consultas fijadas.",

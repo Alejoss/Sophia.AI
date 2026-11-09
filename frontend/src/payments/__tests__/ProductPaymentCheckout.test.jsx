@@ -31,8 +31,12 @@ vi.mock('../../api/paymentsApi', () => ({
   getPaymentStatus: (...args) => mockGetPaymentStatus(...args),
   createRegistrationPayment: vi.fn(),
   listRegistrationPayments: vi.fn(),
+  createRegistrationBchPayment: vi.fn(),
+  verifyRegistrationBchPayment: vi.fn(),
   createAnchorRequestPayment: vi.fn(),
   listAnchorRequestPayments: vi.fn(),
+  createTranscriptGenerationPayment: vi.fn(),
+  listTranscriptGenerationPayments: vi.fn(),
   createTokenPurchasePayment: vi.fn(),
   listTokenPurchasePayments: vi.fn(),
   createCoursePurchasePayment: vi.fn(),
@@ -240,6 +244,34 @@ describe('ProductPaymentCheckout method switch', () => {
       await screen.findByText(/Pago recibido — contactar soporte/i),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Contactar soporte$/i })).toBeEnabled();
+  });
+
+  it('offers direct BCH on event checkout, the same rail as other products', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ProductPaymentCheckout
+        open
+        onClose={vi.fn()}
+        title="La Real Historia de Bitcoin y la Guerra por las Criptomonedas"
+        priceUsd={35}
+        productKind="event"
+        createBchPayment={mockCreateBch}
+        verifyBchPayment={mockVerifyBch}
+        paymentTarget={{ kind: 'event', purchaseId: 4 }}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Pagar evento' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Tarjeta de Crédito/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /NOWPayments \(varias criptos\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Bitcoin Cash directo \(BCH\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Pagar con Monero/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Bitcoin Cash directo \(BCH\)/i }));
+    await waitFor(() => {
+      expect(mockCreateBch).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText('bitcoincash:qptestaddress')).toBeInTheDocument();
   });
 
 });

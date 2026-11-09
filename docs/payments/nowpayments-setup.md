@@ -45,7 +45,7 @@ FRONTEND_PUBLIC_URL=http://localhost:5173
 
 No hay FK directa a `Event` ni a `KnowledgePath`. El producto tiene `reference_price`; el entitlement guarda el estado `PENDING`/`PAID` y el snapshot del precio.
 
-Para anclajes y caminos, el usuario puede cambiar de NOWPayments a [BCH directo](bch-direct.md) mientras el invoice sigue en `waiting`. Un pago NOWPayments ya en confirmación bloquea BCH hasta que termine o expire.
+Para anclajes, caminos y registros de evento, el usuario puede cambiar de NOWPayments a [BCH directo](bch-direct.md) mientras el invoice sigue en `waiting`. Un pago NOWPayments ya en confirmación bloquea BCH hasta que termine o expire.
 
 ## Flujo (según [API NOWPayments](https://documenter.getpostman.com/view/7907941/2s93JusNJt))
 
@@ -57,6 +57,7 @@ Para anclajes y caminos, el usuario puede cambiar de NOWPayments a [BCH directo]
 5. NOWPayments envía IPN (POST) a `/api/payments/ipn/` en cada cambio de estado del **payment**.
 6. El backend también consulta NOWPayments al hacer polling (`GET /api/payments/{id}/`) usando `GET /v1/invoice-payment` o `GET /v1/payment/?invoiceid=...` hasta obtener el `payment_id`.
 7. Cuando el estado es `finished`, el backend marca el `EventRegistration` como `PAID` y ejecuta `on_crypto_payment_completed`.
+8. El mismo registro también puede pagarse con [BCH directo](bch-direct.md) (`POST /api/payments/registration/{id}/bch/`). Empezar esa orden abandona un invoice NOWPayments que siga en `waiting`.
 
 ### Caminos del Conocimiento
 1. El autor (edición del camino → Guardar precio) o el staff (`/dashboard/pagos-bch`) define `reference_price > 0`.
@@ -103,6 +104,8 @@ También se llama `on_crypto_payment_completed()` desde `sync_payment_from_provi
 | GET | `/api/payments/status/` | ¿Pasarela activa? Monedas + `methods.nowpayments` / `methods.bch_direct` |
 | POST | `/api/payments/registration/{id}/` | Crear invoice para registro de evento |
 | GET | `/api/payments/registration/{id}/list/` | Listar pagos de un registro |
+| GET/POST | `/api/payments/registration/{id}/bch/` | Orden BCH directa del registro — [bch-direct.md](bch-direct.md) |
+| POST | `/api/payments/registration/{id}/bch/verify/` | Verificar pago BCH on-chain del registro |
 | POST | `/api/payments/path-purchase/{id}/` | Crear invoice para compra de camino |
 | GET | `/api/payments/path-purchase/{id}/list/` | Listar pagos de una compra |
 | POST | `/api/payments/anchor-request/{id}/` | Crear invoice para solicitud de anclaje |

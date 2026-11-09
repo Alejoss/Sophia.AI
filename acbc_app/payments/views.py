@@ -626,6 +626,116 @@ class RegistrationPaymentsListView(APIView):
         return Response(CryptoPaymentSerializer(payments, many=True).data)
 
 
+def _get_event_registration(registration_id):
+    try:
+        return EventRegistration.objects.select_related('event', 'user').get(pk=registration_id)
+    except EventRegistration.DoesNotExist:
+        return None
+
+
+class EventRegistrationBchPaymentView(APIView):
+    """Create or reuse a direct BCH order for an event registration."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, registration_id):
+        registration = _get_event_registration(registration_id)
+        if registration is None:
+            return Response({'error': 'Registro no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        if (
+            registration.user_id != request.user.id
+            and registration.event.owner_id != request.user.id
+            and not request.user.is_staff
+        ):
+            return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
+        payment = _latest_bch_for(event_registration=registration)
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data if payment else None,
+            'bch_direct_enabled': is_bch_direct_configured(),
+            'bch_network': get_bch_network(),
+        })
+
+    def post(self, request, registration_id):
+        registration = _get_event_registration(registration_id)
+        if registration is None:
+            return Response({'error': 'Registro no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = create_or_reuse_bch_payment(
+                user=request.user,
+                event_registration=registration,
+            )
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc,
+                action='create_event_bch',
+                registration_id=registration_id,
+                user_id=request.user.id,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(
+                exc,
+                action='create_event_bch',
+                registration_id=registration_id,
+                user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='create_event_bch',
+                public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
+                registration_id=registration_id,
+                user_id=request.user.id,
+            )
+        return Response(BchDirectPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+
+class EventRegistrationBchVerifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, registration_id):
+        registration = _get_event_registration(registration_id)
+        if registration is None:
+            return Response({'error': 'Registro no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payment = verify_bch_payment(
+                user=request.user,
+                event_registration=registration,
+                payment_txid=_request_bch_txid(request),
+            )
+        except PermissionError as exc:
+            return _permission_error_response(
+                exc,
+                action='verify_event_bch',
+                registration_id=registration_id,
+                user_id=request.user.id,
+            )
+        except BchPaymentError as exc:
+            return _bch_error_response(
+                exc,
+                action='verify_event_bch',
+                registration_id=registration_id,
+                user_id=request.user.id,
+            )
+        except Exception as exc:
+            return _unexpected_payment_error_response(
+                exc,
+                action='verify_event_bch',
+                public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
+                registration_id=registration_id,
+                user_id=request.user.id,
+            )
+        registration.refresh_from_db()
+        return Response({
+            'payment': BchDirectPaymentSerializer(payment).data,
+            'registration': {
+                'id': registration.id,
+                'payment_status': registration.payment_status,
+                'is_paid': registration.payment_status == 'PAID',
+                'event_id': registration.event_id,
+            },
+        })
+
+
 class PathPurchasePaymentsListView(APIView):
     """List payments for a knowledge path purchase."""
 
