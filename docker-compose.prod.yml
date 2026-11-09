@@ -8,7 +8,11 @@ services:
       - "443:443"
     volumes:
       - ${NGINX_CONF:-./nginx/nginx.conf}:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/persisted-logs.conf:/etc/nginx/conf.d/00-persisted-logs.conf:ro
+      - ./nginx/acbc-nginx-entrypoint.sh:/opt/acbc-nginx-entrypoint.sh:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      - nginx_logs:/var/log/nginx/persisted
+    entrypoint: ["/bin/sh", "/opt/acbc-nginx-entrypoint.sh"]
     depends_on:
       - backend
       - frontend
@@ -28,14 +32,17 @@ services:
     image: ${GHCR_IMAGE_PREFIX:?Set GHCR_IMAGE_PREFIX}-backend:${IMAGE_TAG:-main}
     pull_policy: always
     container_name: acbc_backend_prod
-    # No volume mounts in production - code is baked into image
+    # Code stays in the image. backend_logs keeps Django and Gunicorn files
+    # after `up --force-recreate` (docker compose logs does not).
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+      - backend_logs:/app/logs
     env_file:
       - ./acbc_app/.env
     environment:
       - ENVIRONMENT=PRODUCTION
+      - LOGS_DIR=/app/logs
     # Don't expose port directly - accessed via nginx
     expose:
       - "8000"
@@ -64,7 +71,12 @@ services:
     image: ${GHCR_IMAGE_PREFIX:?Set GHCR_IMAGE_PREFIX}-frontend:${IMAGE_TAG:-main}
     pull_policy: always
     container_name: acbc_frontend_prod
-    # No volume mounts in production - static files are baked into image
+    # Static files stay in the image. This volume only keeps nginx access logs.
+    volumes:
+      - frontend_logs:/var/log/nginx/persisted
+      - ./nginx/persisted-logs.conf:/etc/nginx/conf.d/00-persisted-logs.conf:ro
+      - ./nginx/acbc-nginx-entrypoint.sh:/opt/acbc-nginx-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/opt/acbc-nginx-entrypoint.sh"]
     # Don't expose port directly - accessed via nginx
     expose:
       - "80"
@@ -98,6 +110,9 @@ services:
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C.UTF-8
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - postgres_logs:/var/log/postgresql
+      - ./scripts/docker/postgres-entrypoint.sh:/usr/local/bin/acbc-postgres-entrypoint.sh:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/acbc-postgres-entrypoint.sh"]
     networks:
       - app_network
     healthcheck:
@@ -126,4 +141,13 @@ volumes:
     driver: local
   media_volume:
     driver: local
+  # Explicit names survive a checkout in a different directory. `down -v` deletes them.
+  backend_logs:
+    name: acbc_prod_backend_logs
+  nginx_logs:
+    name: acbc_prod_nginx_logs
+  frontend_logs:
+    name: acbc_prod_frontend_logs
+  postgres_logs:
+    name: acbc_prod_postgres_logs
   # certbot dirs (./certbot/www, ./certbot/certs) are bind-mounted; created by setup-ssl.sh

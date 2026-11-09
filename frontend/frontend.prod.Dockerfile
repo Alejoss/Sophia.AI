@@ -41,11 +41,15 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 ARG BUILD_SHA=unknown
 RUN echo "${BUILD_SHA}" > /usr/share/nginx/html/.build_sha
 
-# Copy nginx configuration
+# Copy nginx configuration. Compose also mounts nginx/persisted-logs.conf so
+# historical access logs are written even before this image is rebuilt.
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port 80
 EXPOSE 80
+
+# Directory for the persisted-log volume. Compose mounts it in production.
+RUN mkdir -p /var/log/nginx/persisted
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]

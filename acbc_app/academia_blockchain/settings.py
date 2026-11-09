@@ -10,22 +10,24 @@ import logging
 from datetime import timedelta
 from decimal import Decimal
 
+from academia_blockchain.log_paths import resolve_logs_dir
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Ensure logs directory exists even when /app is volume-mounted
-LOGS_DIR = os.path.join(BASE_DIR, "logs")
-try:
-    os.makedirs(LOGS_DIR, exist_ok=True)
-except Exception:
-    # Fallback to tmp if repo mount prevents creating /app/logs
-    LOGS_DIR = "/tmp/academia_blockchain_logs"
-    os.makedirs(LOGS_DIR, exist_ok=True)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
 SECRET_KEY = os.environ.get("ACADEMIA_BLOCKCHAIN_SKEY", 'django-insecure-development-key-123')  # Default key for development
 ENVIRONMENT = os.getenv("ENVIRONMENT", "DEVELOPMENT")
+
+# File logs must stay on a volume (LOGS_DIR, default <repo>/logs). /tmp is
+# deleted with the container, so production refuses that fallback.
+LOGS_DIR = resolve_logs_dir(
+    BASE_DIR,
+    ENVIRONMENT,
+    configured=os.environ.get("LOGS_DIR") or None,
+)
 
 # Security settings based on environment
 if ENVIRONMENT == "PRODUCTION":
