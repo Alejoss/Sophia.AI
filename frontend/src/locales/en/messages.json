@@ -17,6 +17,8 @@
     "loadFailed": "Could not load messages.",
     "sendFailed": "Could not send the message.",
     "notFound": "Thread not found.",
+    "back": "Back",
+    "logLabel": "Conversation messages",
     "withUser": "Conversation with",
     "unknownUser": "User",
     "empty": "No messages yet.",
