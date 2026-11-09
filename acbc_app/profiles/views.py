@@ -61,9 +61,8 @@ from profiles.newsletter import (
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from dj_rest_auth.registration.views import SocialLoginView
-from allauth.socialaccount.providers.google.provider import GoogleProvider
 from allauth.socialaccount.models import SocialApp, SocialToken
-from allauth.socialaccount.models import SocialAccount
+from profiles.google_auth import GoogleAuthError, provision_google_user
 from notifications.models import Notification
 from utils.notification_cache import (
     get_cached_unread_count,
@@ -1307,7 +1306,10 @@ class GoogleLoginView(SocialLoginView):
         # Get Google's public keys
         try:
             logger.info(f"Fetching Google public keys for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
-            response = requests.get('https://www.googleapis.com/oauth2/v3/certs')
+            response = requests.get(
+                'https://www.googleapis.com/oauth2/v3/certs',
+                timeout=5,
+            )
             if response.status_code != 200:
                 logger.error(f"Failed to fetch Google public keys. Status code: {response.status_code} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
                 return Response(
@@ -1326,7 +1328,16 @@ class GoogleLoginView(SocialLoginView):
         try:
             logger.info(f"Verifying ID token for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
             unverified_header = jwt.get_unverified_header(id_token)
-            key_id = unverified_header['kid']
+            key_id = unverified_header.get('kid')
+            if not key_id:
+                logger.warning(
+                    "Google login: ID token header has no kid",
+                    extra={'path': request.path},
+                )
+                return Response(
+                    {'error': 'No se encontró una clave pública coincidente para el token'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             
             # Find matching public key
             public_key = None
@@ -1361,7 +1372,10 @@ class GoogleLoginView(SocialLoginView):
                     public_key,
                     algorithms=['RS256'],
                     audience=client_id,
-                    issuer='https://accounts.google.com',
+                    issuer=[
+                        'https://accounts.google.com',
+                        'accounts.google.com',
+                    ],
                     options={
                         'verify_iat': False,  # Don't verify issued at time
                         'verify_exp': True,   # Still verify expiration
@@ -1407,58 +1421,16 @@ class GoogleLoginView(SocialLoginView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get or create user
         try:
-            logger.info(f"Looking up social account for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
-            social_account = SocialAccount.objects.get(
-                provider=GoogleProvider.id, 
-                uid=decoded_token['sub']
+            user = provision_google_user(decoded_token)
+        except GoogleAuthError as exc:
+            logger.warning(
+                "Google login rejected: %s",
+                exc.message,
+                extra={'path': request.path},
             )
-            user = social_account.user
-            logger.info(f"Found existing user: {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
-        except SocialAccount.DoesNotExist:
-            logger.info(f"No existing social account found for user {request.user.username if request.user.is_authenticated else 'anonymous'}, creating new user")
-            # Create new user
-            email = decoded_token.get('email')
-            if not email:
-                logger.warning(
-                    "Google login: no email in token for new social account",
-                    extra={'path': request.path},
-                )
-                return Response(
-                    {'error': 'Correo electrónico no proporcionado por Google'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            try:
-                user = User.objects.get(email=email)
-                logger.info(f"Found existing user with email: {email} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
-            except User.DoesNotExist:
-                logger.info(f"Creating new user with email: {email} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
-                username = email.split('@')[0]
-                # Ensure unique username
-                base_username = username
-                counter = 1
-                while User.objects.filter(username=username).exists():
-                    username = f"{base_username}{counter}"
-                    counter += 1
-                
-                user = User.objects.create_user(
-                    username=username,
-                    email=email,
-                    first_name=decoded_token.get('given_name', ''),
-                    last_name=decoded_token.get('family_name', '')
-                )
-                logger.info(f"Created new user: {username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
-            
-            # Create social account
-            social_account = SocialAccount.objects.create(
-                user=user,
-                provider=GoogleProvider.id,
-                uid=decoded_token['sub'],
-                extra_data=decoded_token
-            )
-            logger.info(f"Created social account for user: {user.username} for user {request.user.username if request.user.is_authenticated else 'anonymous'}")
+            return Response({'error': exc.message}, status=exc.status_code)
+        logger.info("Google login provisioned user %s", user.username)
 
         # Always ensure a Profile exists (picture download is optional)
         profile, created = Profile.objects.get_or_create(user=user)
@@ -1472,9 +1444,9 @@ class GoogleLoginView(SocialLoginView):
                 f"Profile picture URL from token for user {user.username}: {picture_url}"
             )
 
-            if picture_url:
+            if picture_url and str(picture_url).startswith('https://'):
                 logger.info(f"Downloading profile picture for user {user.username}")
-                picture_response = requests.get(picture_url)
+                picture_response = requests.get(picture_url, timeout=5)
                 if picture_response.status_code == 200:
                     filename = f"{user.username}_{datetime.today().strftime('%h-%d-%y')}.jpeg"
                     logger.info(f"Saving profile picture as: {filename} for user {user.username}")
