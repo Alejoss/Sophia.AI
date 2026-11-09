@@ -100,6 +100,28 @@ export const createRegistrationPayment = async (registrationId) => {
   }
 };
 
+export const createRegistrationBchPayment = async (registrationId) => {
+  try {
+    const response = await axiosInstance.post(`/payments/registration/${registrationId}/bch/`, {});
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo crear la orden BCH. Inténtalo de nuevo');
+  }
+};
+
+export const verifyRegistrationBchPayment = async (registrationId, txid) => {
+  try {
+    const body = txid ? { txid } : {};
+    const response = await axiosInstance.post(
+      `/payments/registration/${registrationId}/bch/verify/`,
+      body,
+    );
+    return response.data;
+  } catch (error) {
+    throwApiError(error, 'No se pudo verificar el pago BCH. Inténtalo de nuevo');
+  }
+};
+
 export const getPaymentStatus = async (paymentId) => {
   try {
     const response = await axiosInstance.get(`/payments/${paymentId}/`);
