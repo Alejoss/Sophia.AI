@@ -248,6 +248,9 @@ class CoursePurchase(models.Model):
         'auth.User',
         on_delete=models.CASCADE,
         related_name='course_purchases',
+        null=True,
+        blank=True,
+        help_text='Empty when the buyer paid from the public checkout without an account.',
     )
     course = models.ForeignKey(
         Course,
@@ -259,6 +262,12 @@ class CoursePurchase(models.Model):
         blank=True,
         default='',
         help_text='Email confirmed at checkout for receipt and course access notices.',
+    )
+    checkout_token = models.CharField(
+        max_length=64,
+        blank=True,
+        default='',
+        help_text='Secret that lets a buyer without an account continue this checkout.',
     )
     payment_status = models.CharField(
         max_length=20,
@@ -274,11 +283,17 @@ class CoursePurchase(models.Model):
                 fields=['user', 'course'],
                 name='course_purchase_one_per_user',
             ),
+            models.UniqueConstraint(
+                fields=['course', 'receipt_email'],
+                condition=Q(user__isnull=True) & ~Q(receipt_email=''),
+                name='course_purchase_one_guest_email',
+            ),
         ]
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.user_id} → {self.course_id} ({self.payment_status})'
+        who = self.user_id or self.receipt_email or 'guest'
+        return f'{who} → {self.course_id} ({self.payment_status})'
 
     @property
     def is_paid(self):

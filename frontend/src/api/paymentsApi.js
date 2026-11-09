@@ -1,4 +1,17 @@
 import axiosInstance from './axiosConfig.js';
+import { getCourseCheckoutToken } from '../courses/courseCheckoutAccess.js';
+
+const courseCheckoutRequestConfig = (config = undefined) => {
+  const token = getCourseCheckoutToken();
+  if (!token) return config;
+  return {
+    ...(config || {}),
+    headers: {
+      ...(config?.headers || {}),
+      'X-Course-Checkout-Token': token,
+    },
+  };
+};
 
 const throwApiError = (error, fallbackMessage) => {
   const data = error.response?.data;
@@ -44,7 +57,11 @@ export const createOrGetCoursePurchase = async (courseCode, { receiptEmail } = {
     if (receiptEmail != null) {
       body.receipt_email = receiptEmail;
     }
-    const response = await axiosInstance.post('/payments/course-purchases/', body);
+    const response = await axiosInstance.post(
+      '/payments/course-purchases/',
+      body,
+      courseCheckoutRequestConfig(),
+    );
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo iniciar la compra del curso');
@@ -53,7 +70,11 @@ export const createOrGetCoursePurchase = async (courseCode, { receiptEmail } = {
 
 export const createCoursePurchasePayment = async (purchaseId) => {
   try {
-    const response = await axiosInstance.post(`/payments/course-purchase/${purchaseId}/`, {});
+    const response = await axiosInstance.post(
+      `/payments/course-purchase/${purchaseId}/`,
+      {},
+      courseCheckoutRequestConfig(),
+    );
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo crear el pago del curso. Inténtalo de nuevo');
@@ -62,7 +83,11 @@ export const createCoursePurchasePayment = async (purchaseId) => {
 
 export const createCoursePurchaseBchPayment = async (purchaseId) => {
   try {
-    const response = await axiosInstance.post(`/payments/course-purchase/${purchaseId}/bch/`, {});
+    const response = await axiosInstance.post(
+      `/payments/course-purchase/${purchaseId}/bch/`,
+      {},
+      courseCheckoutRequestConfig(),
+    );
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo crear la orden BCH. Inténtalo de nuevo');
@@ -75,6 +100,7 @@ export const verifyCoursePurchaseBchPayment = async (purchaseId, txid) => {
     const response = await axiosInstance.post(
       `/payments/course-purchase/${purchaseId}/bch/verify/`,
       body,
+      courseCheckoutRequestConfig(),
     );
     return response.data;
   } catch (error) {
@@ -84,7 +110,10 @@ export const verifyCoursePurchaseBchPayment = async (purchaseId, txid) => {
 
 export const listCoursePurchasePayments = async (purchaseId) => {
   try {
-    const response = await axiosInstance.get(`/payments/course-purchase/${purchaseId}/list/`);
+    const response = await axiosInstance.get(
+      `/payments/course-purchase/${purchaseId}/list/`,
+      courseCheckoutRequestConfig(),
+    );
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo listar los pagos del curso');
@@ -124,7 +153,10 @@ export const verifyRegistrationBchPayment = async (registrationId, txid) => {
 
 export const getPaymentStatus = async (paymentId) => {
   try {
-    const response = await axiosInstance.get(`/payments/${paymentId}/`);
+    const response = await axiosInstance.get(
+      `/payments/${paymentId}/`,
+      courseCheckoutRequestConfig(),
+    );
     return response.data;
   } catch (error) {
     throwApiError(error, 'No se pudo consultar el pago');
@@ -303,6 +335,7 @@ export const reportBchOrderTxid = async (orderId, { txid, note } = {}) => {
     const response = await axiosInstance.post(
       `/payments/bch-orders/${orderId}/report-txid/`,
       { txid, note: note || '' },
+      courseCheckoutRequestConfig(),
     );
     return response.data;
   } catch (error) {

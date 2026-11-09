@@ -2573,9 +2573,26 @@ def notify_bch_txid_reported(payment, *, note: str = ''):
 
     buyer = payment.buyer
     if buyer is None:
-        logger.warning(
-            'Skipping BCH TXID report notifications — no buyer',
-            extra={'payment_id': getattr(payment, 'id', None)},
+        guest_email = ''
+        course_purchase = getattr(payment, 'course_purchase', None)
+        if course_purchase is not None:
+            guest_email = (course_purchase.receipt_email or '').strip()
+        if not guest_email:
+            logger.warning(
+                'Skipping BCH TXID report notifications — no buyer',
+                extra={'payment_id': getattr(payment, 'id', None)},
+            )
+            return
+        meta = get_bch_payment_product_meta(payment)
+        payload = payment.provider_payload or {}
+        _send_bch_txid_reported_email_to_admins(
+            payment,
+            buyer_username=guest_email,
+            buyer_email=guest_email,
+            product_title=meta.get('product_title') or 'producto',
+            product_type=meta.get('product_type') or 'product',
+            reported_txid=payload.get('reported_txid') or payment.payment_txid or '',
+            note=(note or payload.get('reported_note') or '').strip(),
         )
         return
 
@@ -2663,7 +2680,8 @@ def notify_bch_txid_reported(payment, *, note: str = ''):
 
     _send_bch_txid_reported_email_to_admins(
         payment,
-        buyer=buyer,
+        buyer_username=buyer.username,
+        buyer_email=buyer.email or '',
         product_title=product_title,
         product_type=product_type,
         reported_txid=reported_txid,
@@ -2674,7 +2692,8 @@ def notify_bch_txid_reported(payment, *, note: str = ''):
 def _send_bch_txid_reported_email_to_admins(
     payment,
     *,
-    buyer,
+    buyer_username: str,
+    buyer_email: str,
     product_title: str,
     product_type: str,
     reported_txid: str,
@@ -2698,8 +2717,8 @@ def _send_bch_txid_reported_email_to_admins(
             subject=f'TXID BCH reportado — orden #{payment.id}: {product_title}',
             template_name='bch_txid_reported',
             context={
-                'buyer_username': buyer.username,
-                'buyer_email': buyer.email or '',
+                'buyer_username': buyer_username,
+                'buyer_email': buyer_email,
                 'order_id': payment.id,
                 'product_type_label': type_label,
                 'product_title': product_title,
