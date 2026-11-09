@@ -4,11 +4,40 @@
 
 - **Configuration**: `LOGGING` in `settings.py` differs by `ENVIRONMENT`. Production: `RotatingFileHandler` (10MB, 5 backups), `error_file` for `ERROR`; dev: console + file, `DEBUG` levels.
 - **Paths**: File logs go to `LOGS_DIR` (default `logs/` next to the Django project, `/app/logs` in Docker). Set `LOGS_DIR` to override. Production does not fall back to `/tmp`: that directory is deleted when the container is recreated.
-- **Docker**: `docker compose logs` only shows the current container. Historical logs are on named volumes (`backend_logs`, `nginx_logs`, `frontend_logs`, `postgres_logs`). `docker compose down -v` deletes those volumes. Nginx writes a second copy via `nginx/persisted-logs.conf`. Postgres stderr is copied by `scripts/docker/postgres-entrypoint.sh`. Install `scripts/docker/acbc-logrotate.conf` on the host to rotate nginx and Postgres files while the containers stay up. Django and Gunicorn rotate their own files (10MB, several backups).
+- **Gunicorn**: `entrypoint.sh` still starts Gunicorn with `--bind 0.0.0.0:8000 --workers 3 --timeout 600 --access-logfile - --error-logfile -`. `gunicorn.conf.py` only adds file handlers. It must not set bind, workers, timeout, or the stdout/stderr destinations. The master writes `gunicorn-master.log` before fork. Each worker closes that inherited file and writes `gunicorn-access.log` and `gunicorn-error.log` after Django loads.
 - **Security**:
   - **Do not** log request bodies, `Authorization` headers, cookies, or tokens. `RequestLoggingMiddleware` → `log_request` logs only `method`, `path`, `user_id`, `username`, `ip_address`, `user_agent`, `query_params`, `status_code`, `response_size`, `duration`.
   - Avoid logging PII (e.g. emails, passwords) in `extra`. Use IDs/usernames only where needed for debugging.
   - If you add body/header logging later, redact secrets first.
+
+## Where to read logs
+
+`docker compose logs` shows only the container that is running now. Recreate (`deploy.sh` uses `up --force-recreate`) deletes that stream. Older lines are the files below. `docker compose down -v` deletes the volumes.
+
+Production compose file: `docker-compose.prod.yml`. Prefix commands with `docker compose --env-file .env.compose -f docker-compose.prod.yml`.
+
+| What you need | File inside the container | Volume |
+|---|---|---|
+| Django application log | `/app/logs/academia_blockchain.log` | `acbc_prod_backend_logs` |
+| Django errors | `/app/logs/errors.log` | `acbc_prod_backend_logs` |
+| Gunicorn worker errors | `/app/logs/gunicorn-error.log` | `acbc_prod_backend_logs` |
+| Gunicorn access | `/app/logs/gunicorn-access.log` | `acbc_prod_backend_logs` |
+| Gunicorn master (boot, worker timeouts) | `/app/logs/gunicorn-master.log` | `acbc_prod_backend_logs` |
+| Edge nginx access and errors | `/var/log/nginx/persisted/access.log`, `error.log` | `acbc_prod_nginx_logs` |
+| Frontend nginx access and errors | `/var/log/nginx/persisted/access.log`, `error.log` | `acbc_prod_frontend_logs` |
+| Postgres | `/var/log/postgresql/postgresql.log` | `acbc_prod_postgres_logs` |
+
+```bash
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend tail -n 200 /app/logs/errors.log
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend tail -n 200 /app/logs/gunicorn-master.log
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec nginx tail -n 200 /var/log/nginx/persisted/error.log
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec frontend tail -n 200 /var/log/nginx/persisted/access.log
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec postgres tail -n 200 /var/log/postgresql/postgresql.log
+```
+
+Dev compose (`docker-compose.yml`) uses the same paths and the volumes `acbc_dev_backend_logs`, `acbc_dev_frontend_logs`, and `acbc_dev_postgres_logs`. There is no edge nginx container. The backend volume hides `acbc_app/logs` on the host, so a `docker compose exec` is the read path. A process started without Docker writes `acbc_app/logs/` directly.
+
+Nginx and Postgres files grow until rotation. Copy `scripts/docker/acbc-logrotate.conf` to `/etc/logrotate.d/acbc` on the droplet. Django and Gunicorn rotate their own files (10MB, several backups). Do not point logrotate at `academia_blockchain.log`, `errors.log`, or the `gunicorn-*.log` files; those handlers rename the files themselves.
 
 ## RequestLoggingMiddleware
 

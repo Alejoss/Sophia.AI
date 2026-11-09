@@ -198,13 +198,14 @@ docker compose --env-file .env.compose -f docker-compose.prod.yml logs -f nginx
 docker compose --env-file .env.compose -f docker-compose.prod.yml logs -f postgres
 ```
 
-`docker compose logs` follows the container. A recreate (`deploy.sh` runs `up --force-recreate`) deletes that stream. Older lines stay on named volumes:
+`docker compose logs` follows the container. A recreate (`deploy.sh` runs `up --force-recreate`) deletes that stream. Older lines are files on named volumes. The map (which file is Django, Gunicorn, nginx, or Postgres) is [docs/backend/logging-and-observability.md](docs/backend/logging-and-observability.md).
 
 ```bash
-docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend ls -la /app/logs
-docker compose --env-file .env.compose -f docker-compose.prod.yml exec nginx ls -la /var/log/nginx/persisted
-docker compose --env-file .env.compose -f docker-compose.prod.yml exec frontend ls -la /var/log/nginx/persisted
-docker compose --env-file .env.compose -f docker-compose.prod.yml exec postgres ls -la /var/log/postgresql
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend tail -n 200 /app/logs/errors.log
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend tail -n 200 /app/logs/gunicorn-master.log
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec nginx tail -n 200 /var/log/nginx/persisted/error.log
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec frontend tail -n 200 /var/log/nginx/persisted/access.log
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec postgres tail -n 200 /var/log/postgresql/postgresql.log
 ```
 
 Do not run `docker compose down -v` if you need that history. To rotate nginx and Postgres files while the containers keep running, install `scripts/docker/acbc-logrotate.conf` as `/etc/logrotate.d/acbc`. If production uses `nginx/nginx-ssl.conf`, no SSL regen is required: compose mounts `nginx/persisted-logs.conf` next to whichever server config is selected.

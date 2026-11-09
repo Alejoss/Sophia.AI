@@ -7,6 +7,7 @@ entrypoint scripts that keep nginx and Postgres history on a volume.
 
 import io
 import logging
+import logging.config
 import os
 import stat
 import subprocess
@@ -16,7 +17,12 @@ from pathlib import Path
 
 from django.test import SimpleTestCase
 
-from academia_blockchain.gunicorn_logging import attach_persisted_gunicorn_handlers
+from academia_blockchain.gunicorn_logging import (
+    MASTER_LOG,
+    attach_master_log,
+    attach_worker_logs,
+    detach_inherited_persisted_handlers,
+)
 from academia_blockchain.log_paths import resolve_logs_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -76,31 +82,88 @@ class GunicornFileLogTests(SimpleTestCase):
                     logger.removeHandler(handler)
         super().tearDown()
 
-    def test_records_are_written_without_removing_stream_handlers(self):
+    def test_master_and_workers_use_different_files(self):
         with tempfile.TemporaryDirectory() as tmp:
-            logger = logging.getLogger("gunicorn.error")
-            previous_propagate = logger.propagate
-            logger.propagate = False
+            error_logger = logging.getLogger("gunicorn.error")
+            access_logger = logging.getLogger("gunicorn.access")
+            previous = (error_logger.propagate, access_logger.propagate, access_logger.level)
+            error_logger.propagate = False
+            access_logger.propagate = False
+            access_logger.setLevel(logging.INFO)
             stream = logging.StreamHandler(io.StringIO())
-            logger.addHandler(stream)
+            error_logger.addHandler(stream)
             try:
-                paths = attach_persisted_gunicorn_handlers(tmp)
-                self.assertEqual(len(paths), 2)
-                logger.error("persisted-line")
-                error_log = Path(tmp) / "gunicorn-error.log"
-                self.assertIn("persisted-line", error_log.read_text(encoding="utf-8"))
-                again = attach_persisted_gunicorn_handlers(tmp)
+                master_path = attach_master_log(tmp)
+                error_logger.error("master-line")
+                # Forked worker: drop the master's descriptor, then open worker files.
+                detach_inherited_persisted_handlers()
+                self.assertFalse(any(
+                    getattr(handler, "_acbc_persisted_log", False)
+                    for handler in error_logger.handlers
+                ))
+                attached = attach_worker_logs(tmp)
+                self.assertEqual(len(attached), 2)
+                # Stream handler from gunicorn's stdout/stderr setup must remain.
+                self.assertIn(stream, error_logger.handlers)
+                error_logger.error("worker-line")
+                access_logger.info("access-line")
+                again = attach_worker_logs(tmp)
                 self.assertEqual(again, [])
-                file_handlers = [
-                    handler
-                    for handler in logger.handlers
-                    if isinstance(handler, RotatingFileHandler)
-                ]
-                self.assertEqual(len(file_handlers), 1)
+
+                master_text = Path(master_path).read_text(encoding="utf-8")
+                worker_text = (Path(tmp) / "gunicorn-error.log").read_text(encoding="utf-8")
+                access_text = (Path(tmp) / "gunicorn-access.log").read_text(encoding="utf-8")
+                self.assertIn("master-line", master_text)
+                self.assertNotIn("worker-line", master_text)
+                self.assertIn("worker-line", worker_text)
+                self.assertNotIn("master-line", worker_text)
+                self.assertIn("access-line", access_text)
+                self.assertEqual(master_path, str(Path(tmp) / MASTER_LOG))
             finally:
-                logger.propagate = previous_propagate
-                logger.removeHandler(stream)
+                error_logger.propagate, access_logger.propagate, access_level = previous
+                access_logger.setLevel(access_level)
+                error_logger.removeHandler(stream)
                 stream.close()
+
+    def test_django_logging_config_does_not_drop_gunicorn_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            error_logger = logging.getLogger("gunicorn.error")
+            previous_propagate = error_logger.propagate
+            error_logger.propagate = False
+            try:
+                attach_worker_logs(tmp)
+                logging.config.dictConfig({
+                    "version": 1,
+                    "disable_existing_loggers": False,
+                    "handlers": {
+                        "console": {"class": "logging.StreamHandler"},
+                    },
+                    "loggers": {
+                        "django": {"handlers": ["console"], "level": "INFO"},
+                    },
+                    "root": {"handlers": ["console"], "level": "WARNING"},
+                })
+                error_logger.error("after-django-config")
+                text = (Path(tmp) / "gunicorn-error.log").read_text(encoding="utf-8")
+                self.assertIn("after-django-config", text)
+            finally:
+                error_logger.propagate = previous_propagate
+                detach_inherited_persisted_handlers()
+
+    def test_gunicorn_config_does_not_set_process_options(self):
+        config = (REPO_ROOT / "acbc_app" / "gunicorn.conf.py").read_text(encoding="utf-8")
+        entrypoint = (REPO_ROOT / "acbc_app" / "entrypoint.sh").read_text(encoding="utf-8")
+        for forbidden in ("bind =", "workers =", "timeout =", "accesslog =", "errorlog ="):
+            self.assertNotIn(forbidden, config)
+        self.assertIn("def on_starting", config)
+        self.assertIn("def post_fork", config)
+        self.assertIn("def post_worker_init", config)
+        self.assertIn("--bind 0.0.0.0:8000", entrypoint)
+        self.assertIn("--workers 3", entrypoint)
+        self.assertIn("--timeout 600", entrypoint)
+        self.assertIn("--access-logfile -", entrypoint)
+        self.assertIn("--error-logfile -", entrypoint)
+        self.assertIn("--config /app/gunicorn.conf.py", entrypoint)
 
 
 class ComposeLogVolumeTests(SimpleTestCase):

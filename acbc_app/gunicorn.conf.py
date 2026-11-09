@@ -1,23 +1,39 @@
-"""Gunicorn settings for the production container.
+"""Gunicorn hooks for persisted log files.
 
-stdout/stderr stay attached so ``docker compose logs`` shows the running
-container. ``on_starting`` also copies access and error logs into LOGS_DIR,
-which is a volume mounted at /app/logs.
+Do not set bind, workers, timeout, accesslog, or errorlog here. Those are
+flags on the gunicorn command in entrypoint.sh. Gunicorn applies the command
+line after this file, but keeping them off this file means a hook edit cannot
+change how the server listens or how many workers it starts.
+
+``on_starting`` runs in the master, before workers are forked.
+``post_fork`` runs in the child only.
+``post_worker_init`` runs in the child after the Django application is loaded.
 """
 
 import os
+import sys
 
-from academia_blockchain.gunicorn_logging import attach_persisted_gunicorn_handlers
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
-bind = "0.0.0.0:8000"
-workers = 3
-timeout = 600
-accesslog = "-"
-errorlog = "-"
+from academia_blockchain.gunicorn_logging import (  # noqa: E402
+    attach_master_log,
+    attach_worker_logs,
+    detach_inherited_persisted_handlers,
+)
 
 _log_dir = os.environ.get("LOGS_DIR", "/app/logs")
 
 
 def on_starting(server):
-    paths = attach_persisted_gunicorn_handlers(_log_dir)
-    server.log.info("Persisted gunicorn logs: %s", ", ".join(paths))
+    path = attach_master_log(_log_dir)
+    server.log.info("Persisted gunicorn master log: %s", path)
+
+
+def post_fork(server, worker):
+    detach_inherited_persisted_handlers()
+
+
+def post_worker_init(worker):
+    attach_worker_logs(_log_dir)
