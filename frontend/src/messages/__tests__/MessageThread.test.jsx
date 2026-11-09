@@ -106,10 +106,16 @@ describe('MessageThread form', () => {
 
     const log = await screen.findByRole('log', { name: /mensajes de la conversación/i });
     const form = screen.getByRole('button', { name: /^enviar$/i }).closest('form');
+    const gutter = log.parentElement;
     const styles = window.getComputedStyle(log);
+    const gutterStyles = window.getComputedStyle(gutter);
 
-    expect(log.parentElement).toBe(form.parentElement);
+    expect(form.parentElement.contains(log)).toBe(true);
     expect(log.contains(form)).toBe(false);
+    // Gutter keeps the clip edge off the title bar and the composer.
+    expect(gutterStyles.paddingTop).toBe('16px');
+    expect(gutterStyles.paddingBottom).toBe('16px');
+    expect(gutterStyles.overflow).toBe('hidden');
     expect(styles.overflowY).toBe('auto');
     expect(styles.maxHeight).not.toBe('400px');
     expect(styles.overscrollBehaviorY === 'contain' || styles.overscrollBehavior === 'contain').toBe(true);
