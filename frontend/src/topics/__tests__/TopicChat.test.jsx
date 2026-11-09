@@ -331,7 +331,7 @@ describe('TopicChat component', () => {
           pinned_content_ids: [42],
           vote_count: 3,
           user_vote: 0,
-          can_unpin: false,
+          can_unpin: true,
         },
       ],
     });
@@ -348,6 +348,7 @@ describe('TopicChat component', () => {
     await user.click(screen.getByRole('button', { name: /consultas fijadas/i }));
     expect(screen.getByText(/qué dice el libro sobre los bloques/i)).toBeInTheDocument();
     expect(screen.getByText(/fijada por ana/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /quitar pin/i })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/escribe tu pregunta/i)).not.toBeInTheDocument();
   });
 

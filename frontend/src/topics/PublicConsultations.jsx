@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Typography,
-  Button,
   Link,
   CircularProgress,
   Alert,
@@ -73,7 +72,7 @@ function SourcesList({ sources, topicId }) {
   );
 }
 
-function PublicConsultationCard({ item, topicId, onUnpin, unpinning }) {
+function PublicConsultationCard({ item, topicId }) {
   const { t } = useTranslation('topics');
   const { intl } = useDateLocales();
   return (
@@ -105,18 +104,6 @@ function PublicConsultationCard({ item, topicId, onUnpin, unpinning }) {
         {item.answer}
       </Typography>
       <SourcesList sources={item.sources} topicId={topicId} />
-      {item.can_unpin && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1.5 }}>
-          <Button
-            size="small"
-            color="inherit"
-            onClick={() => onUnpin(item.id)}
-            disabled={unpinning}
-          >
-            {t('chat.unpin')}
-          </Button>
-        </Box>
-      )}
     </Box>
   );
 }
@@ -133,7 +120,6 @@ function PublicConsultations({ topicId, contentId = null, showEmpty = true }) {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [unpinning, setUnpinning] = useState(false);
 
   const load = useCallback(async () => {
     if (!topicId) {
@@ -163,19 +149,6 @@ function PublicConsultations({ topicId, contentId = null, showEmpty = true }) {
   useEffect(() => {
     load();
   }, [load]);
-
-  const unpin = async (queryId) => {
-    setUnpinning(true);
-    setError(null);
-    try {
-      await contentApi.unpinTopicChatQuery(topicId, queryId);
-      await load();
-    } catch {
-      setError(t('chat.unpinError'));
-    } finally {
-      setUnpinning(false);
-    }
-  };
 
   if (!loading && !error && items.length === 0 && !showEmpty) {
     return null;
@@ -242,8 +215,6 @@ function PublicConsultations({ topicId, contentId = null, showEmpty = true }) {
               key={item.id}
               item={item}
               topicId={topicId}
-              onUnpin={unpin}
-              unpinning={unpinning}
             />
           ))}
         </Box>
