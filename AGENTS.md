@@ -31,6 +31,25 @@ python manage.py runserver 0.0.0.0:8000
 - Superuser seeded by `python manage.py create_admin` is **`admin` / `admin`**.
 - Seed data commands (run in order, see `acbc_app/README.md`): `populate_cryptocurrencies`, `populate_users`, `populate_content`, `populate_knowledge_paths`, `populate_interactions`, `populate_book_club`.
 
+### Where to read logs
+
+`docker compose logs` is only the container that is running now. A recreate deletes it. Read the files below. Full table and commands: [docs/backend/logging-and-observability.md](docs/backend/logging-and-observability.md).
+
+Production (`docker compose --env-file .env.compose -f docker-compose.prod.yml exec <service> ...`):
+
+- Django app: `backend` `/app/logs/academia_blockchain.log`
+- Django errors: `backend` `/app/logs/errors.log`
+- Gunicorn worker errors: `backend` `/app/logs/gunicorn-error.log`
+- Gunicorn access: `backend` `/app/logs/gunicorn-access.log`
+- Gunicorn master (boot, worker timeouts): `backend` `/app/logs/gunicorn-master.log`
+- Edge nginx: `nginx` `/var/log/nginx/persisted/access.log` and `error.log`
+- Frontend nginx: `frontend` `/var/log/nginx/persisted/access.log` and `error.log`
+- Postgres: `postgres` `/var/log/postgresql/postgresql.log`
+
+Volumes: `acbc_prod_backend_logs`, `acbc_prod_nginx_logs`, `acbc_prod_frontend_logs`, `acbc_prod_postgres_logs`. Dev compose uses `acbc_dev_backend_logs`, `acbc_dev_frontend_logs`, `acbc_dev_postgres_logs` at the same paths. Native (no Docker) Django logs are `acbc_app/logs/`. `docker compose down -v` deletes the volumes.
+
+Gunicorn's bind, workers, timeout, and stdout/stderr flags live on the command in `acbc_app/entrypoint.sh`. `acbc_app/gunicorn.conf.py` must not set them. It only adds the log files.
+
 ### Backend tests
 
 Tests **automatically switch to in-memory SQLite** (see the `"test" in sys.argv` check in `settings.py`), so PostgreSQL is NOT required to run them:

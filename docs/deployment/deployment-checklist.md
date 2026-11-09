@@ -339,8 +339,9 @@ docker compose -f docker-compose.prod.yml exec backend python -c "import urllib.
   - `postgres_data`: Base de datos
   - `static_volume`: Static files
   - `media_volume`: Media files
+  - `backend_logs`, `nginx_logs`, `frontend_logs`, `postgres_logs`: logs que siguen disponibles después de recrear el contenedor
 
-- **Logs**: Los logs de Django están en `/app/logs` dentro del contenedor
+- **Logs**: `docker compose logs` solo muestra el contenedor en ejecución. El historial queda en el volumen: Django/Gunicorn en `/app/logs`, nginx en `/var/log/nginx/persisted`, Postgres en `/var/log/postgresql/postgresql.log`. `docker compose down -v` borra esos volúmenes.
 
 ## ✅ Estado Actual
 

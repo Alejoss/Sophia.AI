@@ -11,6 +11,8 @@ services:
       - ./acbc_app:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+      # Hides ./acbc_app/logs so recreate does not depend on the bind mount.
+      - backend_logs:/app/logs
     # No command - entrypoint.sh elige según ENVIRONMENT del .env
     # contracts/.env holds the Sepolia signer. It is gitignored.
     env_file:
@@ -21,6 +23,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
+      - LOGS_DIR=/app/logs
     ports:
       - "8000:8000"
     depends_on:
@@ -49,6 +52,9 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      # Used when the frontend image is nginx. Harmless for the Vite image.
+      - frontend_logs:/var/log/nginx/persisted
+      - ./nginx/persisted-logs.conf:/etc/nginx/conf.d/00-persisted-logs.conf:ro
     ports:
       # Frontend en puerto 8080 (Nginx usará el 80 y redirigirá aquí)
       - "${FRONTEND_PORT:-8080}:80"
@@ -67,6 +73,9 @@ services:
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C.UTF-8
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - postgres_logs:/var/log/postgresql
+      - ./scripts/docker/postgres-entrypoint.sh:/usr/local/bin/acbc-postgres-entrypoint.sh:ro
+    entrypoint: ["/bin/bash", "/usr/local/bin/acbc-postgres-entrypoint.sh"]
     networks:
       - app_network
     healthcheck:
@@ -84,3 +93,9 @@ volumes:
   postgres_data:
   static_volume:
   media_volume:
+  backend_logs:
+    name: acbc_dev_backend_logs
+  frontend_logs:
+    name: acbc_dev_frontend_logs
+  postgres_logs:
+    name: acbc_dev_postgres_logs

@@ -169,6 +169,9 @@ const MessageThread = () => {
         display: 'flex',
         alignItems: 'center',
         gap: 1,
+        bgcolor: 'background.default',
+        position: 'relative',
+        zIndex: 1,
       }}>
         <IconButton
           onClick={() => navigate('/messages')}
@@ -188,6 +191,19 @@ const MessageThread = () => {
         </Typography>
       </Box>
 
+      <Box
+        sx={{
+          // The log clips on its own edge. Without this gutter that edge
+          // is the title bar, so the top of a bubble is hidden behind it.
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          px: 2,
+          py: 2,
+        }}
+      >
       <Box
         ref={scrollerRef}
         role="log"
@@ -253,6 +269,7 @@ const MessageThread = () => {
           })}
         </List>
       </Box>
+      </Box>
 
       <Box
         component="form"
@@ -266,6 +283,9 @@ const MessageThread = () => {
           p: 2,
           borderTop: '1px solid',
           borderColor: 'divider',
+          bgcolor: 'background.default',
+          position: 'relative',
+          zIndex: 1,
         }}
       >
         {generalError && (

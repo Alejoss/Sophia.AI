@@ -355,7 +355,8 @@ Common script variables (set in `acbc_app/.env` or exported). Full backup table 
 ### Deployment fails
 - Check that all required environment variables are set
 - Verify Docker is running
-- Check logs: `docker compose -f docker-compose.prod.yml logs`
+- Check logs: `docker compose -f docker-compose.prod.yml logs` (current container only)
+- Older logs survive recreate on volumes: backend `/app/logs`, nginx and frontend `/var/log/nginx/persisted`, Postgres `/var/log/postgresql/postgresql.log`. `down -v` deletes them.
 
 ### SSL setup fails
 - Ensure domain DNS points to server
