@@ -198,6 +198,17 @@ docker compose --env-file .env.compose -f docker-compose.prod.yml logs -f nginx
 docker compose --env-file .env.compose -f docker-compose.prod.yml logs -f postgres
 ```
 
+`docker compose logs` follows the container. A recreate (`deploy.sh` runs `up --force-recreate`) deletes that stream. Older lines stay on named volumes:
+
+```bash
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend ls -la /app/logs
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec nginx ls -la /var/log/nginx/persisted
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec frontend ls -la /var/log/nginx/persisted
+docker compose --env-file .env.compose -f docker-compose.prod.yml exec postgres ls -la /var/log/postgresql
+```
+
+Do not run `docker compose down -v` if you need that history. To rotate nginx and Postgres files while the containers keep running, install `scripts/docker/acbc-logrotate.conf` as `/etc/logrotate.d/acbc`. If production uses `nginx/nginx-ssl.conf`, no SSL regen is required: compose mounts `nginx/persisted-logs.conf` next to whichever server config is selected.
+
 **Other commands:**
 
 ```bash

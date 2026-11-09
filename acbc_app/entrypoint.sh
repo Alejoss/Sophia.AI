@@ -8,15 +8,16 @@ set -e
 # Default to DEVELOPMENT if not set
 ENVIRONMENT=${ENVIRONMENT:-DEVELOPMENT}
 
+# Named volume (production) or bind mount (development) at this path.
+LOG_DIR="${LOGS_DIR:-/app/logs}"
+mkdir -p "$LOG_DIR"
+
 if [ "$ENVIRONMENT" = "PRODUCTION" ]; then
-    # Production: Use Gunicorn
+    # Production: Use Gunicorn. accesslog/errorlog stay on stdout/stderr and
+    # are also copied under LOG_DIR (see gunicorn.conf.py).
     echo "Starting Gunicorn (PRODUCTION mode)..."
-    exec gunicorn academia_blockchain.wsgi:application \
-        --bind 0.0.0.0:8000 \
-        --workers 3 \
-        --timeout 600 \
-        --access-logfile - \
-        --error-logfile -
+    echo "Persisted application logs: ${LOG_DIR}"
+    exec gunicorn academia_blockchain.wsgi:application --config /app/gunicorn.conf.py
 else
     # Development: Use Django runserver
     echo "Starting Django development server (DEVELOPMENT mode)..."

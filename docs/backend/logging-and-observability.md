@@ -3,7 +3,8 @@
 ## Logging
 
 - **Configuration**: `LOGGING` in `settings.py` differs by `ENVIRONMENT`. Production: `RotatingFileHandler` (10MB, 5 backups), `error_file` for `ERROR`; dev: console + file, `DEBUG` levels.
-- **Paths**: Logs under `LOGS_DIR` (`logs/` or `/tmp/...` fallback). Rotate by size; avoid unbounded growth.
+- **Paths**: File logs go to `LOGS_DIR` (default `logs/` next to the Django project, `/app/logs` in Docker). Set `LOGS_DIR` to override. Production does not fall back to `/tmp`: that directory is deleted when the container is recreated.
+- **Docker**: `docker compose logs` only shows the current container. Historical logs are on named volumes (`backend_logs`, `nginx_logs`, `frontend_logs`, `postgres_logs`). `docker compose down -v` deletes those volumes. Nginx writes a second copy via `nginx/persisted-logs.conf`. Postgres stderr is copied by `scripts/docker/postgres-entrypoint.sh`. Install `scripts/docker/acbc-logrotate.conf` on the host to rotate nginx and Postgres files while the containers stay up. Django and Gunicorn rotate their own files (10MB, several backups).
 - **Security**:
   - **Do not** log request bodies, `Authorization` headers, cookies, or tokens. `RequestLoggingMiddleware` → `log_request` logs only `method`, `path`, `user_id`, `username`, `ip_address`, `user_agent`, `query_params`, `status_code`, `response_size`, `duration`.
   - Avoid logging PII (e.g. emails, passwords) in `extra`. Use IDs/usernames only where needed for debugging.

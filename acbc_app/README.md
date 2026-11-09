@@ -40,9 +40,7 @@ docker-compose exec backend python manage.py makemigrations
 docker-compose exec backend python manage.py migrate
 docker-compose exec backend python manage.py setup_google_oauth
 
-*Troubleshooting: If you get a logging error about missing logs directory, run:*
-
-docker-compose exec backend mkdir -p /app/logs
+*Logs:* Django writes to `/app/logs`, which Compose keeps on a volume. Recreating the container does not erase those files. `docker compose logs` only shows the container that is running now.
 
 *Optionally create a superuser:*
 
