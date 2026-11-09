@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useContext, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useContext, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useDateLocales } from '../hooks/useDateLocales';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
@@ -11,7 +11,6 @@ import { fetchOrCreateThread, fetchMessages, sendMessage } from '../api/messages
 import {
   Box,
   Typography,
-  Paper,
   CircularProgress,
   TextField,
   Button,
@@ -19,7 +18,9 @@ import {
   ListItem,
   ListItemText,
   Alert,
+  IconButton,
 } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors.js';
 
 const messageSchema = yup.object({
@@ -33,6 +34,7 @@ const MessageThread = () => {
   const { t } = useTranslation('messages');
   const { intl } = useDateLocales();
   const { userId } = useParams();
+  const navigate = useNavigate();
   const { authState } = useContext(AuthContext);
   const currentUser = authState.user;
   const [thread, setThread] = useState(null);
@@ -40,7 +42,8 @@ const MessageThread = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [generalError, setGeneralError] = useState('');
-  const messagesEndRef = useRef(null);
+  const scrollerRef = useRef(null);
+  const stickToBottomRef = useRef(true);
 
   const {
     register,
@@ -59,6 +62,7 @@ const MessageThread = () => {
   };
 
   useEffect(() => {
+    stickToBottomRef.current = true;
     const loadThreadAndMessages = async () => {
       setLoading(true);
       try {
@@ -85,6 +89,7 @@ const MessageThread = () => {
   const onSubmit = async ({ text }) => {
     if (!thread) return;
 
+    stickToBottomRef.current = true;
     setGeneralError('');
 
     try {
@@ -107,37 +112,96 @@ const MessageThread = () => {
     }
   };
 
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+  const rememberScrollPosition = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distanceFromBottom < 80;
+  };
+
+  // Scroll only the message log. scrollIntoView also moves the document,
+  // so the page and the thread end up at two different "tops".
+  useLayoutEffect(() => {
+    const el = scrollerRef.current;
+    if (!el || !stickToBottomRef.current) return;
+    el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress /></Box>;
-  if (error) return <Box sx={{ p: 3 }}><Typography color="error">{error}</Typography></Box>;
-  if (!thread) return <Box sx={{ p: 3 }}><Typography>{t('thread.notFound')}</Typography></Box>;
+  if (loading) {
+    return (
+      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+  if (error) {
+    return (
+      <Box sx={{ flex: 1, minHeight: 0, p: 3 }}>
+        <Typography color="error">{error}</Typography>
+      </Box>
+    );
+  }
+  if (!thread) {
+    return (
+      <Box sx={{ flex: 1, minHeight: 0, p: 3 }}>
+        <Typography>{t('thread.notFound')}</Typography>
+      </Box>
+    );
+  }
 
   const otherUser = getOtherUser();
 
   return (
-    <Box sx={{ maxWidth: 600, mx: 'auto', p: 3 }}>
-      <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h5" gutterBottom>
+    <Box sx={{
+      flex: 1,
+      minHeight: 0,
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+    }}>
+      <Box sx={{
+        flexShrink: 0,
+        px: 2,
+        py: 1.5,
+        borderBottom: '1px solid',
+        borderColor: 'divider',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+      }}>
+        <IconButton
+          onClick={() => navigate('/messages')}
+          aria-label={t('thread.back')}
+          sx={{ display: { md: 'none' } }}
+        >
+          <ArrowBackIcon />
+        </IconButton>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, minWidth: 0 }}>
           {t('thread.withUser')}{' '}
           <Link
             to={`/profiles/user_profile/${otherUser?.id}`}
-            style={{
-              textDecoration: 'none',
-              color: 'inherit',
-              '&:hover': {
-                textDecoration: 'underline'
-              }
-            }}
+            style={{ color: 'inherit' }}
           >
             {otherUser ? otherUser.username : t('thread.unknownUser')}
           </Link>
         </Typography>
-        <List sx={{ maxHeight: 400, overflowY: 'auto', mb: 2 }}>
+      </Box>
+
+      <Box
+        ref={scrollerRef}
+        role="log"
+        aria-label={t('thread.logLabel')}
+        onScroll={rememberScrollPosition}
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          overscrollBehavior: 'contain',
+        }}
+      >
+        <List>
           {(!messages || messages.length === 0) && (
             <ListItem><ListItemText primary={t('thread.empty')} /></ListItem>
           )}
@@ -148,7 +212,8 @@ const MessageThread = () => {
                 key={msg.id}
                 sx={{
                   justifyContent: isOwn ? 'flex-end' : 'flex-start',
-                  mb: 1
+                  alignItems: 'flex-start',
+                  mb: 1,
                 }}
               >
                 <Box
@@ -186,39 +251,48 @@ const MessageThread = () => {
               </ListItem>
             );
           })}
-          <div ref={messagesEndRef} />
         </List>
-        <Box
-          component="form"
-          onSubmit={handleSubmit(onSubmit)}
-          noValidate
-          sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}
-        >
-          {generalError && (
-            <Alert severity="error">{generalError}</Alert>
-          )}
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <TextField
-              fullWidth
-              variant="outlined"
-              size="small"
-              placeholder={t('thread.placeholder')}
-              error={!!errors.text}
-              helperText={errors.text?.message}
-              disabled={isSubmitting}
-              {...register('text')}
-            />
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? t('thread.sending') : t('thread.send')}
-            </Button>
-          </Box>
+      </Box>
+
+      <Box
+        component="form"
+        onSubmit={handleSubmit(onSubmit)}
+        noValidate
+        sx={{
+          flexShrink: 0,
+          display: 'flex',
+          gap: 1,
+          flexDirection: 'column',
+          p: 2,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+        }}
+      >
+        {generalError && (
+          <Alert severity="error">{generalError}</Alert>
+        )}
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+          <TextField
+            fullWidth
+            variant="outlined"
+            size="small"
+            placeholder={t('thread.placeholder')}
+            error={!!errors.text}
+            helperText={errors.text?.message}
+            disabled={isSubmitting}
+            {...register('text')}
+          />
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            disabled={isSubmitting}
+            sx={{ flexShrink: 0 }}
+          >
+            {isSubmitting ? t('thread.sending') : t('thread.send')}
+          </Button>
         </Box>
-      </Paper>
+      </Box>
     </Box>
   );
 };

@@ -17,6 +17,13 @@ const CHAPTERS = [
     videoUrl: 'https://www.youtube.com/embed/GWiIiydRaVc',
     takeawayImage: '/images/guides/aprender-sin-algoritmos-takeaway.png',
   },
+  {
+    slug: 'aceptamos-criptomonedas',
+    number: '03',
+    videoUrl: 'https://www.youtube.com/embed/qYarbcCXMSk',
+    videoOrientation: 'portrait',
+    takeawayImage: '/images/guides/aceptamos-criptomonedas-takeaway.svg',
+  },
 ];
 
 const HowItWorksGuide = () => {
@@ -68,13 +75,23 @@ const HowItWorksGuide = () => {
               <Typography component="p" className="guide-introduction">{copy.introduction}</Typography>
             </div>
             {chapter.videoUrl ? (
-              <div className="guide-video-embed">
+              <div className={`guide-video-embed${chapter.videoOrientation === 'portrait' ? ' guide-video-embed-portrait' : ''}`}>
                 <iframe
                   src={chapter.videoUrl}
                   title={t('videoTitle', { title: copy.title })}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   referrerPolicy="strict-origin-when-cross-origin"
                   allowFullScreen
+                />
+              </div>
+            ) : chapter.videoSrc ? (
+              <div className={`guide-video-embed${chapter.videoOrientation === 'portrait' ? ' guide-video-embed-portrait' : ''}`}>
+                <video
+                  src={chapter.videoSrc}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  aria-label={t('videoTitle', { title: copy.title })}
                 />
               </div>
             ) : (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { 
     Box, 
     Typography, 
@@ -9,6 +9,7 @@ import {
     CardMedia, 
     CardActionArea,
     Button,
+    Link,
     Alert,
     CircularProgress 
 } from '@mui/material';
@@ -113,6 +114,17 @@ const TopicList = () => {
 
     return (
         <Box sx={{ pt: { xs: 2, md: 3 }, px: { xs: 1, md: 3 } }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 1 }}>
+                <Link
+                    component={RouterLink}
+                    to="/como-funciona/aprender-sin-algoritmos"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="caption"
+                >
+                    {t('list.whyNoAlgorithm')}
+                </Link>
+            </Box>
             <FeaturedEventBanner />
             {body}
         </Box>

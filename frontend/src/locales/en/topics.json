@@ -222,6 +222,7 @@
   "list": {
     "title": "Topics",
     "requestTopic": "Request a topic",
+    "whyNoAlgorithm": "Why not browse by following an algorithm?",
     "loadError": "Could not load topics.",
     "loadFailed": "Could not load topics",
     "empty": "No topics have been created yet",

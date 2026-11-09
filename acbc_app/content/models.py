@@ -880,10 +880,17 @@ class Topic(models.Model):
 
     def indexed_transcript_count(self):
         """Contents in this topic with ContentEmbedding.status=indexed (any media type)."""
+        annotated = getattr(self, '_indexed_transcript_count', None)
+        if annotated is not None:
+            return annotated
         from content.models import ContentEmbedding
-        return self.contents.filter(
+        count = self.contents.filter(
             embedding__status=ContentEmbedding.STATUS_INDEXED,
         ).count()
+        # Serializer reads this twice (count and chat_can_enable). Keep the
+        # result on the instance so a single topic does not COUNT twice.
+        self._indexed_transcript_count = count
+        return count
 
     def has_indexed_transcripts(self):
         return self.indexed_transcript_count() > 0

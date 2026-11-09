@@ -15,7 +15,9 @@ from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 from django.db import models, IntegrityError, transaction
-from django.db.models import Q, OuterRef, Subquery, Count, Value
+from django.db.models import (
+    Q, OuterRef, Subquery, Count, Value, Exists, Prefetch,
+)
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 import logging
@@ -48,12 +50,13 @@ from content.models import (
     FileSuggestion,
     TopicCreationRequest,
     ContentTranscript,
+    TranscriptAnchor,
     ContentEmbedding,
     TopicChatQuery,
     UnlimitedConsultationUser,
 )
 from knowledge_paths.models import KnowledgePath, Node
-from votes.models import VoteCount
+from votes.models import Vote, VoteCount
 from content.serializers import (
     LibrarySerializer,
     CollectionSerializer,
@@ -1453,7 +1456,7 @@ class AdminTopicsConsultationsView(APIView):
     )
 
     def get(self, request):
-        queryset = Topic.objects.annotate(
+        queryset = Topic.objects.select_related('creator').annotate(
             _indexed_transcript_count=Count(
                 'contents',
                 filter=self.INDEXED_Q,
@@ -2087,6 +2090,24 @@ def get_topic_content_profile_for_display(
 
 
 # Topic Views
+def _topics_listing_queryset(queryset):
+    """Load creator and indexed-transcript counts with the topic rows.
+
+    TopicBasicSerializer reads creator.username plus the indexed count twice.
+    Without this, GET /api/content/topics/ issues one auth_user lookup and two
+    content COUNTs per topic (Sentry PYTHON-DJANGO-18).
+    """
+    return queryset.select_related('creator').annotate(
+        _indexed_transcript_count=Count(
+            'contents',
+            filter=Q(
+                contents__embedding__status=ContentEmbedding.STATUS_INDEXED,
+            ),
+            distinct=True,
+        ),
+    )
+
+
 class TopicView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -2096,7 +2117,9 @@ class TopicView(APIView):
         return [permission() for permission in self.permission_classes]
 
     def get(self, request):
-        topics = Topic.objects.filter(is_public=True).order_by('-activity_score', '-created_at')
+        topics = _topics_listing_queryset(
+            Topic.objects.filter(is_public=True)
+        ).order_by('-activity_score', '-created_at')
         serializer = TopicBasicSerializer(topics, many=True, context={'request': request})
         return Response(serializer.data)
 
@@ -2391,7 +2414,17 @@ class TopicTimelineView(APIView):
             return [AllowAny()]
         return [permission() for permission in self.permission_classes]
 
-    def get_timeline_queryset(self):
+    def get_timeline_queryset(self, request, topic):
+        contents = annotate_topic_content_queryset(
+            Content.objects.select_related('uploaded_by'),
+            topic,
+            request.user,
+        ).prefetch_related(
+            'topics',
+            'file_details',
+            'profiles',
+            'profiles__user',
+        )
         return TopicTimeline.objects.select_related(
             'topic',
             'created_by',
@@ -2400,9 +2433,7 @@ class TopicTimelineView(APIView):
             'entries__created_by',
             'entries__updated_by',
             'entries__entry_contents',
-            'entries__entry_contents__content',
-            'entries__entry_contents__content__file_details',
-            'entries__entry_contents__content__profiles',
+            Prefetch('entries__entry_contents__content', queryset=contents),
         )
 
     def get_selected_profiles(self, timeline, request):
@@ -2432,7 +2463,7 @@ class TopicTimelineView(APIView):
         topic, error_response = get_topic_or_not_found_response(request, pk)
         if error_response is not None:
             return error_response
-        timeline = self.get_timeline_queryset().filter(topic=topic).first()
+        timeline = self.get_timeline_queryset(request, topic).filter(topic=topic).first()
         if timeline is None:
             return Response(
                 {
@@ -2474,7 +2505,7 @@ class TopicTimelineView(APIView):
         )
         if serializer.is_valid():
             entry = serializer.save()
-            timeline = self.get_timeline_queryset().get(pk=timeline.pk)
+            timeline = self.get_timeline_queryset(request, topic).get(pk=timeline.pk)
             response_serializer = TopicTimelineEntrySerializer(
                 entry,
                 context={
@@ -3187,7 +3218,8 @@ class UserTopicsView(APIView):
             topics = Topic.objects.filter(
                 Q(creator=request.user) | Q(moderators=request.user)
             ).distinct().order_by('-created_at')
-        
+
+        topics = _topics_listing_queryset(topics)
         serializer = TopicBasicSerializer(topics, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -3208,6 +3240,42 @@ class UserTopicInvitationsView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+def annotate_topic_content_queryset(queryset, topic, user):
+    """Batch topic-list fields that ContentSerializer otherwise loads per row.
+
+    Covers PYTHON-DJANGO-16 and PYTHON-DJANGO-19: topics, vote totals, the
+    viewer's vote, transcript existence, and a Bitcoin anchor.
+    """
+    content_type = ContentType.objects.get_for_model(Content)
+    vote_count_subquery = Subquery(
+        VoteCount.objects.filter(
+            content_type=content_type,
+            object_id=OuterRef('pk'),
+            topic=topic,
+        ).values('vote_count')[:1]
+    )
+    annotations = {
+        'vote_count_value': Coalesce(vote_count_subquery, Value(0)),
+        'has_transcript': Exists(
+            ContentTranscript.objects.filter(content_id=OuterRef('pk'))
+        ),
+        'transcript_btc_anchored': Exists(
+            TranscriptAnchor.objects.filter(content_id=OuterRef('pk')).exclude(btc_txid='')
+        ),
+    }
+    if getattr(user, 'is_authenticated', False):
+        user_vote_subquery = Subquery(
+            Vote.objects.filter(
+                user=user,
+                content_type=content_type,
+                object_id=OuterRef('pk'),
+                topic=topic,
+            ).values('value')[:1]
+        )
+        annotations['user_vote_value'] = Coalesce(user_vote_subquery, Value(0))
+    return queryset.annotate(**annotations)
+
+
 class TopicContentMediaTypeView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -3221,20 +3289,15 @@ class TopicContentMediaTypeView(APIView):
         if error_response is not None:
             return error_response
         media_type = media_type.upper()
-        content_type = ContentType.objects.get_for_model(Content)
-        vote_count_subquery = Subquery(
-            VoteCount.objects.filter(
-                content_type=content_type,
-                object_id=OuterRef('id'),
-                topic=topic
-            ).values('vote_count')[:1]
-        )
-        contents = topic.contents.filter(media_type=media_type).annotate(
-            vote_count_value=Coalesce(vote_count_subquery, 0)
+        contents = annotate_topic_content_queryset(
+            topic.contents.filter(media_type=media_type),
+            topic,
+            request.user,
         ).order_by('-vote_count_value', '-created_at').prefetch_related(
             'file_details',
             'profiles',
             'profiles__user',
+            'topics',
         ).select_related('uploaded_by')
 
         # Batch profile lookup via prefetch — avoids N+1 selects on content_contentprofile.

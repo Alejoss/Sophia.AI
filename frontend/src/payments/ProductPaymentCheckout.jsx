@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -11,6 +12,7 @@ import {
   DialogTitle,
   Divider,
   IconButton,
+  Link,
   Paper,
   Stack,
   TextField,
@@ -469,6 +471,16 @@ const ProductPaymentCheckout = ({
               )}
             </Stack>
           )}
+          <Link
+            component={RouterLink}
+            to="/como-funciona/aceptamos-criptomonedas"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="caption"
+            sx={{ display: 'inline-block', mt: 2 }}
+          >
+            {t('checkout.whyCrypto')}
+          </Link>
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>{t('cancel')}</Button>

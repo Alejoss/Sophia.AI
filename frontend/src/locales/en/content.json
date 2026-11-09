@@ -350,6 +350,7 @@
     "acceptError": "Could not accept the suggestion.",
     "rejectError": "Could not reject the suggestion.",
     "goToLibrary": "Go to your library",
+    "whyDownload": "Why can you download the file?",
     "editProfile": "Edit content profile",
     "editThumbnailLater": "You can edit the thumbnail image later",
     "pendingSuggestions": "Pending file suggestions",

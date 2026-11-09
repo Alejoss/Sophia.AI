@@ -40,17 +40,15 @@ from profiles.serializers import UserSerializer
 
 def _content_has_transcript(obj):
     """True if Content has a ContentTranscript row (uses annotation when present)."""
-    annotated = getattr(obj, 'has_transcript', None)
-    if isinstance(annotated, bool):
-        return annotated
+    if 'has_transcript' in obj.__dict__:
+        return bool(obj.__dict__['has_transcript'])
     return ContentTranscript.objects.filter(content_id=obj.pk).exists()
 
 
 def _content_transcript_btc_anchored(obj):
     """True if any TranscriptAnchor for this content has a non-empty btc_txid."""
-    annotated = getattr(obj, 'transcript_btc_anchored', None)
-    if isinstance(annotated, bool):
-        return annotated
+    if 'transcript_btc_anchored' in obj.__dict__:
+        return bool(obj.__dict__['transcript_btc_anchored'])
     return (
         TranscriptAnchor.objects.filter(content_id=obj.pk)
         .exclude(btc_txid='')
@@ -162,10 +160,14 @@ class ContentSerializer(serializers.ModelSerializer):
             return None
     
     def get_vote_count(self, obj):
+        if 'vote_count_value' in obj.__dict__:
+            return obj.__dict__['vote_count_value']
         topic = self.context.get('topic')
         return obj.get_vote_count(topic)
 
     def get_user_vote(self, obj):
+        if 'user_vote_value' in obj.__dict__:
+            return obj.__dict__['user_vote_value']
         request = self.context.get('request')
         topic = self.context.get('topic')
         if not request or not request.user.is_authenticated:
