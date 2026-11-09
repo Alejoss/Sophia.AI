@@ -2633,6 +2633,137 @@ class CourseBchPaymentTests(TestCase):
 
 
 @override_settings(
+    BCH_NETWORK='mainnet',
+    BCH_RECEIVE_ADDRESS='bitcoincash:qqqqzqsrqszsvpcgpy9qkrqdpc83qygjzvcnueldtz',
+    BCH_USD_PRICE=200,
+    BCH_MIN_CONFIRMATIONS=0,
+    BCH_PAYMENT_TTL_MINUTES=30,
+)
+class EventBchPaymentTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.owner = UserFactory()
+        self.buyer = UserFactory()
+        self.event = EventFactory(
+            owner=self.owner,
+            title='La Real Historia de Bitcoin',
+            reference_price=35,
+        )
+        self.registration = EventRegistrationFactory(
+            user=self.buyer,
+            event=self.event,
+            payment_status='PENDING',
+        )
+
+    def _paid_tx(self, order, txid='ef' * 32):
+        return BchTransaction(
+            txid=txid,
+            timestamp=int(order.created_at.timestamp()) + 10,
+            confirmations=1,
+            outputs=[
+                BchTxOutput(address=order.address, amount_sats=order.expected_amount_sats),
+            ],
+        )
+
+    def test_event_bch_create_and_verify_marks_paid(self):
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            event_registration=self.registration,
+            user=self.buyer,
+            client=client,
+        )
+        self.assertEqual(order.event_registration_id, self.registration.id)
+        self.assertEqual(order.expected_amount_sats, 17_500_000)  # 35/200 BCH
+        self.assertEqual(get_bch_payment_product_meta(order)['product_type'], 'event')
+        self.assertEqual(get_bch_payment_product_meta(order)['product_title'], self.event.title)
+
+        txid = 'ef' * 32
+        client.get_transaction.return_value = self._paid_tx(order, txid=txid)
+        paid = verify_bch_payment(
+            event_registration=self.registration,
+            user=self.buyer,
+            payment_txid=txid,
+            client=client,
+        )
+        self.assertEqual(paid.status, BchDirectPayment.STATUS_PAID)
+        self.registration.refresh_from_db()
+        self.assertEqual(self.registration.payment_status, 'PAID')
+
+    def test_event_bch_http_create_and_verify(self):
+        self.client.force_authenticate(user=self.buyer)
+        with patch('payments.bch_services.build_bch_client') as mock_build:
+            mock_client = MagicMock()
+            mock_client.get_bch_usd_rate.return_value = Decimal('200')
+            mock_build.return_value = mock_client
+            created = self.client.post(
+                reverse('registration-bch', kwargs={'registration_id': self.registration.id}),
+                {},
+                format='json',
+            )
+            self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(created.data['usd_amount'], '35.00')
+            order = BchDirectPayment.objects.get(pk=created.data['id'])
+            txid = 'ab' * 32
+            mock_client.get_transaction.return_value = self._paid_tx(order, txid=txid)
+            verified = self.client.post(
+                reverse('registration-bch-verify', kwargs={'registration_id': self.registration.id}),
+                {'txid': txid},
+                format='json',
+            )
+        self.assertEqual(verified.status_code, status.HTTP_200_OK)
+        self.assertEqual(verified.data['payment']['status'], 'paid')
+        self.assertTrue(verified.data['registration']['is_paid'])
+
+    def test_waiting_nowpayments_is_abandoned_when_starting_event_bch(self):
+        CryptoPayment.objects.create(
+            event_registration=self.registration,
+            order_id='evt-waiting-switch',
+            payment_status='waiting',
+            price_amount=35,
+            invoice_url='https://nowpayments.io/payment/?iid=event',
+        )
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        order = create_or_reuse_bch_payment(
+            event_registration=self.registration,
+            user=self.buyer,
+            client=client,
+        )
+        self.assertEqual(order.status, BchDirectPayment.STATUS_PENDING)
+        abandoned = CryptoPayment.objects.get(order_id='evt-waiting-switch')
+        self.assertEqual(abandoned.payment_status, 'expired')
+
+    def test_confirming_nowpayments_still_blocks_event_bch(self):
+        CryptoPayment.objects.create(
+            event_registration=self.registration,
+            order_id='evt-confirming-switch',
+            payment_status='confirming',
+            price_amount=35,
+        )
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        with self.assertRaises(BchPaymentError) as ctx:
+            create_or_reuse_bch_payment(
+                event_registration=self.registration,
+                user=self.buyer,
+                client=client,
+            )
+        self.assertIn('confirmación', str(ctx.exception))
+
+    def test_event_bch_rejects_other_users(self):
+        stranger = UserFactory()
+        client = MagicMock()
+        client.get_bch_usd_rate.return_value = Decimal('200')
+        with self.assertRaises(PermissionError):
+            create_or_reuse_bch_payment(
+                event_registration=self.registration,
+                user=stranger,
+                client=client,
+            )
+
+
+@override_settings(
     PAYPHONE_TOKEN='test-payphone-token',
     PAYPHONE_STORE_ID='store-123',
     PAYPHONE_IVA_PERCENT=0,

@@ -1,4 +1,4 @@
-"""Create / verify self-custody BCH payments for anchors, paths, and topics."""
+"""Create / verify self-custody BCH payments for paid products, including events."""
 from __future__ import annotations
 
 import logging
@@ -12,6 +12,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from content.models import TopicPurchase, TranscriptAnchorRequest, TranscriptGenerationRequest
+from events.models import EventRegistration
 from knowledge_paths.models import KnowledgePathPurchase
 from payments.bch_client import (
     SATS_PER_BCH,
@@ -31,6 +32,7 @@ from payments.services import (
     has_in_flight_nowpayments,
     mark_anchor_request_paid,
     mark_course_purchase_paid,
+    mark_event_registration_paid,
     mark_path_purchase_paid,
     mark_token_purchase_paid,
     mark_topic_purchase_paid,
@@ -139,6 +141,7 @@ def _target_filter(
     token_purchase=None,
     course_purchase=None,
     transcript_generation=None,
+    event_registration=None,
 ) -> Q:
     if anchor_request is not None:
         return Q(anchor_request=anchor_request)
@@ -152,6 +155,8 @@ def _target_filter(
         return Q(course_purchase=course_purchase)
     if transcript_generation is not None:
         return Q(transcript_generation=transcript_generation)
+    if event_registration is not None:
+        return Q(event_registration=event_registration)
     raise BchPaymentError('Falta el entitlement del pago BCH.')
 
 
@@ -163,6 +168,7 @@ def _release_waiting_nowpayments(
     token_purchase=None,
     course_purchase=None,
     transcript_generation=None,
+    event_registration=None,
 ) -> None:
     """Allow switching from an unused NOWPayments / Payphone order to BCH."""
     if has_in_flight_nowpayments(
@@ -171,6 +177,7 @@ def _release_waiting_nowpayments(
         token_purchase=token_purchase,
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
+        event_registration=event_registration,
     ):
         raise BchPaymentError(
             'Hay un pago NOWPayments en confirmación. Espera a que termine o expire.'
@@ -181,6 +188,7 @@ def _release_waiting_nowpayments(
         token_purchase=token_purchase,
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
+        event_registration=event_registration,
     )
     abandon_pending_payphone(
         path_purchase=path_purchase,
@@ -189,6 +197,7 @@ def _release_waiting_nowpayments(
         token_purchase=token_purchase,
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
+        event_registration=event_registration,
     )
 
 
@@ -269,6 +278,7 @@ def _authorize_create(
     token_purchase=None,
     course_purchase=None,
     transcript_generation=None,
+    event_registration=None,
 ) -> None:
     if not is_bch_direct_configured():
         raise BchPaymentError('Pagos BCH directos no están configurados en el servidor.')
@@ -332,6 +342,19 @@ def _authorize_create(
         _release_waiting_nowpayments(course_purchase=course_purchase)
         return
 
+    if event_registration is not None:
+        event = event_registration.event
+        if event_registration.user_id != user.id:
+            raise PermissionError('Solo el participante puede iniciar el pago BCH.')
+        if event_registration.registration_status != 'REGISTERED':
+            raise BchPaymentError('El registro no está activo.')
+        if event_registration.payment_status == 'PAID':
+            raise BchPaymentError('Este registro ya está pagado.')
+        if not event.reference_price or event.reference_price <= 0:
+            raise BchPaymentError('Este evento no requiere pago.')
+        _release_waiting_nowpayments(event_registration=event_registration)
+        return
+
     if transcript_generation is not None:
         if transcript_generation.requester_id != user.id:
             raise PermissionError('Solo quien solicitó la transcripción puede iniciar el pago BCH.')
@@ -352,6 +375,7 @@ def _authorize_verify(
     token_purchase=None,
     course_purchase=None,
     transcript_generation=None,
+    event_registration=None,
 ) -> None:
     if anchor_request is not None:
         if anchor_request.requester_id != user.id and not getattr(user, 'is_staff', False):
@@ -383,6 +407,15 @@ def _authorize_verify(
         if course_purchase.user_id != user.id and not getattr(user, 'is_staff', False):
             raise PermissionError('No tienes permiso para verificar este pago.')
         return
+    if event_registration is not None:
+        event = event_registration.event
+        if (
+            event_registration.user_id != user.id
+            and event.owner_id != user.id
+            and not getattr(user, 'is_staff', False)
+        ):
+            raise PermissionError('No tienes permiso para verificar este pago.')
+        return
     if transcript_generation is not None:
         if transcript_generation.requester_id != user.id and not getattr(user, 'is_staff', False):
             raise PermissionError('No tienes permiso para verificar este pago.')
@@ -398,6 +431,7 @@ def _usd_for_target(
     token_purchase=None,
     course_purchase=None,
     transcript_generation=None,
+    event_registration=None,
 ) -> Decimal:
     if anchor_request is not None:
         return Decimal(str(
@@ -417,6 +451,8 @@ def _usd_for_target(
         return Decimal(str(
             course_purchase.price_amount or course_purchase.course.price_usd or 0
         ))
+    if event_registration is not None:
+        return Decimal(str(event_registration.event.reference_price or 0))
     if transcript_generation is not None:
         return Decimal(str(
             transcript_generation.price_amount
@@ -434,12 +470,13 @@ def create_or_reuse_bch_payment(
     token_purchase: TokenPurchase | None = None,
     course_purchase: CoursePurchase | None = None,
     transcript_generation: TranscriptGenerationRequest | None = None,
+    event_registration: EventRegistration | None = None,
     client: BchPublicClient | BchElectrumClient | BchFailoverClient | None = None,
 ) -> BchDirectPayment:
     targets = [
         t for t in (
             anchor_request, path_purchase, topic_purchase, token_purchase,
-            course_purchase, transcript_generation,
+            course_purchase, transcript_generation, event_registration,
         ) if t is not None
     ]
     if len(targets) != 1:
@@ -453,6 +490,7 @@ def create_or_reuse_bch_payment(
         token_purchase=token_purchase,
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
+        event_registration=event_registration,
     )
 
     target_q = _target_filter(
@@ -462,6 +500,7 @@ def create_or_reuse_bch_payment(
         token_purchase=token_purchase,
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
+        event_registration=event_registration,
     )
     _expire_stale_pending()
     existing = (
@@ -497,6 +536,7 @@ def create_or_reuse_bch_payment(
         token_purchase=token_purchase,
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
+        event_registration=event_registration,
     )
     if usd <= 0 or rate <= 0:
         raise BchPaymentError('No se pudo calcular el monto BCH.')
@@ -515,6 +555,7 @@ def create_or_reuse_bch_payment(
         token_purchase=token_purchase,
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
+        event_registration=event_registration,
         address=address,
         expected_amount_sats=sats,
         usd_amount=usd.quantize(Decimal('0.01')),
@@ -668,6 +709,7 @@ def verify_bch_payment(
     token_purchase: TokenPurchase | None = None,
     course_purchase: CoursePurchase | None = None,
     transcript_generation: TranscriptGenerationRequest | None = None,
+    event_registration: EventRegistration | None = None,
     payment_txid: str | None = None,
     client: BchPublicClient | BchElectrumClient | BchFailoverClient | None = None,
 ) -> BchDirectPayment:
@@ -684,7 +726,7 @@ def verify_bch_payment(
     targets = [
         t for t in (
             anchor_request, path_purchase, topic_purchase, token_purchase,
-            course_purchase, transcript_generation,
+            course_purchase, transcript_generation, event_registration,
         ) if t is not None
     ]
     if len(targets) != 1:
@@ -698,6 +740,7 @@ def verify_bch_payment(
         token_purchase=token_purchase,
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
+        event_registration=event_registration,
     )
 
     if anchor_request is not None:
@@ -763,6 +806,18 @@ def verify_bch_payment(
         if paid:
             return paid
         raise BchPaymentError('Este curso ya está pagado.')
+    elif event_registration is not None and event_registration.payment_status == 'PAID':
+        paid = (
+            BchDirectPayment.objects.filter(
+                event_registration=event_registration,
+                status=BchDirectPayment.STATUS_PAID,
+            )
+            .order_by('-paid_at')
+            .first()
+        )
+        if paid:
+            return paid
+        raise BchPaymentError('Este registro ya está pagado.')
     elif (
         transcript_generation is not None
         and transcript_generation.status in (
@@ -789,6 +844,7 @@ def verify_bch_payment(
         token_purchase=token_purchase,
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
+        event_registration=event_registration,
     )
 
     raw_txid = (payment_txid or '').strip()
@@ -977,6 +1033,10 @@ def _fulfill_bch_payment(
         'course_purchase__user',
         'transcript_generation',
         'transcript_generation__requester',
+        'event_registration',
+        'event_registration__user',
+        'event_registration__event',
+        'event_registration__event__owner',
     ).get(pk=payment.pk)
     if locked.status == BchDirectPayment.STATUS_PAID:
         return locked
@@ -1007,6 +1067,8 @@ def _fulfill_bch_payment(
         mark_token_purchase_paid(locked.token_purchase, source='bch_direct')
     elif locked.course_purchase_id:
         mark_course_purchase_paid(locked.course_purchase)
+    elif locked.event_registration_id:
+        mark_event_registration_paid(locked.event_registration, source='bch_direct')
     elif locked.transcript_generation_id:
         from content.transcript_generation import mark_generation_request_paid
         mark_generation_request_paid(locked.transcript_generation, source='bch_direct')
@@ -1075,6 +1137,15 @@ def get_bch_payment_product_meta(payment: BchDirectPayment) -> dict:
             'owner': None,
             'product': course,
         }
+    if payment.event_registration_id:
+        event = getattr(payment.event_registration, 'event', None)
+        return {
+            'product_type': 'event',
+            'product_id': getattr(event, 'id', None) or payment.event_registration.event_id,
+            'product_title': getattr(event, 'title', None) or f'Evento #{payment.event_registration.event_id}',
+            'owner': getattr(event, 'owner', None),
+            'product': event,
+        }
     if payment.transcript_generation_id:
         return {
             'product_type': 'transcript_generation',
@@ -1125,6 +1196,9 @@ def list_staff_bch_orders(
             'token_purchase__package',
             'course_purchase__user',
             'course_purchase__course',
+            'event_registration__user',
+            'event_registration__event',
+            'event_registration__event__owner',
         )
         .order_by('-created_at')[:cap]
     )
@@ -1167,6 +1241,9 @@ def report_bch_payment_txid(
             'token_purchase__package',
             'course_purchase__user',
             'course_purchase__course',
+            'event_registration__user',
+            'event_registration__event',
+            'event_registration__event__owner',
         )
         .filter(pk=payment_id)
         .first()
@@ -1247,6 +1324,10 @@ def manual_confirm_bch_payment(
             'course_purchase',
             'course_purchase__course',
             'course_purchase__user',
+            'event_registration',
+            'event_registration__user',
+            'event_registration__event',
+            'event_registration__event__owner',
         )
         .filter(pk=payment_id)
         .first()
@@ -1300,6 +1381,8 @@ def manual_confirm_bch_payment(
         mark_token_purchase_paid(locked.token_purchase, source='bch_direct_manual')
     elif locked.course_purchase_id:
         mark_course_purchase_paid(locked.course_purchase)
+    elif locked.event_registration_id:
+        mark_event_registration_paid(locked.event_registration, source='bch_direct_manual')
     elif locked.transcript_generation_id:
         from content.transcript_generation import mark_generation_request_paid
         mark_generation_request_paid(locked.transcript_generation, source='bch_direct_manual')

@@ -129,6 +129,7 @@ class BchDirectPaymentAdmin(admin.ModelAdmin):
         'topic_purchase',
         'token_purchase',
         'course_purchase',
+        'event_registration',
         'expected_amount_sats',
         'usd_amount',
         'status',
@@ -146,6 +147,8 @@ class BchDirectPaymentAdmin(admin.ModelAdmin):
         'token_purchase__user__username',
         'course_purchase__user__username',
         'course_purchase__course__code',
+        'event_registration__user__username',
+        'event_registration__event__title',
     )
     raw_id_fields = (
         'anchor_request',
@@ -153,6 +156,7 @@ class BchDirectPaymentAdmin(admin.ModelAdmin):
         'topic_purchase',
         'token_purchase',
         'course_purchase',
+        'event_registration',
     )
     readonly_fields = ('created_at', 'updated_at', 'provider_payload', 'paid_at')
 
