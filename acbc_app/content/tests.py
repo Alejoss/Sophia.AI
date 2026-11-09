@@ -1595,6 +1595,117 @@ class TopicAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_topic_content_lists_do_not_query_per_content(self):
+        """Media-type and timeline pages batch topics, votes, and transcripts."""
+        from django.contrib.contenttypes.models import ContentType
+        from votes.models import Vote, VoteCount
+
+        contents = []
+        for index in range(4):
+            owner = User.objects.create_user(
+                username=f'mediaowner{index}',
+                email=f'mediaowner{index}@example.com',
+                password='pass12345',
+            )
+            content = Content.objects.create(
+                uploaded_by=owner,
+                media_type='TEXT',
+                original_title=f'Listed content {index}',
+            )
+            ContentProfile.objects.create(
+                content=content,
+                user=owner,
+                title=f'Profile {index}',
+            )
+            self.topic.contents.add(content)
+            contents.append(content)
+
+        ContentTranscript.objects.create(
+            content=contents[0],
+            processed_plain='Texto anclado.',
+            language='es',
+        )
+        TranscriptAnchor.objects.create(
+            content=contents[0],
+            text_hash='a' * 64,
+            btc_txid='b' * 64,
+        )
+        content_type = ContentType.objects.get_for_model(Content)
+        VoteCount.objects.create(
+            content_type=content_type,
+            object_id=contents[0].id,
+            topic=self.topic,
+            vote_count=3,
+        )
+        Vote.objects.create(
+            user=self.user,
+            value=1,
+            content_type=content_type,
+            object_id=contents[0].id,
+            topic=self.topic,
+        )
+        timeline = TopicTimeline.objects.create(
+            topic=self.topic,
+            created_by=self.user,
+            title='Linea',
+        )
+        entry = TopicTimelineEntry.objects.create(
+            timeline=timeline,
+            title='Inicio',
+            order=1,
+            created_by=self.user,
+        )
+        for order, content in enumerate(contents):
+            TopicTimelineEntryContent.objects.create(
+                entry=entry,
+                content=content,
+                order=order,
+            )
+
+        def repeated_lookups(captured):
+            hits = []
+            for query in captured.captured_queries:
+                sql = ' '.join(query['sql'].split())
+                if ' IN (' in sql or 'FROM "content_content"' in sql:
+                    continue
+                if any(needle in sql for needle in (
+                    'INNER JOIN "content_content_topics"',
+                    'FROM "content_contenttranscript"',
+                    'FROM "content_transcriptanchor"',
+                    'FROM "votes_votecount"',
+                    'FROM "votes_vote"',
+                    'FROM "auth_user" WHERE "auth_user"."id" =',
+                )):
+                    hits.append(sql)
+            return hits
+
+        media_url = reverse(
+            'content:topic-content-media-type',
+            args=[self.topic.id, 'text'],
+        )
+        with CaptureQueriesContext(connection) as media_queries:
+            media = self.client.get(media_url)
+        self.assertEqual(media.status_code, status.HTTP_200_OK)
+        listed = {item['id']: item for item in media.data['contents']}
+        self.assertEqual(listed[contents[0].id]['vote_count'], 3)
+        self.assertEqual(listed[contents[0].id]['user_vote'], 1)
+        self.assertTrue(listed[contents[0].id]['has_transcript'])
+        self.assertTrue(listed[contents[0].id]['transcript_btc_anchored'])
+        self.assertIn(self.topic.id, listed[contents[0].id]['topics'])
+        self.assertEqual(listed[contents[1].id]['vote_count'], 0)
+        self.assertFalse(listed[contents[1].id]['has_transcript'])
+        self.assertEqual(repeated_lookups(media_queries), [])
+
+        timeline_url = reverse('content:topic-timeline', args=[self.topic.id])
+        with CaptureQueriesContext(connection) as timeline_queries:
+            timeline_response = self.client.get(timeline_url)
+        self.assertEqual(timeline_response.status_code, status.HTTP_200_OK)
+        timeline_content = timeline_response.data['entries'][0]['contents'][0]['content']
+        self.assertEqual(timeline_content['id'], contents[0].id)
+        self.assertEqual(timeline_content['vote_count'], 3)
+        self.assertEqual(timeline_content['user_vote'], 1)
+        self.assertEqual(repeated_lookups(timeline_queries), [])
+
     def test_hidden_topic_detail_hidden_from_anonymous(self):
         """Private topics remain hidden from anonymous users."""
         self.topic.is_public = False
