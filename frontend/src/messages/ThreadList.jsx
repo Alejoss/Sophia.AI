@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import { useDateLocales } from '../hooks/useDateLocales';
 import { AuthContext } from '../context/AuthContext';
 import { fetchThreads } from '../api/messagesApi';
@@ -29,7 +28,6 @@ const ThreadList = ({ onThreadSelect }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const { authState } = useContext(AuthContext);
     const currentUser = authState.user;
-    const navigate = useNavigate();
 
     useEffect(() => {
         const loadThreads = async () => {
@@ -74,9 +72,15 @@ const ThreadList = ({ onThreadSelect }) => {
     );
 
     return (
-        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+        }}>
             {/* Header */}
-            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ flexShrink: 0, p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="h6" sx={{ mb: 2 }}>{t('list.title')}</Typography>
                 <Paper
                     component="form"
@@ -98,7 +102,7 @@ const ThreadList = ({ onThreadSelect }) => {
             </Box>
 
             {/* Thread List */}
-            <List sx={{ flex: 1, overflow: 'auto' }}>
+            <List sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
                 {!filteredThreads || filteredThreads.length === 0 ? (
                     <ListItem>
                         <ListItemText 

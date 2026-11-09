@@ -1,11 +1,9 @@
-import React, { useState, useContext } from 'react';
+import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, Outlet, Link } from 'react-router-dom';
-import { Box, Paper, useTheme, useMediaQuery, Typography, Avatar, IconButton } from '@mui/material';
+import { Box, Paper, useTheme, useMediaQuery, Typography, Avatar } from '@mui/material';
 import ThreadList from './ThreadList';
-import MessageThread from './MessageThread';
 import { AuthContext } from '../context/AuthContext';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 const MessagesLayout = () => {
     const { t } = useTranslation('messages');
@@ -13,135 +11,106 @@ const MessagesLayout = () => {
     const navigate = useNavigate();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-    const [selectedThread, setSelectedThread] = useState(null);
     const { authState } = useContext(AuthContext);
     const currentUser = authState.user;
 
-    const handleThreadSelect = (userId) => {
-        setSelectedThread(userId);
-        navigate(`/messages/thread/${userId}`);
+    const handleThreadSelect = (nextUserId) => {
+        navigate(`/messages/thread/${nextUserId}`);
     };
 
+    const showList = !isMobile || !userId;
+    const showThread = !isMobile || Boolean(userId);
+
     return (
-        <Box sx={{ 
-            height: 'calc(100vh - 64px)', // Subtract header height
+        <Box sx={{
+            flex: 1,
+            minHeight: 0,
+            height: '100%',
             display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            bgcolor: 'background.default',
         }}>
-            {/* Top Header with Profile Link */}
-            <Paper 
-                elevation={0} 
-                sx={{ 
-                    p: 2,
+            <Paper
+                data-testid="inbox-list"
+                elevation={0}
+                sx={{
+                    width: { xs: '100%', md: 320 },
+                    flex: { xs: '1 1 auto', md: '0 0 320px' },
+                    minWidth: 0,
+                    minHeight: 0,
+                    display: showList ? 'flex' : 'none',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    borderRight: '1px solid',
+                    borderColor: 'divider',
+                }}
+            >
+                <Box sx={{
+                    flexShrink: 0,
+                    px: 2,
+                    py: 1.5,
                     borderBottom: '1px solid',
                     borderColor: 'divider',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 2
-                }}
-            >
-                <Link 
-                    to="/profiles/my_profile"
-                    style={{ 
-                        textDecoration: 'none',
-                        color: 'inherit',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                    }}
-                >
-                    <Avatar 
-                        src={currentUser?.profile_picture}
-                        sx={{ width: 32, height: 32 }}
+                    gap: 1.5,
+                }}>
+                    <Link
+                        to="/profiles/my_profile"
+                        style={{
+                            textDecoration: 'none',
+                            color: 'inherit',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            minWidth: 0,
+                        }}
                     >
-                        {currentUser?.username?.[0]?.toUpperCase()}
-                    </Avatar>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                        {currentUser?.username}
-                    </Typography>
-                </Link>
+                        <Avatar
+                            src={currentUser?.profile_picture}
+                            sx={{ width: 32, height: 32 }}
+                        >
+                            {currentUser?.username?.[0]?.toUpperCase()}
+                        </Avatar>
+                        <Typography variant="subtitle1" noWrap sx={{ fontWeight: 500 }}>
+                            {currentUser?.username}
+                        </Typography>
+                    </Link>
+                </Box>
+                <ThreadList onThreadSelect={handleThreadSelect} />
             </Paper>
 
-            {/* Main Content Area */}
-            <Box sx={{ 
-                flex: 1,
-                display: 'flex',
-                flexDirection: { xs: 'column', md: 'row' },
-                overflow: 'hidden'
-            }}>
-                {/* Left Panel - Thread List */}
-                <Paper 
-                    elevation={0} 
-                    sx={{ 
-                        width: { xs: '100%', md: 320 },
-                        height: { xs: userId ? 0 : '100%', md: '100%' },
-                        borderRight: '1px solid',
-                        borderColor: 'divider',
-                        display: { xs: userId ? 'none' : 'block', md: 'block' }
-                    }}
-                >
-                    <ThreadList onThreadSelect={handleThreadSelect} />
-                </Paper>
-
-                {/* Middle Panel - Message Thread */}
-                <Box 
-                    sx={{ 
+            <Box
+                data-testid="inbox-thread"
+                sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    minHeight: 0,
+                    display: showThread ? 'flex' : 'none',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                }}
+            >
+                {userId ? (
+                    <Outlet />
+                ) : (
+                    <Box sx={{
                         flex: 1,
-                        height: '100%',
-                        display: { xs: userId ? 'block' : 'none', md: 'flex' },
-                        flexDirection: 'column'
-                    }}
-                >
-                    {userId ? (
-                        <>
-                            {/* Thread Header */}
-                            <Paper 
-                                elevation={0} 
-                                sx={{ 
-                                    p: 2,
-                                    borderBottom: '1px solid',
-                                    borderColor: 'divider',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 2
-                                }}
-                            >
-                                <IconButton 
-                                    onClick={() => navigate('/messages')}
-                                    sx={{ display: { md: 'none' } }}
-                                >
-                                    <ArrowBackIcon />
-                                </IconButton>
-                                <MessageThread />
-                            </Paper>
-                        </>
-                    ) : (
-                        <Box 
-                            sx={{ 
-                                height: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                bgcolor: 'background.default'
-                            }}
-                        >
-                            <Box 
-                                sx={{ 
-                                    textAlign: 'center',
-                                    color: 'text.secondary',
-                                    p: 3
-                                }}
-                            >
-                                <h2>{t('layout.selectTitle')}</h2>
-                                <p>{t('layout.selectHint')}</p>
-                            </Box>
+                        minHeight: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        px: 3,
+                    }}>
+                        <Box sx={{ textAlign: 'center', color: 'text.secondary' }}>
+                            <h2>{t('layout.selectTitle')}</h2>
+                            <p>{t('layout.selectHint')}</p>
                         </Box>
-                    )}
-                </Box>
+                    </Box>
+                )}
             </Box>
         </Box>
     );
 };
 
-export default MessagesLayout; 
+export default MessagesLayout;

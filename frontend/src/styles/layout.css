@@ -17,3 +17,36 @@
     padding-top: 72px; /* 56px header + 16px margin */
   }
 }
+
+/* Messages fills the screen under the fixed header and must not grow the
+   document. A child of height calc(100vh - 64px) inside the default 80px
+   padding left the page slightly scrollable, so the window and the thread
+   scrolled as two different lists. */
+.main-layout--locked {
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: none;
+}
+
+.main-content.main-content--locked {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 64px 0 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+@media screen and (max-width: 768px) {
+  .main-content.main-content--locked {
+    padding-top: 56px;
+  }
+}
