@@ -13,6 +13,7 @@ Official setup guide: [SMTP2GO + Django](https://www.smtp2go.com/setupguide/djan
 | **Suggestions to admins** | `SuggestionCreateView` → `_send_email_to_admins()` | When a user submits a suggestion | `EmailService` → `SEND_EMAILS` |
 | **Book club invite** | `book_clubs.emailing.send_book_club_invite_email` | Guest leaves email / invite flow | `EmailService` → `SEND_EMAILS` |
 | **Topic creation request** | `notification_utils` → admins | Staff notification for topic requests | `EmailService` → `SEND_EMAILS` |
+| **Course purchase receipt** | `payments.course_receipt.send_course_purchase_receipt` | A course purchase first becomes `PAID` (NOWPayments, direct BCH, Payphone, or admin). Sent to the checkout receipt address, or the account email if that field is empty. | `EmailService` → `SEND_EMAILS` |
 
 ## Are they active?
 
@@ -59,7 +60,7 @@ In production, `EMAIL_HOST`, `EMAIL_HOST_USER`, and `EMAIL_HOST_PASSWORD` are re
 Transactional HTML is rendered by Django templates under `acbc_app/profiles/templates/profiles/emails/`:
 
 - `base_email.html` — shared layout (logo, brand orange `#E86A00`, footer)
-- Feature templates extend the base (`suggestion_notification`, `newsletter_subscription`, `topic_creation_request`, `book_club_invite`)
+- Feature templates extend the base (`suggestion_notification`, `newsletter_subscription`, `topic_creation_request`, `book_club_invite`). The course receipt (`course_purchase_confirmed`) is a standalone layout so the welcome artwork can sit full width.
 - If the template context includes `unsubscribe_url`, the base footer prints that link and `EmailService` adds the `List-Unsubscribe` / `List-Unsubscribe-Post` headers (RFC 8058 one-click)
 
 ## Newsletter unsubscribe
