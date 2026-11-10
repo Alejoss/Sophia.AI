@@ -13,6 +13,11 @@ COURSE_WELCOME_IMAGES = {
     'real-historia-bitcoin': '/images/real-historia-bitcoin-welcome.jpg',
 }
 
+REAL_HISTORIA_SUBJECT = (
+    'Tu inscripción al curso La real historia de Bitcoin '
+    'y la guerra por las criptomonedas está confirmada.'
+)
+
 
 def buyer_email_for_purchase(purchase: CoursePurchase) -> str:
     """Receipt address from checkout, then the account email when the buyer has one."""
@@ -74,7 +79,11 @@ def send_course_purchase_receipt(purchase: CoursePurchase) -> bool:
     try:
         return EmailService.send_template_email(
             receiver_email=receiver,
-            subject=f'Tu inscripción está confirmada — {course.title}',
+            subject=(
+                REAL_HISTORIA_SUBJECT
+                if course.code == 'real-historia-bitcoin'
+                else f'Tu inscripción está confirmada — {course.title}'
+            ),
             template_name='course_purchase_confirmed',
             context={
                 'buyer_name': buyer_name,

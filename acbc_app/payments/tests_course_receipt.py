@@ -39,7 +39,11 @@ class CoursePurchaseReceiptEmailTests(TestCase):
         kwargs = mock_send.call_args.kwargs
         self.assertEqual(kwargs['receiver_email'], 'recibo@example.com')
         self.assertEqual(kwargs['template_name'], 'course_purchase_confirmed')
-        self.assertIn(self.course.title, kwargs['subject'])
+        self.assertEqual(
+            kwargs['subject'],
+            'Tu inscripción al curso La real historia de Bitcoin '
+            'y la guerra por las criptomonedas está confirmada.',
+        )
         self.assertEqual(kwargs['context']['buyer_name'], 'Ana')
         self.assertEqual(kwargs['context']['price_label'], '$35.00 USD')
         self.assertIn('real-historia-bitcoin-welcome.jpg', kwargs['context']['hero_image_url'])
@@ -133,8 +137,8 @@ class CoursePurchaseReceiptEmailTests(TestCase):
             },
         )
         self.assertIn('real-historia-bitcoin-welcome.jpg', html)
-        self.assertIn('Entrar al curso', html)
-        self.assertIn('Hola Ana,', html)
-        self.assertIn('$35.00 USD', html)
-        self.assertIn(self.course.title, text)
+        self.assertIn('Revisar la página de descripción del curso', html)
+        self.assertIn('Estamos por explorar juntos esa historia.', html)
+        self.assertIn('Comprender es libertad.', html)
+        self.assertIn('¡Nos vemos pronto!', text)
         self.assertIn('https://www.academiablockchain.com/cursos/real-historia-bitcoin', text)

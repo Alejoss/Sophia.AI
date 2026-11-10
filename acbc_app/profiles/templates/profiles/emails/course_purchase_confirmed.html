@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Tu inscripción está confirmada — {{ course_title }}</title>
+    <title>Tu inscripción al curso La real historia de Bitcoin y la guerra por las criptomonedas está confirmada.</title>
     <!--[if mso]>
     <noscript>
         <xml>
@@ -27,7 +27,7 @@
 </head>
 <body style="margin:0;padding:0;width:100% !important;background-color:#efe8dc;font-family:Georgia,'Iowan Old Style','Palatino Linotype',Palatino,serif;color:#1c1915;">
     <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
-        Tu lugar en {{ course_title }} está confirmado. El pago de {{ price_label }} quedó registrado.
+        Tu inscripción al curso La real historia de Bitcoin y la guerra por las criptomonedas está confirmada.
         &#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;
     </div>
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#efe8dc;">
@@ -40,31 +40,24 @@
                             <img src="{{ hero_image_url }}" alt="{{ hero_image_alt }}" width="600" style="width:100%;max-width:600px;height:auto;display:block;border:0;">
                         </td>
                     </tr>
-                    {% else %}
-                    <tr>
-                        <td class="email-pad" style="padding:32px 36px 8px 36px;background-color:#0c1c18;">
-                            <p style="margin:0 0 8px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#e8c872;">
-                                {{ brand_name|default:"Academia Blockchain" }}
-                            </p>
-                            <h1 style="margin:0;font-size:28px;line-height:1.25;font-weight:700;color:#f7f1e4;">
-                                Tu inscripción está confirmada
-                            </h1>
-                        </td>
-                    </tr>
                     {% endif %}
 
                     <tr>
                         <td class="email-pad" style="padding:28px 36px 8px 36px;background-color:#fffdf8;">
-                            <p style="margin:0 0 16px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.6;color:#1c1915;">
-                                {% if buyer_name %}Hola {{ buyer_name }},{% else %}Hola,{% endif %}
+                            <p style="margin:0 0 16px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.65;color:#1c1915;">
+                                <strong>Tu inscripción al curso La real historia de Bitcoin y la guerra por las criptomonedas está confirmada.</strong>
                             </p>
                             <p style="margin:0 0 16px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.65;color:#3f3a33;">
-                                Recibimos tu pago de <strong style="color:#1c1915;">{{ price_label }}</strong>.
-                                Tu lugar en <strong style="color:#1c1915;">{{ course_title }}</strong> está confirmado.
+                                Estás a punto de explorar una historia fascinante: las ideas que dieron origen a Bitcoin, los personajes que marcaron su desarrollo y las disputas que transformaron el mundo de las criptomonedas.
+                            </p>
+                            <p style="margin:0 0 16px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.65;color:#3f3a33;">
+                                Detrás de Bitcoin hay mucho más que una revolución tecnológica: hay ideales enfrentados, disputas por su futuro y episodios poco conocidos que cambiaron el rumbo de las criptomonedas. Estamos por explorar juntos esa historia.
+                            </p>
+                            <p style="margin:0 0 8px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.65;color:#1c1915;">
+                                <strong>¿Cuál es el siguiente paso?</strong>
                             </p>
                             <p style="margin:0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.65;color:#3f3a33;">
-                                En la página del curso están el recorrido y el calendario de encuentros en vivo.
-                                Puedes entrar cuando quieras.
+                                El fin de semana estará disponible la página del curso, donde encontrarás el recorrido de aprendizaje y el calendario de nuestros encuentros en vivo.
                             </p>
                         </td>
                     </tr>
@@ -72,35 +65,38 @@
                     {% if course_url %}
                     <tr>
                         <td class="email-pad" align="center" style="padding:22px 36px 8px 36px;background-color:#fffdf8;">
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:420px;">
                                 <tr>
-                                    <td align="center" bgcolor="#14302b" style="border-radius:8px;background-color:#14302b;">
+                                    <td align="center" bgcolor="#14302b" style="border-radius:8px;background-color:#14302b;padding:14px 22px;">
                                         <a href="{{ course_url }}" target="_blank"
-                                           style="display:inline-block;padding:14px 28px;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;letter-spacing:0.02em;color:#f4e7c3 !important;text-decoration:none;border-radius:8px;">
-                                            <span style="color:#f4e7c3 !important;">Entrar al curso</span>
+                                           style="font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.4;font-weight:700;letter-spacing:0.01em;color:#f4e7c3 !important;text-decoration:none;">
+                                            <span style="color:#f4e7c3 !important;">Revisar la página de descripción del curso</span>
                                         </a>
                                     </td>
                                 </tr>
                             </table>
                         </td>
                     </tr>
-                    <tr>
-                        <td class="email-pad" style="padding:14px 36px 28px 36px;background-color:#fffdf8;">
-                            <p style="margin:0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#8a8175;word-break:break-all;">
-                                Si el botón no abre, copia este enlace:<br>
-                                <a href="{{ course_url }}" style="color:#8a5a12;text-decoration:underline;">{{ course_url }}</a>
-                            </p>
-                        </td>
-                    </tr>
                     {% endif %}
 
                     <tr>
-                        <td class="email-pad" style="padding:18px 36px;background-color:#f7f1e6;border-top:1px solid #eadfce;text-align:center;">
-                            <p style="margin:0 0 4px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#1c1915;">
-                                <strong>{{ brand_name|default:"Academia Blockchain" }}</strong>
+                        <td class="email-pad" style="padding:18px 36px 8px 36px;background-color:#fffdf8;">
+                            <p style="margin:0 0 16px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.65;color:#3f3a33;">
+                                Nos alegra que formes parte de esta experiencia. Esperamos que este espacio sea una oportunidad para aprender, cuestionar y compartir ideas.
                             </p>
-                            <p style="margin:0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#8a8175;">
-                                Este es un mensaje automático. No hace falta responder.
+                            <p style="margin:0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.65;color:#1c1915;">
+                                ¡Nos vemos pronto!
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td class="email-pad" style="padding:18px 36px 22px 36px;background-color:#fffdf8;border-top:1px solid #eadfce;text-align:center;">
+                            <p style="margin:0 0 4px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:#1c1915;">
+                                <strong>Academia Blockchain</strong>
+                            </p>
+                            <p style="margin:0;font-family:Georgia,'Iowan Old Style',Palatino,serif;font-size:14px;line-height:1.5;color:#8a5a12;">
+                                Comprender es libertad.
                             </p>
                         </td>
                     </tr>
