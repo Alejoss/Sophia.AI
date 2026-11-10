@@ -1,0 +1,19 @@
+Tu inscripción al curso La real historia de Bitcoin y la guerra por las criptomonedas está confirmada.
+
+Estás a punto de explorar una historia fascinante: las ideas que dieron origen a Bitcoin, los personajes que marcaron su desarrollo y las disputas que transformaron el mundo de las criptomonedas.
+
+Detrás de Bitcoin hay mucho más que una revolución tecnológica: hay ideales enfrentados, disputas por su futuro y episodios poco conocidos que cambiaron el rumbo de las criptomonedas. Estamos por explorar juntos esa historia.
+
+¿Cuál es el siguiente paso?
+
+El fin de semana estará disponible la página del curso, donde encontrarás el recorrido de aprendizaje y el calendario de nuestros encuentros en vivo.
+{% if course_url %}
+Revisar la página de descripción del curso: {{ course_url }}
+
+{% endif %}
+Nos alegra que formes parte de esta experiencia. Esperamos que este espacio sea una oportunidad para aprender, cuestionar y compartir ideas.
+
+¡Nos vemos pronto!
+
+Academia Blockchain
+Comprender es libertad.

@@ -46,6 +46,7 @@ from payments.services import (
     create_course_purchase_payment,
     create_event_registration_payment,
     create_path_purchase_payment,
+    course_purchase_buyer_ok,
     get_or_create_course_purchase,
     create_token_purchase,
     create_token_purchase_payment,
@@ -157,7 +158,28 @@ def _find_crypto_payment_for_ipn(body: dict):
     return None
 
 
-def _user_can_access_payment(user, payment: CryptoPayment) -> bool:
+def _checkout_token(request) -> str:
+    return (request.headers.get('X-Course-Checkout-Token') or '').strip()
+
+
+def _actor_id(request):
+    user = getattr(request, 'user', None)
+    if user is not None and getattr(user, 'is_authenticated', False):
+        return user.id
+    return None
+
+
+def _user_can_access_payment(user, payment: CryptoPayment, checkout_token='') -> bool:
+    authenticated = getattr(user, 'is_authenticated', False)
+    if payment.course_purchase_id:
+        purchase = payment.course_purchase
+        if purchase.user_id is None:
+            return course_purchase_buyer_ok(purchase, user, checkout_token)
+        if not authenticated:
+            return False
+        return user.id == purchase.user_id or user.is_staff
+    if not authenticated:
+        return False
     if payment.event_registration_id:
         reg = payment.event_registration
         return user.id in (reg.user_id, reg.event.owner_id)
@@ -168,8 +190,6 @@ def _user_can_access_payment(user, payment: CryptoPayment) -> bool:
         return user.id == payment.anchor_request.requester_id or user.is_staff
     if payment.token_purchase_id:
         return user.id == payment.token_purchase.user_id or user.is_staff
-    if payment.course_purchase_id:
-        return user.id == payment.course_purchase.user_id or user.is_staff
     return False
 
 
@@ -293,7 +313,7 @@ def _public_course_choice(course: Course) -> dict:
 
 
 def _course_purchase_payload(purchase: CoursePurchase) -> dict:
-    return {
+    payload = {
         'id': purchase.id,
         'course_code': purchase.course.code,
         'title': purchase.course.title,
@@ -302,6 +322,9 @@ def _course_purchase_payload(purchase: CoursePurchase) -> dict:
         'payment_status': purchase.payment_status,
         'is_paid': purchase.is_paid,
     }
+    if purchase.user_id is None and purchase.checkout_token:
+        payload['checkout_token'] = purchase.checkout_token
+    return payload
 
 
 class PublicCourseListView(APIView):
@@ -333,17 +356,22 @@ class CourseDetailView(APIView):
 
 
 class CoursePurchaseView(APIView):
-    """Create or fetch the current user's purchase for a fixed-price course."""
+    """Create or fetch a course purchase.
 
-    permission_classes = [IsAuthenticated]
+    Signed-in buyers are stored on their account. Everyone else checks out
+    with the receipt email alone; the response includes a checkout token.
+    """
+
+    permission_classes = [AllowAny]
 
     def post(self, request):
         course_code = (request.data.get('course_code') or '').strip()
         receipt_email = request.data.get('receipt_email')
+        buyer = request.user if request.user.is_authenticated else None
         try:
             purchase = get_or_create_course_purchase(
                 course_code=course_code,
-                user=request.user,
+                user=buyer,
                 receipt_email=receipt_email,
             )
         except ValueError as exc:
@@ -354,10 +382,11 @@ class CoursePurchaseView(APIView):
 class CoursePurchasePaymentView(APIView):
     """Create or refresh a NOWPayments invoice for a course purchase."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request, purchase_id):
         pay_currency = (request.data.get('pay_currency') or '').lower().strip() or None
+        actor_id = _actor_id(request)
         try:
             purchase = CoursePurchase.objects.select_related('user', 'course').get(pk=purchase_id)
         except CoursePurchase.DoesNotExist:
@@ -367,18 +396,19 @@ class CoursePurchasePaymentView(APIView):
                 course_purchase=purchase,
                 pay_currency=pay_currency,
                 user=request.user,
+                checkout_token=_checkout_token(request),
             )
         except PermissionError as exc:
             return _permission_error_response(
-                exc, action='create_course_payment', purchase_id=purchase_id, user_id=request.user.id,
+                exc, action='create_course_payment', purchase_id=purchase_id, user_id=actor_id,
             )
         except ValueError as exc:
             return _validation_error_response(
-                exc, action='create_course_payment', purchase_id=purchase_id, user_id=request.user.id,
+                exc, action='create_course_payment', purchase_id=purchase_id, user_id=actor_id,
             )
         except NOWPaymentsError as exc:
             return _nowpayments_error_response(
-                exc, action='create_course_payment', purchase_id=purchase_id, user_id=request.user.id,
+                exc, action='create_course_payment', purchase_id=purchase_id, user_id=actor_id,
             )
         except Exception as exc:
             return _unexpected_payment_error_response(
@@ -386,20 +416,22 @@ class CoursePurchasePaymentView(APIView):
                 action='create_course_payment',
                 public_message='No se pudo iniciar el pago. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
-                user_id=request.user.id,
+                user_id=actor_id,
             )
         return Response(CryptoPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
 
 
 class CoursePurchasePaymentsListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, purchase_id):
         try:
             purchase = CoursePurchase.objects.get(pk=purchase_id)
         except CoursePurchase.DoesNotExist:
             return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
-        if purchase.user_id != request.user.id and not request.user.is_staff:
+        if not course_purchase_buyer_ok(
+            purchase, request.user, _checkout_token(request), allow_staff=True,
+        ):
             return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
 
         payments = CryptoPayment.objects.filter(course_purchase=purchase).order_by('-created_at')[:10]
@@ -430,13 +462,15 @@ def _get_course_purchase(purchase_id):
 
 
 class CoursePurchaseBchPaymentView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, purchase_id):
         purchase = _get_course_purchase(purchase_id)
         if purchase is None:
             return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
-        if purchase.user_id != request.user.id and not request.user.is_staff:
+        if not course_purchase_buyer_ok(
+            purchase, request.user, _checkout_token(request), allow_staff=True,
+        ):
             return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
         payment = _latest_bch_for(course_purchase=purchase)
         return Response({
@@ -449,15 +483,20 @@ class CoursePurchaseBchPaymentView(APIView):
         purchase = _get_course_purchase(purchase_id)
         if purchase is None:
             return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        actor_id = _actor_id(request)
         try:
-            payment = create_or_reuse_bch_payment(user=request.user, course_purchase=purchase)
+            payment = create_or_reuse_bch_payment(
+                user=request.user,
+                course_purchase=purchase,
+                checkout_token=_checkout_token(request),
+            )
         except PermissionError as exc:
             return _permission_error_response(
-                exc, action='create_course_bch', purchase_id=purchase_id, user_id=request.user.id,
+                exc, action='create_course_bch', purchase_id=purchase_id, user_id=actor_id,
             )
         except BchPaymentError as exc:
             return _bch_error_response(
-                exc, action='create_course_bch', purchase_id=purchase_id, user_id=request.user.id,
+                exc, action='create_course_bch', purchase_id=purchase_id, user_id=actor_id,
             )
         except Exception as exc:
             return _unexpected_payment_error_response(
@@ -465,31 +504,33 @@ class CoursePurchaseBchPaymentView(APIView):
                 action='create_course_bch',
                 public_message='No se pudo crear la orden BCH. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
-                user_id=request.user.id,
+                user_id=actor_id,
             )
         return Response(BchDirectPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
 
 
 class CoursePurchaseBchVerifyView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request, purchase_id):
         purchase = _get_course_purchase(purchase_id)
         if purchase is None:
             return Response({'error': 'Compra no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        actor_id = _actor_id(request)
         try:
             payment = verify_bch_payment(
                 user=request.user,
                 course_purchase=purchase,
                 payment_txid=_request_bch_txid(request),
+                checkout_token=_checkout_token(request),
             )
         except PermissionError as exc:
             return _permission_error_response(
-                exc, action='verify_course_bch', purchase_id=purchase_id, user_id=request.user.id,
+                exc, action='verify_course_bch', purchase_id=purchase_id, user_id=actor_id,
             )
         except BchPaymentError as exc:
             return _bch_error_response(
-                exc, action='verify_course_bch', purchase_id=purchase_id, user_id=request.user.id,
+                exc, action='verify_course_bch', purchase_id=purchase_id, user_id=actor_id,
             )
         except Exception as exc:
             return _unexpected_payment_error_response(
@@ -497,7 +538,7 @@ class CoursePurchaseBchVerifyView(APIView):
                 action='verify_course_bch',
                 public_message='No se pudo verificar el pago BCH. Inténtalo de nuevo.',
                 purchase_id=purchase_id,
-                user_id=request.user.id,
+                user_id=actor_id,
             )
         purchase.refresh_from_db()
         return Response({
@@ -560,7 +601,7 @@ class PathPurchasePaymentView(APIView):
 class CryptoPaymentDetailView(APIView):
     """Poll payment status (syncs with NOWPayments)."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, payment_id):
         try:
@@ -575,11 +616,13 @@ class CryptoPaymentDetailView(APIView):
                 'anchor_request__requester',
                 'token_purchase',
                 'token_purchase__user',
+                'course_purchase',
+                'course_purchase__user',
             ).get(pk=payment_id)
         except CryptoPayment.DoesNotExist:
             return Response({'error': 'Pago no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if not _user_can_access_payment(request.user, payment):
+        if not _user_can_access_payment(request.user, payment, _checkout_token(request)):
             return Response({'error': 'Permiso denegado.'}, status=status.HTTP_403_FORBIDDEN)
 
         client = NOWPaymentsClient()
@@ -1306,7 +1349,7 @@ class BchOrderReportTxidView(APIView):
     in-app) and the product owner (in-app).
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request, pk):
         txid = request.data.get('txid') or request.data.get('payment_txid')
@@ -1317,6 +1360,7 @@ class BchOrderReportTxidView(APIView):
                 txid=txid,
                 user=request.user,
                 note=note,
+                checkout_token=_checkout_token(request),
             )
         except BchPaymentError as exc:
             return _bch_error_response(exc, action='report_bch_txid', payment_id=pk)

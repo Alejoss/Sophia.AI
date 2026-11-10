@@ -115,7 +115,9 @@
     "messageLabel": "Message",
     "send": "Send message",
     "openThreadError": "Could not open the conversation",
-    "sendError": "Could not send the message"
+    "sendError": "Could not send the message",
+    "accountNeeded": "Sending this message requires an account. You can pay with Bitcoin Cash or other cryptocurrencies without registering.",
+    "loginLink": "Log in"
   },
   "card": {
     "title": "Pay with credit card",
@@ -125,7 +127,9 @@
     "messageLabel": "Message",
     "send": "Send message",
     "openThreadError": "Could not open the conversation",
-    "sendError": "Could not send the message"
+    "sendError": "Could not send the message",
+    "accountNeeded": "Sending this message requires an account. You can pay with Bitcoin Cash or other cryptocurrencies without registering.",
+    "loginLink": "Log in"
   },
   "bchSupport": {
     "description": "If you already sent the BCH payment and automatic verification failed, tell us the transaction ID. We will review the payment manually and unlock your access.",

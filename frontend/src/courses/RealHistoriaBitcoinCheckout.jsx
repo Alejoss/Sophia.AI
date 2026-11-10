@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -12,12 +12,12 @@ import {
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext.jsx';
 import { createOrGetCoursePurchase, getCourse } from '../api/paymentsApi.js';
+import { setCourseCheckoutToken } from './courseCheckoutAccess.js';
 import CourseCheckout from '../payments/adapters/CourseCheckout.jsx';
 import '../styles/brand-home.css';
 import '../styles/course-real-historia-bitcoin.css';
 
 const COURSE_PATH = '/cursos/real-historia-bitcoin';
-const CHECKOUT_PATH = `${COURSE_PATH}/checkout`;
 const COURSE_CODE = 'real-historia-bitcoin';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -36,7 +36,6 @@ const formatPrice = (amount) => {
 
 const RealHistoriaBitcoinCheckout = () => {
   const { t } = useTranslation('courses');
-  const navigate = useNavigate();
   const { authState, authInitialized } = useAuth();
   const accountEmail = authState.user?.email || '';
   const emailPrefillDone = useRef(false);
@@ -60,21 +59,13 @@ const RealHistoriaBitcoinCheckout = () => {
   }, [t]);
 
   useEffect(() => {
-    if (!authInitialized) return undefined;
-    if (!authState.isAuthenticated) {
-      navigate(`/profiles/login?next=${encodeURIComponent(CHECKOUT_PATH)}`, { replace: true });
-    }
-    return undefined;
-  }, [authInitialized, authState.isAuthenticated, navigate]);
-
-  useEffect(() => {
     if (emailPrefillDone.current || !accountEmail) return;
     emailPrefillDone.current = true;
     setEmail(accountEmail);
   }, [accountEmail]);
 
   useEffect(() => {
-    if (!authInitialized || !authState.isAuthenticated) return undefined;
+    if (!authInitialized) return undefined;
     let cancelled = false;
     setLoadingCourse(true);
     setError('');
@@ -95,7 +86,7 @@ const RealHistoriaBitcoinCheckout = () => {
     return () => {
       cancelled = true;
     };
-  }, [authInitialized, authState.isAuthenticated, t]);
+  }, [authInitialized, t]);
 
   const emailError = useMemo(() => {
     const trimmed = email.trim();
@@ -116,6 +107,7 @@ const RealHistoriaBitcoinCheckout = () => {
     createOrGetCoursePurchase(COURSE_CODE, { receiptEmail: email.trim().toLowerCase() })
       .then((data) => {
         setPurchase(data);
+        setCourseCheckoutToken(data.checkout_token || '');
         if (data.is_paid || data.payment_status === 'PAID') {
           setPaid(true);
           setCheckoutOpen(false);
@@ -128,10 +120,6 @@ const RealHistoriaBitcoinCheckout = () => {
         setCheckoutOpen(true);
       })
       .catch((err) => {
-        if (err?.status === 401) {
-          navigate(`/profiles/login?next=${encodeURIComponent(CHECKOUT_PATH)}`, { replace: true });
-          return;
-        }
         setError(checkoutErrorMessage(err, t('checkout.openFailed')));
       })
       .finally(() => {
@@ -139,7 +127,7 @@ const RealHistoriaBitcoinCheckout = () => {
       });
   };
 
-  if (!authInitialized || !authState.isAuthenticated) {
+  if (!authInitialized) {
     return (
       <Box className="brand-home rhb-page">
         <Box className="rhb-checkout-status">

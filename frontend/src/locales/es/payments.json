@@ -115,7 +115,9 @@
     "messageLabel": "Mensaje",
     "send": "Enviar mensaje",
     "openThreadError": "No se pudo abrir la conversación",
-    "sendError": "No se pudo enviar el mensaje"
+    "sendError": "No se pudo enviar el mensaje",
+    "accountNeeded": "Enviar este mensaje requiere una cuenta. Puedes pagar con Bitcoin Cash u otras criptos sin registrarte.",
+    "loginLink": "Iniciar sesión"
   },
   "card": {
     "title": "Pagar con tarjeta de crédito",
@@ -125,7 +127,9 @@
     "messageLabel": "Mensaje",
     "send": "Enviar mensaje",
     "openThreadError": "No se pudo abrir la conversación",
-    "sendError": "No se pudo enviar el mensaje"
+    "sendError": "No se pudo enviar el mensaje",
+    "accountNeeded": "Enviar este mensaje requiere una cuenta. Puedes pagar con Bitcoin Cash u otras criptos sin registrarte.",
+    "loginLink": "Iniciar sesión"
   },
   "bchSupport": {
     "description": "Si ya enviaste el pago BCH y la verificación automática falló, cuéntanos el ID de la transacción. Revisaremos el pago manualmente y te desbloquearemos el acceso.",

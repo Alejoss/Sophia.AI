@@ -2415,13 +2415,6 @@ class CoursePurchasePaymentTests(TestCase):
             'id': 3502,
             'invoice_url': 'https://nowpayments.io/payment/?iid=3502',
         }
-        guest = self.client.post(
-            reverse('course-purchase-create'),
-            {'course_code': course.code},
-            format='json',
-        )
-        self.assertEqual(guest.status_code, status.HTTP_401_UNAUTHORIZED)
-
         self.client.force_authenticate(user=self.buyer)
         created = self.client.post(
             reverse('course-purchase-create'),
@@ -2442,6 +2435,74 @@ class CoursePurchasePaymentTests(TestCase):
         )
         self.assertEqual(listed.status_code, status.HTTP_200_OK)
         self.assertEqual(listed.data[0]['invoice_url'], payment.data['invoice_url'])
+
+    @patch('payments.views.refresh_crypto_payment_from_nowpayments', side_effect=lambda payment: payment)
+    @patch('payments.services.NOWPaymentsClient.create_invoice')
+    def test_guest_checkout_stores_email_without_an_account(self, mock_create_invoice, _mock_refresh):
+        mock_create_invoice.return_value = {
+            'id': 3503,
+            'invoice_url': 'https://nowpayments.io/payment/?iid=3503',
+        }
+        missing_email = self.client.post(
+            reverse('course-purchase-create'),
+            {'course_code': 'real-historia-bitcoin'},
+            format='json',
+        )
+        self.assertEqual(missing_email.status_code, status.HTTP_400_BAD_REQUEST)
+
+        created = self.client.post(
+            reverse('course-purchase-create'),
+            {
+                'course_code': 'real-historia-bitcoin',
+                'receipt_email': ' Visita@Example.com ',
+            },
+            format='json',
+        )
+        self.assertEqual(created.status_code, status.HTTP_200_OK)
+        self.assertEqual(created.data['receipt_email'], 'visita@example.com')
+        self.assertTrue(created.data['checkout_token'])
+        purchase = CoursePurchase.objects.get(pk=created.data['id'])
+        self.assertIsNone(purchase.user_id)
+        self.assertEqual(purchase.checkout_token, created.data['checkout_token'])
+
+        again = self.client.post(
+            reverse('course-purchase-create'),
+            {
+                'course_code': 'real-historia-bitcoin',
+                'receipt_email': 'visita@example.com',
+            },
+            format='json',
+        )
+        self.assertEqual(again.data['id'], created.data['id'])
+
+        denied = self.client.post(
+            reverse('course-purchase-payment-create', kwargs={'purchase_id': purchase.id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
+
+        paid = self.client.post(
+            reverse('course-purchase-payment-create', kwargs={'purchase_id': purchase.id}),
+            {},
+            format='json',
+            HTTP_X_COURSE_CHECKOUT_TOKEN=created.data['checkout_token'],
+        )
+        self.assertEqual(paid.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(paid.data['invoice_url'], 'https://nowpayments.io/payment/?iid=3503')
+
+        self.client.force_authenticate(user=self.buyer)
+        account_purchase = self.client.post(
+            reverse('course-purchase-create'),
+            {
+                'course_code': 'real-historia-bitcoin',
+                'receipt_email': 'visita@example.com',
+            },
+            format='json',
+        )
+        self.assertEqual(account_purchase.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(account_purchase.data['id'], purchase.id)
+        self.assertNotIn('checkout_token', account_purchase.data)
 
     def test_finished_payment_marks_course_paid(self):
         course = Course.objects.get(code='real-historia-bitcoin')

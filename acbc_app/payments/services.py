@@ -1,4 +1,5 @@
 import logging
+import secrets
 import uuid
 from decimal import Decimal
 
@@ -741,6 +742,61 @@ def _normalize_receipt_email(receipt_email) -> str:
     return email
 
 
+def course_purchase_buyer_ok(course_purchase, user, checkout_token='', *, allow_staff=False) -> bool:
+    """True when this actor may pay or read a course purchase.
+
+    Account purchases belong to that user. Purchases with no account belong to
+    whoever presents the checkout token returned when the email was saved.
+    """
+    if (
+        allow_staff
+        and user is not None
+        and getattr(user, 'is_authenticated', False)
+        and getattr(user, 'is_staff', False)
+    ):
+        return True
+    if course_purchase.user_id is None:
+        provided = (checkout_token or '').strip()
+        expected = course_purchase.checkout_token or ''
+        if not provided or not expected:
+            return False
+        return secrets.compare_digest(provided, expected)
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return False
+    return course_purchase.user_id == user.id
+
+
+def _get_or_create_guest_course_purchase(course, normalized_email) -> CoursePurchase:
+    purchase, created = CoursePurchase.objects.get_or_create(
+        user=None,
+        course=course,
+        receipt_email=normalized_email,
+        defaults={
+            'price_amount': float(course.price_usd),
+            'payment_status': 'PENDING',
+            'checkout_token': secrets.token_urlsafe(32),
+        },
+    )
+    if created:
+        return purchase
+    update_fields = []
+    if not purchase.checkout_token:
+        purchase.checkout_token = secrets.token_urlsafe(32)
+        update_fields.append('checkout_token')
+    if purchase.payment_status == 'PENDING' and purchase.price_amount != float(course.price_usd):
+        has_open_invoice = CryptoPayment.objects.filter(
+            course_purchase=purchase,
+            payment_status__in=OPEN_PAYMENT_STATUSES,
+        ).exists()
+        if not has_open_invoice:
+            purchase.price_amount = float(course.price_usd)
+            update_fields.append('price_amount')
+    if update_fields:
+        update_fields.append('updated_at')
+        purchase.save(update_fields=update_fields)
+    return purchase
+
+
 def get_or_create_course_purchase(*, course_code, user, receipt_email=None) -> CoursePurchase:
     try:
         course = Course.objects.get(code=course_code)
@@ -750,6 +806,11 @@ def get_or_create_course_purchase(*, course_code, user, receipt_email=None) -> C
         raise ValueError('Este curso no está a la venta.')
 
     normalized_email = _normalize_receipt_email(receipt_email)
+    if user is None or not getattr(user, 'is_authenticated', True):
+        if not normalized_email:
+            raise ValueError('Introduce un correo electrónico válido.')
+        return _get_or_create_guest_course_purchase(course, normalized_email)
+
     defaults = {
         'price_amount': float(course.price_usd),
         'payment_status': 'PENDING',
@@ -810,8 +871,14 @@ def _mark_course_purchase_paid_if_needed(crypto_payment: CryptoPayment) -> None:
         )
 
 
-def create_course_purchase_payment(*, course_purchase: CoursePurchase, user, pay_currency=None) -> CryptoPayment:
-    if course_purchase.user_id != user.id:
+def create_course_purchase_payment(
+    *,
+    course_purchase: CoursePurchase,
+    user,
+    pay_currency=None,
+    checkout_token='',
+) -> CryptoPayment:
+    if not course_purchase_buyer_ok(course_purchase, user, checkout_token):
         raise PermissionError('Solo el comprador puede iniciar el pago.')
     if course_purchase.payment_status == 'PAID':
         raise ValueError('Este curso ya está pagado.')

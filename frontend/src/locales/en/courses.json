@@ -12,7 +12,7 @@
     "stepEmail": "1. Email",
     "stepPayment": "2. Payment",
     "heading": "Checkout",
-    "lead": "Confirm your email for the receipt and course access. Then choose how to pay.",
+    "lead": "Confirm the email for the receipt and course access. You do not need an account. Then choose how to pay.",
     "summaryAria": "Order summary",
     "emailLabel": "Receipt email",
     "emailHelper": "We'll send the payment confirmation to this email.",

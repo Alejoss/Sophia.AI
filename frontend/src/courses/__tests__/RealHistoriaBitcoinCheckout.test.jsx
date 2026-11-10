@@ -5,24 +5,18 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import RealHistoriaBitcoinCheckout from '../RealHistoriaBitcoinCheckout.jsx';
 
-const navigateMock = vi.fn();
-
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
-  return {
-    ...actual,
-    useNavigate: () => navigateMock,
-  };
-});
-
-vi.mock('../../context/AuthContext.jsx', () => ({
-  useAuth: () => ({
+const { authSnapshot } = vi.hoisted(() => ({
+  authSnapshot: {
     authInitialized: true,
     authState: {
       isAuthenticated: true,
       user: { id: 1, username: 'buyer', email: 'buyer@example.com' },
     },
-  }),
+  },
+}));
+
+vi.mock('../../context/AuthContext.jsx', () => ({
+  useAuth: () => authSnapshot,
 }));
 
 vi.mock('../../api/paymentsApi.js', () => ({
@@ -40,7 +34,11 @@ import { getCourse, createOrGetCoursePurchase } from '../../api/paymentsApi.js';
 
 describe('RealHistoriaBitcoinCheckout', () => {
   beforeEach(() => {
-    navigateMock.mockReset();
+    authSnapshot.authInitialized = true;
+    authSnapshot.authState = {
+      isAuthenticated: true,
+      user: { id: 1, username: 'buyer', email: 'buyer@example.com' },
+    };
     getCourse.mockReset();
     createOrGetCoursePurchase.mockReset();
     getCourse.mockResolvedValue({
@@ -105,5 +103,40 @@ describe('RealHistoriaBitcoinCheckout', () => {
     expect(await screen.findByText(/correo electrónico válido/i)).toBeInTheDocument();
     expect(createOrGetCoursePurchase).not.toHaveBeenCalled();
     expect(screen.queryByTestId('course-checkout-modal')).not.toBeInTheDocument();
+  });
+
+  it('lets a visitor pay with an email and without an account', async () => {
+    authSnapshot.authState = { isAuthenticated: false, user: null };
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <RealHistoriaBitcoinCheckout />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: /finalizar compra/i })).toBeInTheDocument();
+    expect(screen.getByText(/no necesitas crear una cuenta/i)).toBeInTheDocument();
+    const input = screen.getByLabelText(/correo para el recibo/i);
+    expect(input).toHaveValue('');
+
+    await user.type(input, 'visita@example.com');
+    createOrGetCoursePurchase.mockResolvedValue({
+      id: 11,
+      title: 'La Real Historia de Bitcoin y la Guerra por las Criptomonedas',
+      price_amount: 35,
+      payment_status: 'PENDING',
+      is_paid: false,
+      receipt_email: 'visita@example.com',
+      checkout_token: 'guest-token',
+    });
+    await user.click(screen.getByRole('button', { name: /continuar al pago/i }));
+
+    await waitFor(() => {
+      expect(createOrGetCoursePurchase).toHaveBeenCalledWith(
+        'real-historia-bitcoin',
+        { receiptEmail: 'visita@example.com' },
+      );
+    });
+    expect(await screen.findByTestId('course-checkout-modal')).toBeInTheDocument();
   });
 });

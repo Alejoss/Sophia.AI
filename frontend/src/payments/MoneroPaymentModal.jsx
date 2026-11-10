@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert,
   Button,
@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  Link as MuiLink,
   Stack,
   TextField,
   Typography,
@@ -47,9 +48,14 @@ const MoneroPaymentModal = ({
 }) => {
   const { t } = useTranslation('payments');
   const navigate = useNavigate();
+  const location = useLocation();
   const { authState } = useAuth();
   const currentUser = authState?.user;
   const isSelf = Number(currentUser?.id) === Number(contactUserId);
+  const needsAccount = !authState?.isAuthenticated;
+  const loginHref = `/profiles/login?next=${encodeURIComponent(
+    `${location.pathname}${location.search || ''}`,
+  )}`;
 
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -116,6 +122,14 @@ const MoneroPaymentModal = ({
           <Typography variant="body1">
             {t(`${copyKey}.description`)}
           </Typography>
+          {needsAccount && (
+            <Alert severity="info">
+              {t(`${copyKey}.accountNeeded`)}{' '}
+              <MuiLink component={Link} to={loginHref} underline="hover">
+                {t(`${copyKey}.loginLink`)}
+              </MuiLink>
+            </Alert>
+          )}
           {isSelf && (
             <Alert severity="info">
               {t(`${copyKey}.self`)}
@@ -129,7 +143,7 @@ const MoneroPaymentModal = ({
             multiline
             minRows={3}
             fullWidth
-            disabled={busy || isSelf}
+            disabled={busy || isSelf || needsAccount}
           />
         </Stack>
       </DialogContent>
@@ -137,7 +151,7 @@ const MoneroPaymentModal = ({
         <Button
           variant="contained"
           fullWidth
-          disabled={busy || isSelf || !text.trim()}
+          disabled={busy || isSelf || needsAccount || !text.trim()}
           onClick={handleSend}
           startIcon={busy ? <CircularProgress size={16} color="inherit" /> : null}
         >

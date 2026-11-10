@@ -117,7 +117,7 @@ class CoursePurchaseAdmin(admin.ModelAdmin):
         'course__code',
         'course__title',
     )
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at', 'checkout_token')
 
 
 @admin.register(BchDirectPayment)

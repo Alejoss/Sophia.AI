@@ -29,6 +29,7 @@ from payments.models import BchDirectPayment, CoursePurchase, TokenPurchase
 from payments.payphone_services import abandon_pending_payphone
 from payments.services import (
     abandon_waiting_nowpayments,
+    course_purchase_buyer_ok,
     has_in_flight_nowpayments,
     mark_anchor_request_paid,
     mark_course_purchase_paid,
@@ -279,6 +280,7 @@ def _authorize_create(
     course_purchase=None,
     transcript_generation=None,
     event_registration=None,
+    checkout_token='',
 ) -> None:
     if not is_bch_direct_configured():
         raise BchPaymentError('Pagos BCH directos no están configurados en el servidor.')
@@ -331,7 +333,7 @@ def _authorize_create(
 
     if course_purchase is not None:
         course = course_purchase.course
-        if course_purchase.user_id != user.id:
+        if not course_purchase_buyer_ok(course_purchase, user, checkout_token):
             raise PermissionError('Solo el comprador puede iniciar el pago BCH.')
         if course_purchase.payment_status == 'PAID':
             raise BchPaymentError('Este curso ya está pagado.')
@@ -376,6 +378,7 @@ def _authorize_verify(
     course_purchase=None,
     transcript_generation=None,
     event_registration=None,
+    checkout_token='',
 ) -> None:
     if anchor_request is not None:
         if anchor_request.requester_id != user.id and not getattr(user, 'is_staff', False):
@@ -404,7 +407,9 @@ def _authorize_verify(
             raise PermissionError('No tienes permiso para verificar este pago.')
         return
     if course_purchase is not None:
-        if course_purchase.user_id != user.id and not getattr(user, 'is_staff', False):
+        if not course_purchase_buyer_ok(
+            course_purchase, user, checkout_token, allow_staff=True,
+        ):
             raise PermissionError('No tienes permiso para verificar este pago.')
         return
     if event_registration is not None:
@@ -472,6 +477,7 @@ def create_or_reuse_bch_payment(
     transcript_generation: TranscriptGenerationRequest | None = None,
     event_registration: EventRegistration | None = None,
     client: BchPublicClient | BchElectrumClient | BchFailoverClient | None = None,
+    checkout_token: str = '',
 ) -> BchDirectPayment:
     targets = [
         t for t in (
@@ -491,6 +497,7 @@ def create_or_reuse_bch_payment(
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
         event_registration=event_registration,
+        checkout_token=checkout_token,
     )
 
     target_q = _target_filter(
@@ -712,6 +719,7 @@ def verify_bch_payment(
     event_registration: EventRegistration | None = None,
     payment_txid: str | None = None,
     client: BchPublicClient | BchElectrumClient | BchFailoverClient | None = None,
+    checkout_token: str = '',
 ) -> BchDirectPayment:
     """
     Confirm an on-chain BCH payment for one product entitlement.
@@ -741,6 +749,7 @@ def verify_bch_payment(
         course_purchase=course_purchase,
         transcript_generation=transcript_generation,
         event_registration=event_registration,
+        checkout_token=checkout_token,
     )
 
     if anchor_request is not None:
@@ -1219,6 +1228,7 @@ def report_bch_payment_txid(
     txid: str,
     user,
     note: str = '',
+    checkout_token: str = '',
 ) -> tuple[BchDirectPayment, bool]:
     """
     Buyer reports an on-chain TXID after auto-verify failed.
@@ -1252,8 +1262,18 @@ def report_bch_payment_txid(
         raise BchPaymentError('Orden BCH no encontrada.')
 
     buyer = locked.buyer
-    if buyer is None or buyer.id != getattr(user, 'id', None):
+    guest_course = (
+        locked.course_purchase_id is not None and locked.course_purchase.user_id is None
+    )
+    if guest_course:
+        if not course_purchase_buyer_ok(locked.course_purchase, user, checkout_token):
+            raise PermissionError('Solo el comprador puede reportar el TXID de esta orden.')
+    elif buyer is None or buyer.id != getattr(user, 'id', None):
         raise PermissionError('Solo el comprador puede reportar el TXID de esta orden.')
+    reporter_id = user.id if getattr(user, 'is_authenticated', False) else None
+    reporter_name = getattr(user, 'username', '') if reporter_id else (
+        locked.course_purchase.receipt_email if guest_course else ''
+    )
 
     if locked.status == BchDirectPayment.STATUS_PAID:
         raise BchPaymentError('Esta orden ya está marcada como pagada.')
@@ -1272,8 +1292,8 @@ def report_bch_payment_txid(
     payload.update({
         'reported_txid': clean_txid,
         'reported_at': timezone.now().isoformat(),
-        'reported_by_id': user.id,
-        'reported_by_username': getattr(user, 'username', ''),
+        'reported_by_id': reporter_id,
+        'reported_by_username': reporter_name,
         'reported_note': clean_note,
         'txid_report_pending_staff': True,
     })
@@ -1284,7 +1304,7 @@ def report_bch_payment_txid(
         'BCH TXID reported payment_id=%s txid=%s by user_id=%s notify=%s',
         locked.pk,
         clean_txid,
-        user.id,
+        reporter_id,
         should_notify,
     )
     return locked, should_notify

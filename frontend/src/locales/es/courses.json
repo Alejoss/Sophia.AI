@@ -12,7 +12,7 @@
     "stepEmail": "1. Correo",
     "stepPayment": "2. Pago",
     "heading": "Finalizar compra",
-    "lead": "Confirma tu correo para el recibo y el acceso al curso. Luego elige cómo pagar.",
+    "lead": "Confirma el correo para el recibo y el acceso al curso. No necesitas crear una cuenta. Luego elige cómo pagar.",
     "summaryAria": "Resumen del pedido",
     "emailLabel": "Correo para el recibo",
     "emailHelper": "Te enviaremos la confirmación de pago a este correo.",
