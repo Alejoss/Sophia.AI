@@ -25,7 +25,7 @@ All buyer checkouts share one chooser (`ProductPaymentCheckout`) entered through
 | Transcript generation ($1) | `TranscriptGenerationCheckout` | yes | gateway | gateway | yes | yes |
 | Token package | `TokenCheckout` | yes | yes | yes | **no** | n/a |
 
-Course checkout UX (`/courses/<code>/checkout`): confirm receipt email first, then open the method chooser. `CoursePurchase.receipt_email` stores the address from that step.
+Course checkout UX (`/courses/<code>/checkout`): confirm receipt email first, then open the method chooser. `CoursePurchase.receipt_email` stores the address from that step. When the purchase first becomes paid, that address receives the confirmation (`course_purchase_confirmed`). For La Real Historia de Bitcoin the message includes the welcome artwork.
 
 Method availability is centralized in `frontend/src/payments/productCatalog.js` (`resolveAvailableMethods`) and combined with `GET /payments/status/`. NOWPayments invoices use a single `paymentTarget: { kind, purchaseId }` shape (`nowpaymentsTarget.js`); legacy ID props on `CryptoPaymentModal` remain as shims.
 

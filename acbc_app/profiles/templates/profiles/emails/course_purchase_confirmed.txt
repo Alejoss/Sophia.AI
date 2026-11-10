@@ -1,0 +1,11 @@
+{% if buyer_name %}Hola {{ buyer_name }},{% else %}Hola,{% endif %}
+
+Recibimos tu pago de {{ price_label }}. Tu lugar en {{ course_title }} está confirmado.
+
+En la página del curso están el recorrido y el calendario de encuentros en vivo. Puedes entrar cuando quieras.
+{% if course_url %}
+Entrar al curso: {{ course_url }}
+{% endif %}
+
+{{ brand_name|default:"Academia Blockchain" }}
+Este es un mensaje automático. No hace falta responder.

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Tu inscripción está confirmada — {{ course_title }}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style type="text/css">
+        body, table, td, p, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+        img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; display: block; }
+        a { text-decoration: none; }
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; }
+            .email-pad { padding-left: 20px !important; padding-right: 20px !important; }
+        }
+    </style>
+</head>
+<body style="margin:0;padding:0;width:100% !important;background-color:#efe8dc;font-family:Georgia,'Iowan Old Style','Palatino Linotype',Palatino,serif;color:#1c1915;">
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
+        Tu lugar en {{ course_title }} está confirmado. El pago de {{ price_label }} quedó registrado.
+        &#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;
+    </div>
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#efe8dc;">
+        <tr>
+            <td align="center" style="padding:28px 12px;">
+                <table role="presentation" class="email-container" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width:600px;width:100%;background-color:#fffdf8;border-radius:16px;overflow:hidden;border:1px solid #e4d8c4;">
+                    {% if hero_image_url %}
+                    <tr>
+                        <td style="padding:0;background-color:#0c1c18;line-height:0;font-size:0;">
+                            <img src="{{ hero_image_url }}" alt="{{ hero_image_alt }}" width="600" style="width:100%;max-width:600px;height:auto;display:block;border:0;">
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td class="email-pad" style="padding:32px 36px 8px 36px;background-color:#0c1c18;">
+                            <p style="margin:0 0 8px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#e8c872;">
+                                {{ brand_name|default:"Academia Blockchain" }}
+                            </p>
+                            <h1 style="margin:0;font-size:28px;line-height:1.25;font-weight:700;color:#f7f1e4;">
+                                Tu inscripción está confirmada
+                            </h1>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td class="email-pad" style="padding:28px 36px 8px 36px;background-color:#fffdf8;">
+                            <p style="margin:0 0 16px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.6;color:#1c1915;">
+                                {% if buyer_name %}Hola {{ buyer_name }},{% else %}Hola,{% endif %}
+                            </p>
+                            <p style="margin:0 0 16px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.65;color:#3f3a33;">
+                                Recibimos tu pago de <strong style="color:#1c1915;">{{ price_label }}</strong>.
+                                Tu lugar en <strong style="color:#1c1915;">{{ course_title }}</strong> está confirmado.
+                            </p>
+                            <p style="margin:0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.65;color:#3f3a33;">
+                                En la página del curso están el recorrido y el calendario de encuentros en vivo.
+                                Puedes entrar cuando quieras.
+                            </p>
+                        </td>
+                    </tr>
+
+                    {% if course_url %}
+                    <tr>
+                        <td class="email-pad" align="center" style="padding:22px 36px 8px 36px;background-color:#fffdf8;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center" bgcolor="#14302b" style="border-radius:8px;background-color:#14302b;">
+                                        <a href="{{ course_url }}" target="_blank"
+                                           style="display:inline-block;padding:14px 28px;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;letter-spacing:0.02em;color:#f4e7c3 !important;text-decoration:none;border-radius:8px;">
+                                            <span style="color:#f4e7c3 !important;">Entrar al curso</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="email-pad" style="padding:14px 36px 28px 36px;background-color:#fffdf8;">
+                            <p style="margin:0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#8a8175;word-break:break-all;">
+                                Si el botón no abre, copia este enlace:<br>
+                                <a href="{{ course_url }}" style="color:#8a5a12;text-decoration:underline;">{{ course_url }}</a>
+                            </p>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td class="email-pad" style="padding:18px 36px;background-color:#f7f1e6;border-top:1px solid #eadfce;text-align:center;">
+                            <p style="margin:0 0 4px 0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#1c1915;">
+                                <strong>{{ brand_name|default:"Academia Blockchain" }}</strong>
+                            </p>
+                            <p style="margin:0;font-family:Inter,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#8a8175;">
+                                Este es un mensaje automático. No hace falta responder.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
