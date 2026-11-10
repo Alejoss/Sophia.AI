@@ -71,11 +71,10 @@ services:
       - ./acbc_app/.env
     environment:
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C.UTF-8
+    # Official image entrypoint. Do not wrap it to capture logs; that wrapper
+    # made the production healthcheck fail. See docs/operations/postgres-container-unhealthy.md.
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - postgres_logs:/var/log/postgresql
-      - ./scripts/docker/postgres-entrypoint.sh:/usr/local/bin/acbc-postgres-entrypoint.sh:ro
-    entrypoint: ["/bin/bash", "/usr/local/bin/acbc-postgres-entrypoint.sh"]
     networks:
       - app_network
     healthcheck:
@@ -97,5 +96,3 @@ volumes:
     name: acbc_dev_backend_logs
   frontend_logs:
     name: acbc_dev_frontend_logs
-  postgres_logs:
-    name: acbc_dev_postgres_logs

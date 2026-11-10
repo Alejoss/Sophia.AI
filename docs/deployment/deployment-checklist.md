@@ -339,9 +339,9 @@ docker compose -f docker-compose.prod.yml exec backend python -c "import urllib.
   - `postgres_data`: Base de datos
   - `static_volume`: Static files
   - `media_volume`: Media files
-  - `backend_logs`, `nginx_logs`, `frontend_logs`, `postgres_logs`: logs que siguen disponibles después de recrear el contenedor
+  - `backend_logs`, `nginx_logs`, `frontend_logs`: logs de Django, Gunicorn y nginx que siguen disponibles después de recrear el contenedor
 
-- **Logs**: `docker compose logs` solo muestra el contenedor en ejecución. El historial queda en el volumen: Django/Gunicorn en `/app/logs`, nginx en `/var/log/nginx/persisted`, Postgres en `/var/log/postgresql/postgresql.log`. `docker compose down -v` borra esos volúmenes.
+- **Logs**: `docker compose logs` solo muestra el contenedor en ejecución. El historial de la app y de nginx queda en el volumen (`/app/logs`, `/var/log/nginx/persisted`). Postgres usa el entrypoint oficial de la imagen; su historial no sobrevive a recrear el contenedor. No reemplazar ese entrypoint: un wrapper dejó `acbc_postgres_prod` unhealthy y el sitio respondió Cloudflare 521. `docker compose down -v` borra la base y los volúmenes de logs. Recuperación: [postgres-container-unhealthy.md](../operations/postgres-container-unhealthy.md).
 
 ## ✅ Estado Actual
 
