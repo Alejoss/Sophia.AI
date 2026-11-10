@@ -140,5 +140,13 @@ class CoursePurchaseReceiptEmailTests(TestCase):
         self.assertIn('Revisar la página de descripción del curso', html)
         self.assertIn('Estamos por explorar juntos esa historia.', html)
         self.assertIn('Comprender es libertad.', html)
+        self.assertIn(
+            'Mientras tanto, dale un poco de cariño a tu perfil de usuario de Academia Blockchain, quizás una foto de perfil, una biblioteca?',
+            html,
+        )
         self.assertIn('¡Nos vemos pronto!', text)
+        self.assertIn(
+            'Mientras tanto, dale un poco de cariño a tu perfil de usuario de Academia Blockchain, quizás una foto de perfil, una biblioteca?',
+            text,
+        )
         self.assertIn('https://www.academiablockchain.com/cursos/real-historia-bitcoin', text)
