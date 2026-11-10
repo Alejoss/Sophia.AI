@@ -31,5 +31,11 @@ rotate_file() {
 rotate_file "$LOG_DIR/access.log"
 rotate_file "$LOG_DIR/error.log"
 
+# Compose drops the image CMD when entrypoint is overridden. With no args,
+# /docker-entrypoint.sh execs nothing and the container exits 0 ("Restarting").
+if [ "$#" -eq 0 ]; then
+  set -- nginx -g "daemon off;"
+fi
+
 echo "Nginx persisted logs: $LOG_DIR"
 exec "$ENTRYPOINT" "$@"

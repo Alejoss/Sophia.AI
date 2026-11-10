@@ -35,6 +35,8 @@ docker compose --env-file .env.compose -f docker-compose.prod.yml exec frontend 
 docker compose --env-file .env.compose -f docker-compose.prod.yml logs --tail=200 postgres
 ```
 
+`docker-compose.prod.yml` starts edge and frontend nginx with `nginx -g "daemon off;"`. That command has to stay. Setting `entrypoint` makes Compose drop the image CMD; nginx then backgrounds itself and the container exits 0 (`Restarting (0)`), so nothing listens on port 80. `nginx/acbc-nginx-entrypoint.sh` uses the same command when it is started with no arguments.
+
 Dev compose (`docker-compose.yml`) uses the same app and nginx paths and the volumes `acbc_dev_backend_logs` and `acbc_dev_frontend_logs`. There is no edge nginx container. The backend volume hides `acbc_app/logs` on the host, so a `docker compose exec` is the read path. A process started without Docker writes `acbc_app/logs/` directly.
 
 Nginx files grow until rotation. Copy `scripts/docker/acbc-logrotate.conf` to `/etc/logrotate.d/acbc` on the droplet. Django and Gunicorn rotate their own files (10MB, several backups). Do not point logrotate at `academia_blockchain.log`, `errors.log`, or the `gunicorn-*.log` files; those handlers rename the files themselves.

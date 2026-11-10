@@ -12,7 +12,10 @@ services:
       - ./nginx/acbc-nginx-entrypoint.sh:/opt/acbc-nginx-entrypoint.sh:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - nginx_logs:/var/log/nginx/persisted
+    # command must stay. Overriding entrypoint clears the image CMD; without
+    # "daemon off" nginx backgrounds itself and the container exits 0.
     entrypoint: ["/bin/sh", "/opt/acbc-nginx-entrypoint.sh"]
+    command: ["nginx", "-g", "daemon off;"]
     depends_on:
       - backend
       - frontend
@@ -76,7 +79,9 @@ services:
       - frontend_logs:/var/log/nginx/persisted
       - ./nginx/persisted-logs.conf:/etc/nginx/conf.d/00-persisted-logs.conf:ro
       - ./nginx/acbc-nginx-entrypoint.sh:/opt/acbc-nginx-entrypoint.sh:ro
+    # Same as edge nginx: keep the foreground command when overriding entrypoint.
     entrypoint: ["/bin/sh", "/opt/acbc-nginx-entrypoint.sh"]
+    command: ["nginx", "-g", "daemon off;"]
     # Don't expose port directly - accessed via nginx
     expose:
       - "80"
