@@ -108,11 +108,11 @@ services:
       - ./acbc_app/.env
     environment:
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C.UTF-8
+    # Do not replace the image entrypoint. A wrapper that teed stderr made
+    # acbc_postgres_prod fail its healthcheck (Cloudflare 521). Postgres logs
+    # for the running container are `docker compose logs postgres`.
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - postgres_logs:/var/log/postgresql
-      - ./scripts/docker/postgres-entrypoint.sh:/usr/local/bin/acbc-postgres-entrypoint.sh:ro
-    entrypoint: ["/bin/bash", "/usr/local/bin/acbc-postgres-entrypoint.sh"]
     networks:
       - app_network
     healthcheck:
@@ -148,6 +148,4 @@ volumes:
     name: acbc_prod_nginx_logs
   frontend_logs:
     name: acbc_prod_frontend_logs
-  postgres_logs:
-    name: acbc_prod_postgres_logs
   # certbot dirs (./certbot/www, ./certbot/certs) are bind-mounted; created by setup-ssl.sh

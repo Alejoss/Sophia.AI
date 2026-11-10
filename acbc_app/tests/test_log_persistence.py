@@ -172,11 +172,11 @@ class ComposeLogVolumeTests(SimpleTestCase):
         self.assertIn("backend_logs:/app/logs", text)
         self.assertIn("nginx_logs:/var/log/nginx/persisted", text)
         self.assertIn("frontend_logs:/var/log/nginx/persisted", text)
-        self.assertIn("postgres_logs:/var/log/postgresql", text)
+        self.assertNotIn("postgres_logs:", text)
+        self.assertNotIn("acbc-postgres-entrypoint", text)
         self.assertIn("name: acbc_prod_backend_logs", text)
         self.assertIn("00-persisted-logs.conf", text)
         self.assertIn("acbc-nginx-entrypoint.sh", text)
-        self.assertIn("postgres-entrypoint.sh", text)
 
     def test_dev_compose_uses_separate_log_volume_names(self):
         text = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
@@ -258,47 +258,3 @@ class EntrypointPersistenceTests(SimpleTestCase):
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertEqual(access.read_text(encoding="utf-8"), "ok\n")
             self.assertFalse((log_dir / "access.log.1").exists())
-
-    def test_postgres_entrypoint_keeps_logs_across_a_new_process(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp_path = Path(tmp)
-            log_dir = tmp_path / "pglogs"
-            stub = tmp_path / "docker-entrypoint.sh"
-            stub.write_text(
-                "#!/bin/bash\necho \"stdout-$STUB_ID\"\necho \"stderr-$STUB_ID\" >&2\n",
-                encoding="utf-8",
-            )
-            stub.chmod(stub.stat().st_mode | stat.S_IEXEC)
-            script = REPO_ROOT / "scripts" / "docker" / "postgres-entrypoint.sh"
-
-            def run_once(stub_id):
-                env = os.environ.copy()
-                env.update(
-                    {
-                        "POSTGRES_LOG_DIR": str(log_dir),
-                        "POSTGRES_DOCKER_ENTRYPOINT": str(stub),
-                        "POSTGRES_LOG_MAX_BYTES": "10485760",
-                        "STUB_ID": stub_id,
-                    }
-                )
-                return subprocess.run(
-                    ["bash", str(script), "postgres"],
-                    env=env,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
-
-            first = run_once("one")
-            self.assertEqual(first.returncode, 0, first.stderr)
-            second = run_once("two")
-            self.assertEqual(second.returncode, 0, second.stderr)
-
-            # A recreate is a new process with the same volume directory.
-            saved = (log_dir / "postgresql.log").read_text(encoding="utf-8")
-            self.assertIn("stdout-one", saved)
-            self.assertIn("stderr-one", saved)
-            self.assertIn("stdout-two", saved)
-            self.assertIn("stderr-two", saved)
-            self.assertIn("stdout-one", first.stdout)
-            self.assertIn("stdout-two", second.stdout)

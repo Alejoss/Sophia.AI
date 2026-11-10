@@ -44,9 +44,9 @@ Production (`docker compose --env-file .env.compose -f docker-compose.prod.yml e
 - Gunicorn master (boot, worker timeouts): `backend` `/app/logs/gunicorn-master.log`
 - Edge nginx: `nginx` `/var/log/nginx/persisted/access.log` and `error.log`
 - Frontend nginx: `frontend` `/var/log/nginx/persisted/access.log` and `error.log`
-- Postgres: `postgres` `/var/log/postgresql/postgresql.log`
+- Postgres: `docker compose logs postgres` for the running container only. Do not replace the Postgres image entrypoint. A stderr tee wrapper made `acbc_postgres_prod` unhealthy and caused Cloudflare 521. Data stays in the `postgres_data` volume. Recovery: [docs/operations/postgres-container-unhealthy.md](docs/operations/postgres-container-unhealthy.md).
 
-Volumes: `acbc_prod_backend_logs`, `acbc_prod_nginx_logs`, `acbc_prod_frontend_logs`, `acbc_prod_postgres_logs`. Dev compose uses `acbc_dev_backend_logs`, `acbc_dev_frontend_logs`, `acbc_dev_postgres_logs` at the same paths. Native (no Docker) Django logs are `acbc_app/logs/`. `docker compose down -v` deletes the volumes.
+Volumes: `acbc_prod_backend_logs`, `acbc_prod_nginx_logs`, `acbc_prod_frontend_logs`. Dev compose uses `acbc_dev_backend_logs` and `acbc_dev_frontend_logs` at the same paths. Native (no Docker) Django logs are `acbc_app/logs/`. `docker compose down -v` deletes the volumes, including the database.
 
 Gunicorn's bind, workers, timeout, and stdout/stderr flags live on the command in `acbc_app/entrypoint.sh`. `acbc_app/gunicorn.conf.py` must not set them. It only adds the log files.
 

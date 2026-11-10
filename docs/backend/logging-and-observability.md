@@ -25,19 +25,21 @@ Production compose file: `docker-compose.prod.yml`. Prefix commands with `docker
 | Gunicorn master (boot, worker timeouts) | `/app/logs/gunicorn-master.log` | `acbc_prod_backend_logs` |
 | Edge nginx access and errors | `/var/log/nginx/persisted/access.log`, `error.log` | `acbc_prod_nginx_logs` |
 | Frontend nginx access and errors | `/var/log/nginx/persisted/access.log`, `error.log` | `acbc_prod_frontend_logs` |
-| Postgres | `/var/log/postgresql/postgresql.log` | `acbc_prod_postgres_logs` |
+| Postgres (current container only) | `docker compose logs postgres` | none. Do not replace the image entrypoint. |
 
 ```bash
 docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend tail -n 200 /app/logs/errors.log
 docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend tail -n 200 /app/logs/gunicorn-master.log
 docker compose --env-file .env.compose -f docker-compose.prod.yml exec nginx tail -n 200 /var/log/nginx/persisted/error.log
 docker compose --env-file .env.compose -f docker-compose.prod.yml exec frontend tail -n 200 /var/log/nginx/persisted/access.log
-docker compose --env-file .env.compose -f docker-compose.prod.yml exec postgres tail -n 200 /var/log/postgresql/postgresql.log
+docker compose --env-file .env.compose -f docker-compose.prod.yml logs --tail=200 postgres
 ```
 
-Dev compose (`docker-compose.yml`) uses the same paths and the volumes `acbc_dev_backend_logs`, `acbc_dev_frontend_logs`, and `acbc_dev_postgres_logs`. There is no edge nginx container. The backend volume hides `acbc_app/logs` on the host, so a `docker compose exec` is the read path. A process started without Docker writes `acbc_app/logs/` directly.
+Dev compose (`docker-compose.yml`) uses the same app and nginx paths and the volumes `acbc_dev_backend_logs` and `acbc_dev_frontend_logs`. There is no edge nginx container. The backend volume hides `acbc_app/logs` on the host, so a `docker compose exec` is the read path. A process started without Docker writes `acbc_app/logs/` directly.
 
-Nginx and Postgres files grow until rotation. Copy `scripts/docker/acbc-logrotate.conf` to `/etc/logrotate.d/acbc` on the droplet. Django and Gunicorn rotate their own files (10MB, several backups). Do not point logrotate at `academia_blockchain.log`, `errors.log`, or the `gunicorn-*.log` files; those handlers rename the files themselves.
+Nginx files grow until rotation. Copy `scripts/docker/acbc-logrotate.conf` to `/etc/logrotate.d/acbc` on the droplet. Django and Gunicorn rotate their own files (10MB, several backups). Do not point logrotate at `academia_blockchain.log`, `errors.log`, or the `gunicorn-*.log` files; those handlers rename the files themselves.
+
+Postgres keeps the official image entrypoint. Its log stream is deleted on recreate. A shell wrapper that copied stderr onto a volume made `acbc_postgres_prod` fail its healthcheck and took the site down with Cloudflare 521. Recovery steps: [postgres-container-unhealthy.md](../operations/postgres-container-unhealthy.md).
 
 ## RequestLoggingMiddleware
 
