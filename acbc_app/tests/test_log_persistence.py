@@ -177,6 +177,7 @@ class ComposeLogVolumeTests(SimpleTestCase):
         self.assertIn("name: acbc_prod_backend_logs", text)
         self.assertIn("00-persisted-logs.conf", text)
         self.assertIn("acbc-nginx-entrypoint.sh", text)
+        self.assertEqual(text.count('command: ["nginx", "-g", "daemon off;"]'), 2)
 
     def test_dev_compose_uses_separate_log_volume_names(self):
         text = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
@@ -258,3 +259,36 @@ class EntrypointPersistenceTests(SimpleTestCase):
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertEqual(access.read_text(encoding="utf-8"), "ok\n")
             self.assertFalse((log_dir / "access.log.1").exists())
+
+    def test_nginx_entrypoint_stays_in_foreground_when_command_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            log_dir = tmp_path / "logs"
+            log_dir.mkdir()
+            marker = tmp_path / "marker"
+            stub = tmp_path / "docker-entrypoint.sh"
+            stub.write_text(
+                "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$MARKER\"\n",
+                encoding="utf-8",
+            )
+            stub.chmod(stub.stat().st_mode | stat.S_IEXEC)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "NGINX_PERSISTED_LOG_DIR": str(log_dir),
+                    "NGINX_DOCKER_ENTRYPOINT": str(stub),
+                    "MARKER": str(marker),
+                }
+            )
+            completed = subprocess.run(
+                ["sh", str(REPO_ROOT / "nginx" / "acbc-nginx-entrypoint.sh")],
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").splitlines(),
+                ["nginx", "-g", "daemon off;"],
+            )
