@@ -205,8 +205,10 @@ docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend t
 docker compose --env-file .env.compose -f docker-compose.prod.yml exec backend tail -n 200 /app/logs/gunicorn-master.log
 docker compose --env-file .env.compose -f docker-compose.prod.yml exec nginx tail -n 200 /var/log/nginx/persisted/error.log
 docker compose --env-file .env.compose -f docker-compose.prod.yml exec frontend tail -n 200 /var/log/nginx/persisted/access.log
-docker compose --env-file .env.compose -f docker-compose.prod.yml exec postgres tail -n 200 /var/log/postgresql/postgresql.log
+docker compose --env-file .env.compose -f docker-compose.prod.yml logs --tail=200 postgres
 ```
+
+Postgres uses the official image entrypoint. Do not wrap it. If `acbc_postgres_prod` is unhealthy and Cloudflare shows 521, follow [docs/operations/postgres-container-unhealthy.md](docs/operations/postgres-container-unhealthy.md). Do not run `docker compose down -v`.
 
 Do not run `docker compose down -v` if you need that history. To rotate nginx and Postgres files while the containers keep running, install `scripts/docker/acbc-logrotate.conf` as `/etc/logrotate.d/acbc`. If production uses `nginx/nginx-ssl.conf`, no SSL regen is required: compose mounts `nginx/persisted-logs.conf` next to whichever server config is selected.
 
