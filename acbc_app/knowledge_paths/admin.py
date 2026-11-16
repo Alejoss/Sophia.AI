@@ -4,6 +4,8 @@ from .models import (
     KnowledgePathPurchase,
     KnowledgePathSnapshotAnchor,
     Node,
+    PathPledge,
+    PathProposal,
     PublishedKnowledgePathSnapshot,
 )
 
@@ -65,6 +67,68 @@ class PublishedKnowledgePathSnapshotAdmin(admin.ModelAdmin):
         'digest',
         'published_at',
         'published_by',
+    )
+
+
+@admin.register(PathProposal)
+class PathProposalAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'frozen_title',
+        'author',
+        'status',
+        'goal_sats',
+        'raised_sats',
+        'deadline',
+    )
+    list_filter = ('status', 'deadline')
+    search_fields = ('frozen_title', 'author__username', 'author_payout_address', 'campaign_txid')
+    readonly_fields = (
+        'knowledge_path',
+        'author',
+        'frozen_title',
+        'frozen_pitch',
+        'goal_sats',
+        'deadline',
+        'author_payout_address',
+        'terms_hash',
+        'status',
+        'raised_sats',
+        'campaign_txid',
+        'campaign_vout',
+        'settlement_txid',
+        'created_at',
+        'updated_at',
+    )
+
+
+@admin.register(PathPledge)
+class PathPledgeAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'proposal',
+        'wallet_address',
+        'amount_sats',
+        'status',
+        'created_at',
+    )
+    list_filter = ('status',)
+    search_fields = ('wallet_address', 'pledge_txid', 'nft_txid', 'refund_txid')
+    readonly_fields = (
+        'proposal',
+        'user',
+        'wallet_address',
+        'amount_sats',
+        'pledge_txid',
+        'vout',
+        'nft_category',
+        'nft_commitment',
+        'nft_txid',
+        'nft_vout',
+        'status',
+        'refund_txid',
+        'created_at',
+        'updated_at',
     )
 
 
