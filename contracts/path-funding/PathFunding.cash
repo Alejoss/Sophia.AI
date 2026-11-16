@@ -1,0 +1,109 @@
+// Knowledge-path funding campaign.
+//
+// The campaign coin carries a minting NFT. Its commitment is one byte:
+// 0x00 open, 0x01 funded, 0x02 expired. Each pledge mints an immutable NFT
+// whose commitment is bytes8(proposalId) + bytes8(amount): two little-endian
+// script numbers.
+//
+// See docs/hackathon/knowledge-path-funding.md.
+
+pragma cashscript ^0.12.0;
+
+contract PathFunding(int proposalId, int goalSats, int deadline, bytes authorLockingBytecode) {
+    function pledge() {
+        require(this.activeInputIndex == 0);
+        require(tx.inputs[0].nftCommitment == 0x00);
+        require(tx.outputs.length == 2 || tx.outputs.length == 3);
+
+        int added = tx.outputs[0].value - tx.inputs[0].value;
+        require(added >= 10000);
+        int raised = tx.inputs[0].value - 1000;
+        require(raised >= 0);
+        int newRaised = raised + added;
+
+        bytes nextState = 0x00;
+        if (newRaised >= goalSats) {
+            nextState = 0x01;
+        }
+
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[0].nftCommitment == nextState);
+
+        bytes category = tx.inputs[0].tokenCategory.split(32)[0];
+        require(tx.outputs[1].tokenCategory == category);
+        require(tx.outputs[1].value == 1000);
+        require(tx.outputs[1].nftCommitment == bytes8(proposalId) + bytes8(added));
+        require(tx.inputs.length >= 2);
+        require(tx.outputs[1].lockingBytecode == tx.inputs[1].lockingBytecode);
+
+        if (tx.outputs.length == 3) {
+            require(tx.outputs[2].tokenCategory == 0x);
+        }
+    }
+
+    function refund() {
+        require(this.activeInputIndex == 0);
+        require(tx.inputs.length == 2);
+        require(tx.outputs.length == 2);
+
+        bytes state = tx.inputs[0].nftCommitment;
+        bool stillOpen = state == 0x00;
+        bool expired = state == 0x02;
+        require(stillOpen || expired);
+        // CashScript can require a locktime only with tx.time >= T. A pledge
+        // stays possible after the deadline until expire() flips the state.
+
+        bytes receipt = tx.inputs[1].nftCommitment;
+        require(int(receipt.split(8)[0]) == proposalId);
+        int amount = int(receipt.split(8)[1]);
+        require(amount > 0);
+
+        bytes category = tx.inputs[0].tokenCategory.split(32)[0];
+        require(tx.inputs[1].tokenCategory == category);
+
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[0].nftCommitment == state);
+        require(tx.outputs[0].value == tx.inputs[0].value - amount);
+
+        require(tx.outputs[1].lockingBytecode == tx.inputs[1].lockingBytecode);
+        require(tx.outputs[1].value == amount);
+        require(tx.outputs[1].tokenCategory == 0x);
+    }
+
+    function expire() {
+        require(this.activeInputIndex == 0);
+        require(tx.inputs[0].nftCommitment == 0x00);
+        require(tx.time >= deadline);
+        int raised = tx.inputs[0].value - 1000;
+        require(goalSats > raised);
+
+        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);
+        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);
+        require(tx.outputs[0].nftCommitment == 0x02);
+        require(tx.outputs[0].value == tx.inputs[0].value);
+
+        // A second input can pay the miner. Its change, if any, carries no token.
+        require(tx.inputs.length == 1 || tx.inputs.length == 2);
+        require(tx.outputs.length == tx.inputs.length);
+        if (tx.inputs.length == 2) {
+            require(tx.outputs[1].tokenCategory == 0x);
+        }
+    }
+
+    function claim() {
+        require(this.activeInputIndex == 0);
+        require(tx.inputs[0].nftCommitment == 0x01);
+        require(tx.outputs[0].lockingBytecode == authorLockingBytecode);
+        require(tx.outputs[0].value == tx.inputs[0].value);
+        require(tx.outputs[0].tokenCategory == 0x);
+
+        // A second input can pay the miner. Its change, if any, carries no token.
+        require(tx.inputs.length == 1 || tx.inputs.length == 2);
+        require(tx.outputs.length == tx.inputs.length);
+        if (tx.inputs.length == 2) {
+            require(tx.outputs[1].tokenCategory == 0x);
+        }
+    }
+}

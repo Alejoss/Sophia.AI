@@ -2,6 +2,17 @@ from django.urls import path
 
 from content.views_social_preview import KnowledgePathSocialPreviewView
 
+from .views_funding import (
+    ProposalCampaignView,
+    ProposalClaimView,
+    ProposalContractView,
+    ProposalUtxoView,
+    ProposalDetailView,
+    ProposalListCreateView,
+    ProposalOpenView,
+    ProposalPledgeView,
+    ProposalRefundView,
+)
 from .views import (
     KnowledgePathListView,
     UserKnowledgePathsView,
@@ -31,6 +42,15 @@ urlpatterns = [
         KnowledgePathSocialPreviewView.as_view(),
         name='knowledge-path-social-preview',
     ),
+    path('proposals/contract/', ProposalContractView.as_view(), name='path-proposal-contract'),
+    path('proposals/utxos/', ProposalUtxoView.as_view(), name='path-proposal-utxos'),
+    path('proposals/', ProposalListCreateView.as_view(), name='path-proposal-list'),
+    path('proposals/<int:proposal_id>/', ProposalDetailView.as_view(), name='path-proposal-detail'),
+    path('proposals/<int:proposal_id>/open/', ProposalOpenView.as_view(), name='path-proposal-open'),
+    path('proposals/<int:proposal_id>/campaign/', ProposalCampaignView.as_view(), name='path-proposal-campaign'),
+    path('proposals/<int:proposal_id>/pledges/', ProposalPledgeView.as_view(), name='path-proposal-pledges'),
+    path('proposals/<int:proposal_id>/refund/', ProposalRefundView.as_view(), name='path-proposal-refund'),
+    path('proposals/<int:proposal_id>/claim/', ProposalClaimView.as_view(), name='path-proposal-claim'),
     path('', KnowledgePathListView.as_view(), name='knowledge-path-list'),
     path('my/', UserKnowledgePathsView.as_view(), name='user-knowledge-paths'),
     path('engaged/', UserEngagedKnowledgePathsView.as_view(), name='user-engaged-knowledge-paths'),

@@ -26,7 +26,7 @@ from content.models import Content, ContentProfile
 from django.db import IntegrityError, transaction
 from django.db import models
 from django.utils import timezone
-from knowledge_paths.services.access_service import user_has_path_access
+from knowledge_paths.services.access_service import user_has_path_access, wallet_from_request
 from knowledge_paths.services.node_user_activity_service import mark_node_as_completed, get_knowledge_path_progress, is_node_available_for_user
 from knowledge_paths.services.snapshot_preview import (
     preview_knowledge_path_snapshot,
@@ -771,7 +771,12 @@ class NodeDetailView(APIView):
                 request.user,
                 request.query_params.get('club'),
             )
-            if not user_has_path_access(request.user, knowledge_path, book_club=book_club):
+            if not user_has_path_access(
+                request.user,
+                knowledge_path,
+                book_club=book_club,
+                wallet_address=wallet_from_request(request),
+            ):
                 return Response(
                     {
                         'detail': 'Este camino requiere pago para acceder a los nodos.',
@@ -845,7 +850,10 @@ class NodeDetailView(APIView):
             
             # Check if the node is available for the user
             if not is_node_available_for_user(
-                node, request.user, book_club=book_club
+                node,
+                request.user,
+                book_club=book_club,
+                wallet_address=wallet_from_request(request),
             ):
                 knowledge_paths_logger.warning("Node completion denied - node not available", extra={
                     'user_id': request.user.id,

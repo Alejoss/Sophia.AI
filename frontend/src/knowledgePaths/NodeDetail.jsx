@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import knowledgePathsApi from '../api/knowledgePathsApi';
+import { readFundingWallet } from '../funding/fundingWallet';
 import contentApi from '../api/contentApi';
 import ContentDisplay from '../content/ContentDisplay';
 import BookClubReturnLink from '../bookClubs/BookClubReturnLink';
@@ -40,8 +41,8 @@ const NodeDetail = () => {
       try {
         // Fetch node and path data first
         const [nodeData, pathData] = await Promise.all([
-        knowledgePathsApi.getNode(pathId, nodeId, { club: clubSlug }),
-        knowledgePathsApi.getKnowledgePath(pathId, { club: clubSlug })]
+        knowledgePathsApi.getNode(pathId, nodeId, { club: clubSlug, wallet: readFundingWallet() }),
+        knowledgePathsApi.getKnowledgePath(pathId, { club: clubSlug, wallet: readFundingWallet() })]
         );
 
         if (!isMounted) return;

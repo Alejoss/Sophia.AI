@@ -9,7 +9,12 @@ from content.image_utils import (
     delete_knowledge_path_image_preview,
 )
 from profiles.models import UserNodeCompletion
-from knowledge_paths.services.access_service import get_user_purchase, user_has_path_access
+from knowledge_paths.services.access_service import (
+    funding_visibility_error,
+    get_user_purchase,
+    user_has_path_access,
+    wallet_from_request,
+)
 from knowledge_paths.services.node_user_activity_service import is_node_available_for_user, is_node_completed_by_user, get_knowledge_path_progress
 from quizzes.serializers import QuizSerializer
 
@@ -61,6 +66,7 @@ class NodeSerializer(serializers.ModelSerializer):
             obj,
             request.user,
             book_club=self.context.get('book_club'),
+            wallet_address=wallet_from_request(request),
         )
 
     def get_club_opens_at(self, obj):
@@ -100,6 +106,7 @@ class NodeSerializer(serializers.ModelSerializer):
             user,
             instance.knowledge_path,
             book_club=self.context.get('book_club'),
+            wallet_address=wallet_from_request(request),
         ):
             # Do not leak quiz answers or content IDs behind the paywall.
             data['quizzes'] = []
@@ -124,6 +131,7 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
     user_purchase_status = serializers.SerializerMethodField()
     user_purchase_id = serializers.SerializerMethodField()
     linked_book_clubs = serializers.SerializerMethodField()
+    funding_proposal = serializers.SerializerMethodField()
 
     class Meta:
         model = KnowledgePath
@@ -134,12 +142,26 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
             'certificates_enabled', 'reference_price', 'is_paid_path',
             'sales_enabled', 'is_for_sale', 'bch_direct_available',
             'user_has_access', 'user_purchase_status', 'user_purchase_id',
-            'linked_book_clubs',
+            'linked_book_clubs', 'funding_proposal',
         ]
 
     def get_bch_direct_available(self, obj):
         from payments.bch_client import is_bch_direct_configured
         return bool(is_bch_direct_configured() and obj.is_for_sale)
+
+    def get_funding_proposal(self, obj):
+        from knowledge_paths.models import PathProposal
+
+        try:
+            proposal = obj.funding_proposal
+        except PathProposal.DoesNotExist:
+            return None
+        return {
+            'id': proposal.pk,
+            'status': proposal.status,
+            'goal_sats': proposal.goal_sats,
+            'raised_sats': proposal.raised_sats,
+        }
 
     def get_user_has_access(self, obj):
         request = self.context.get('request')
@@ -149,6 +171,7 @@ class KnowledgePathSerializer(serializers.ModelSerializer):
             request.user,
             obj,
             book_club=self.context.get('book_club'),
+            wallet_address=wallet_from_request(request),
         )
 
     def get_user_purchase_status(self, obj):
@@ -247,6 +270,10 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
 
     def validate_is_visible(self, value):
         """Validate that knowledge path can be made visible"""
+        if value and self.instance is not None:
+            funding_error = funding_visibility_error(self.instance)
+            if funding_error:
+                raise serializers.ValidationError(funding_error)
         if value and not self.instance.can_be_visible():
             raise serializers.ValidationError(
                 "Los caminos de conocimiento necesitan al menos un nodo para ser visibles"
@@ -292,6 +319,10 @@ class KnowledgePathCreateSerializer(serializers.ModelSerializer):
         # Handle visibility with validation
         if 'is_visible' in validated_data:
             new_visibility = validated_data['is_visible']
+            if new_visibility:
+                funding_error = funding_visibility_error(instance)
+                if funding_error:
+                    raise serializers.ValidationError({'is_visible': funding_error})
             if new_visibility and not instance.can_be_visible():
                 raise serializers.ValidationError({
                     'is_visible': "Los caminos de conocimiento necesitan al menos un nodo para ser visibles"

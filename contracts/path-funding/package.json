@@ -1,0 +1,13 @@
+{
+  "name": "path-funding",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compile": "cashc PathFunding.cash -o artifact.json",
+    "test": "node scenario.mjs"
+  },
+  "devDependencies": {
+    "cashc": "^0.12.2",
+    "cashscript": "^0.12.0"
+  }
+}
