@@ -9,6 +9,8 @@ _CHARSET_MAP = {c: i for i, c in enumerate(CHARSET)}
 # cashaddr version byte: high bits = type, low 3 bits = size
 _TYPE_P2PKH = 0
 _TYPE_P2SH = 1
+_TYPE_P2PKH_TOKEN = 2
+_TYPE_P2SH_TOKEN = 3
 _HASH_SIZES = {
     0: 20,
     1: 24,
@@ -124,20 +126,41 @@ def decode_cashaddr(address: str) -> tuple[str, int, bytes]:
     return prefix, version, hash_bytes
 
 
-def address_to_scripthash(address: str) -> str:
-    """Electrum scripthash (hex) for a CashAddr P2PKH/P2SH address."""
+def address_locking_script(address: str) -> bytes:
+    """P2PKH or P2SH locking script for a CashAddr, including token-aware forms."""
     _prefix, version, payload = decode_cashaddr(address)
     addr_type = version >> 3
-    if addr_type == _TYPE_P2PKH:
+    if addr_type in (_TYPE_P2PKH, _TYPE_P2PKH_TOKEN):
         if len(payload) != 20:
             raise CashAddrError('P2PKH payload must be 20 bytes')
-        script = bytes([0x76, 0xA9, 0x14]) + payload + bytes([0x88, 0xAC])
-    elif addr_type == _TYPE_P2SH:
-        if len(payload) != 20:
-            raise CashAddrError('P2SH payload must be 20 bytes')
-        script = bytes([0xA9, 0x14]) + payload + bytes([0x87])
-    else:
+        return bytes([0x76, 0xA9, 0x14]) + payload + bytes([0x88, 0xAC])
+    if addr_type in (_TYPE_P2SH, _TYPE_P2SH_TOKEN):
+        if len(payload) == 20:
+            return bytes([0xA9, 0x14]) + payload + bytes([0x87])
+        if len(payload) == 32:
+            return bytes([0xAA, 0x20]) + payload + bytes([0x87])
+        raise CashAddrError('P2SH payload must be 20 or 32 bytes')
+    raise CashAddrError(f'Unsupported CashAddr type: {addr_type}')
+
+
+def normalize_cashaddr(address: str) -> str:
+    """Return the plain P2PKH/P2SH CashAddr for a plain or token-aware address."""
+    prefix, version, payload = decode_cashaddr(address)
+    addr_type = version >> 3
+    if addr_type == _TYPE_P2PKH_TOKEN:
+        addr_type = _TYPE_P2PKH
+    elif addr_type == _TYPE_P2SH_TOKEN:
+        addr_type = _TYPE_P2SH
+    if addr_type not in (_TYPE_P2PKH, _TYPE_P2SH):
         raise CashAddrError(f'Unsupported CashAddr type: {addr_type}')
+    if prefix not in ('bitcoincash', 'bchtest', 'bchreg'):
+        raise CashAddrError('Address prefix is not a Bitcoin Cash network.')
+    return encode_cashaddr(prefix, addr_type, payload)
+
+
+def address_to_scripthash(address: str) -> str:
+    """Electrum scripthash (hex) for a CashAddr P2PKH/P2SH address."""
+    script = address_locking_script(address)
     digest = hashlib.sha256(script).digest()
     return digest[::-1].hex()
 

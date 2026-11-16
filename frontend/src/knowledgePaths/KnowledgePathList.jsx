@@ -17,6 +17,7 @@ import {
 '@mui/material';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import FeaturedEventBanner from '../events/FeaturedEventBanner';
+import BlazeBanner from '../funding/BlazeBanner';
 import VoteComponent from '../votes/VoteComponent';
 import { AuthContext } from '../context/AuthContext';
 import { useDateLocales } from '../hooks/useDateLocales';
@@ -331,6 +332,7 @@ const KnowledgePathList = () => {
   return (
     <Container sx={{ py: { xs: 2, md: 3 }, px: { xs: 1, md: 3 } }}>
       <FeaturedEventBanner />
+      <BlazeBanner />
       {body}
     </Container>
   );

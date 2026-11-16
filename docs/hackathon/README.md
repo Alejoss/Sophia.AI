@@ -9,5 +9,9 @@ Keep these files with the project; they are not temporary generated output.
 - [Bitcoin readiness review](bitcoin-anchor-readiness.md): findings, tests and contribution history.
 - [Bitcoin anchoring reference](transcript-anchor.md): canonical API, operations and verification documentation for the existing feature.
 
+## BCH BLAZE 2026
+
+- [Knowledge-path funding](knowledge-path-funding.md): crowdfunding proposals, pledge NFTs, refunds, and the implementation sequence.
+
 Place future hackathon progress reports, demo notes and submission documentation here.
 Distinguish planned, implemented, tested and deployed work.

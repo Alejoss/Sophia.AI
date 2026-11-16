@@ -46,10 +46,13 @@ const knowledgePathsApi = {
     }
   },
 
-  getKnowledgePath: async (pathId, { club } = {}) => {
+  getKnowledgePath: async (pathId, { club, wallet } = {}) => {
     try {
+      const params = {};
+      if (club) params.club = club;
+      if (wallet) params.wallet = wallet;
       const response = await axiosInstance.get(`/knowledge_paths/${pathId}/`, {
-        params: club ? { club } : undefined,
+        params: Object.keys(params).length ? params : undefined,
       });
       return response.data;
     } catch (error) {
@@ -212,10 +215,13 @@ const knowledgePathsApi = {
     }
   },
 
-  getNode: async (pathId, nodeId, { club } = {}) => {
+  getNode: async (pathId, nodeId, { club, wallet } = {}) => {
     try {
+      const params = {};
+      if (club) params.club = club;
+      if (wallet) params.wallet = wallet;
       const response = await axiosInstance.get(`/knowledge_paths/${pathId}/nodes/${nodeId}/`, {
-        params: club ? { club } : undefined,
+        params: Object.keys(params).length ? params : undefined,
       });
       return response.data;
     } catch (error) {

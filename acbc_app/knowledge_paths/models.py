@@ -444,3 +444,154 @@ class KnowledgePathSnapshotAnchor(models.Model):
         digest = bytes.fromhex(self.digest)
         return (prefix + digest).hex()
 
+
+class PathProposal(models.Model):
+    """Funding contract for creating a knowledge path.
+
+    The linked path is the curriculum and stays hidden until a later step
+    publishes it after the campaign is claimed. Funding state lives here.
+    See docs/hackathon/knowledge-path-funding.md.
+    """
+
+    STATUS_DRAFT = 'draft'
+    STATUS_OPEN = 'open'
+    STATUS_FUNDED = 'funded'
+    STATUS_CLAIMED = 'claimed'
+    STATUS_EXPIRED = 'expired'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_CHOICES = (
+        (STATUS_DRAFT, 'Draft'),
+        (STATUS_OPEN, 'Open'),
+        (STATUS_FUNDED, 'Funded'),
+        (STATUS_CLAIMED, 'Claimed'),
+        (STATUS_EXPIRED, 'Expired'),
+        (STATUS_CANCELLED, 'Cancelled'),
+    )
+
+    knowledge_path = models.OneToOneField(
+        KnowledgePath,
+        on_delete=models.CASCADE,
+        related_name='funding_proposal',
+    )
+    author = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='path_proposals',
+    )
+    frozen_title = models.CharField(max_length=200, blank=True)
+    frozen_pitch = models.TextField(blank=True)
+    goal_sats = models.BigIntegerField()
+    deadline = models.DateTimeField()
+    author_payout_address = models.CharField(max_length=128)
+    terms_hash = models.CharField(max_length=64, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_DRAFT,
+        db_index=True,
+    )
+    raised_sats = models.BigIntegerField(default=0)
+    campaign_txid = models.CharField(max_length=64, blank=True)
+    campaign_vout = models.PositiveIntegerField(null=True, blank=True)
+    contract_address = models.CharField(max_length=128, blank=True)
+    token_category = models.CharField(max_length=64, blank=True)
+    settlement_txid = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = 'knowledge_paths'
+        ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(goal_sats__gt=0),
+                name='kp_proposal_goal_positive',
+            ),
+            models.CheckConstraint(
+                check=models.Q(raised_sats__gte=0),
+                name='kp_proposal_raised_nonneg',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['status', 'deadline'], name='kp_proposal_status_dl_idx'),
+        ]
+
+    def __str__(self):
+        return f'PathProposal {self.pk} [{self.status}] goal={self.goal_sats}'
+
+
+class PathPledge(models.Model):
+    """One supporter output indexed from the campaign chain.
+
+    The NFT outpoint is the reclaim ticket. Django stores it so the app can
+    list pledges. The wallet that holds the NFT is the claimant.
+    """
+
+    STATUS_PENDING = 'pending'
+    STATUS_CONFIRMED = 'confirmed'
+    STATUS_REFUNDED = 'refunded'
+    STATUS_SETTLED = 'settled'
+    STATUS_CHOICES = (
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_CONFIRMED, 'Confirmed'),
+        (STATUS_REFUNDED, 'Refunded'),
+        (STATUS_SETTLED, 'Settled'),
+    )
+
+    proposal = models.ForeignKey(
+        PathProposal,
+        on_delete=models.CASCADE,
+        related_name='pledges',
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='path_pledges',
+    )
+    wallet_address = models.CharField(max_length=128)
+    amount_sats = models.BigIntegerField()
+    pledge_txid = models.CharField(max_length=64)
+    vout = models.PositiveIntegerField()
+    nft_category = models.CharField(max_length=64)
+    nft_commitment = models.CharField(max_length=80)
+    nft_txid = models.CharField(max_length=64)
+    nft_vout = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    refund_txid = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = 'knowledge_paths'
+        ordering = ['created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(amount_sats__gt=0),
+                name='kp_pledge_amount_positive',
+            ),
+            models.UniqueConstraint(
+                fields=['pledge_txid', 'vout'],
+                name='kp_pledge_outpoint_uniq',
+            ),
+            models.UniqueConstraint(
+                fields=['nft_txid', 'nft_vout'],
+                name='kp_pledge_nft_outpoint_uniq',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['proposal', 'status'], name='kp_pledge_proposal_status'),
+        ]
+
+    def __str__(self):
+        return (
+            f'PathPledge {self.pk} proposal={self.proposal_id} '
+            f'{self.amount_sats} sats [{self.status}]'
+        )
+
