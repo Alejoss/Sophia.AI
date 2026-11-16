@@ -104,8 +104,8 @@ const KnowledgePathList = () => {
         <Typography variant="h4" component="h1" sx={{ mb: { xs: 2, md: 0 } }}>
           {t('list.title')}
         </Typography>
-        {authState.isAuthenticated &&
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
+            {authState.isAuthenticated &&
             <Link
             to="/profiles/my_profile?section=knowledge-paths"
             style={{ textDecoration: 'none' }}>
@@ -120,20 +120,50 @@ const KnowledgePathList = () => {
                 {t('list.mine')}
               </Typography>
             </Link>
-            <Button
-            component={Link}
-            to="/knowledge_path/create"
-            variant="contained"
-            color="primary"
-            sx={{
-              textDecoration: 'none',
-              width: { xs: '100%', md: 'auto' }
-            }}>
+            }
+            <Link
+            to="/knowledge_path/funding"
+            style={{ textDecoration: 'none' }}>
             
-              {t('list.create')}
-            </Button>
+              <Typography
+              component="span"
+              sx={{
+                color: 'primary.main',
+                '&:hover': { textDecoration: 'underline' }
+              }}>
+              
+                {t('list.campaigns')}
+              </Typography>
+            </Link>
+            {authState.isAuthenticated &&
+            <>
+              <Button
+              component={Link}
+              to="/knowledge_path/funding/new"
+              variant="outlined"
+              color="primary"
+              sx={{
+                textDecoration: 'none',
+                width: { xs: '100%', md: 'auto' }
+              }}>
+              
+                {t('list.fund')}
+              </Button>
+              <Button
+              component={Link}
+              to="/knowledge_path/create"
+              variant="contained"
+              color="primary"
+              sx={{
+                textDecoration: 'none',
+                width: { xs: '100%', md: 'auto' }
+              }}>
+              
+                {t('list.create')}
+              </Button>
+            </>
+            }
           </Stack>
-        }
       </Box>
 
       <Grid container spacing={3}>

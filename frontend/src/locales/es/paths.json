@@ -26,6 +26,8 @@
   "list": {
     "title": "Caminos de Conocimiento",
     "mine": "Mis caminos del Conocimiento",
+    "campaigns": "Campañas",
+    "fund": "Financiar un camino",
     "create": "Crear Nuevo Camino"
   },
   "byUser": {
@@ -50,6 +52,8 @@
   },
   "create": {
     "title": "Crear Camino de Conocimiento",
+    "fundInstead": "Si quieres que la comunidad lo financie con Bitcoin Cash,",
+    "fundLink": "propón una campaña.",
     "descriptionRequired": "La descripción es requerida.",
     "imageError": "Imagen: {{message}}",
     "error": "Error al crear el camino de conocimiento",
