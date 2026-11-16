@@ -1,6 +1,6 @@
 # Knowledge-path funding on Bitcoin Cash
 
-Status: **step 1 implemented** (domain model and state machine). Steps 2–7 are planned.
+Status: **steps 1–7 implemented.** The campaign contract is proven in the Bitcoin Cash virtual machine. A live chipnet broadcast still needs a funded test wallet. The crossing pledge on mainnet needs a real wallet and the EMBER2026 address comes from `VITE_BLAZE_EMBER_ADDRESS`.
 
 This is the BCH BLAZE 2026 plan for crowdfunding the creation of a knowledge path. Supporters lock Bitcoin Cash in a campaign coin and receive a CashToken NFT. That NFT is the reclaim ticket while the goal is unmet, and the access pass after the author claims a completed pool.
 
@@ -10,12 +10,12 @@ The curriculum stays on `KnowledgePath`. The campaign is a separate contract. `B
 
 A proposal creates a hidden knowledge path (`is_visible=False`, not for sale). The public campaign shows `frozen_title` and `frozen_pitch`, copied from the path when the campaign opens. Later edits to the draft do not change that pitch.
 
-One campaign output holds the pool. Each pledge adds satoshis to that output and mints one CashToken NFT. The NFT commitment is 16 bytes: the proposal id as 8 big-endian bytes, then `amount_sats` as 8 big-endian bytes. The holder of the NFT is the only person who can reclaim that pledge.
+One campaign output holds the pool. Each pledge adds satoshis to that output and mints one CashToken NFT. The NFT commitment is 16 bytes: `bytes8(proposalId) + bytes8(amountSats)`. CashScript `bytes8` is `OP_NUM2BIN`, so each integer is an 8-byte little-endian script number. The holder of the NFT is the only person who can reclaim that pledge.
 
 | Campaign state | New pledges | Refund | Author claim |
 |---|---|---|---|
 | `draft` | No | No | No |
-| `open` | Until the deadline | Holder burns the NFT and receives that pledge | No |
+| `open` | While the campaign coin still says open | Holder burns the NFT and receives that pledge | No |
 | `funded` | Closed | Closed | Pays `author_payout_address` |
 | `claimed` | Closed | Closed | Already paid |
 | `expired` | Closed | Still open | No |
@@ -23,7 +23,7 @@ One campaign output holds the pool. Each pledge adds satoshis to that output and
 
 `cancelled` is reachable only from `draft`.
 
-The pledge that reaches `goal_sats` rewrites the campaign output to `funded` in that same transaction. Refunds close then, so the pool cannot be drained while the author is about to claim. A missed deadline moves an underfunded campaign to `expired`. The refund spend checks that state and returns each pledge only to the NFT holder. Claiming spends the pot to the author and leaves every unburned NFT in place. Those NFTs unlock the path.
+The pledge that reaches `goal_sats` rewrites the campaign output to `funded` in that same transaction. Refunds close then, so the pool cannot be drained while the author is about to claim. A missed deadline moves an underfunded campaign to `expired` when someone calls `expire()`. CashScript 0.12 can require `tx.time >= deadline`, and it cannot forbid a spend after a time. A pledge can still land in the window after the deadline and before `expire()` is mined. `expire()` and `claim()` accept an optional second input so that input can pay the miner fee. The refund spend checks the campaign state and returns each pledge only to the NFT holder. Claiming spends the pot to the author and leaves every unburned NFT in place. Those NFTs unlock the path.
 
 Losing the NFT loses the refund and, after a claim, access. A Sophia login cannot replace it.
 
@@ -65,6 +65,7 @@ Both models live on `knowledge_paths`, next to `KnowledgePathPurchase`.
 | `status` | `draft`, `open`, `funded`, `claimed`, `expired`, `cancelled`. |
 | `raised_sats` | Cache recomputed from `confirmed` and `settled` pledges. |
 | `campaign_txid`, `campaign_vout` | Campaign coin. Empty until open. |
+| `contract_address`, `token_category` | Contract instance and the 32-byte CashToken category. Empty until open. |
 | `settlement_txid` | Author claim transaction. Empty until claimed. |
 
 `PathPledge`
@@ -104,15 +105,15 @@ Access and publishing stay out of this step. `user_has_path_access` does not rea
 | Step | Work | Status |
 |---|---|---|
 | 1 | `PathProposal`, `PathPledge`, and `proposal_service`, tested with fake chain events | Implemented |
-| 2 | CashScript contract on chipnet: create, pledge, refund, claim. The crossing pledge locks the pot. Claim does not burn NFTs. Five chipnet transactions must pass before the API calls the contract | Planned |
-| 3 | `sync_path_proposals` reads the campaign coin and pledge NFTs through `payments/bch_client.py` and upserts rows. Running it twice does not duplicate pledges | Planned |
-| 4 | `user_has_path_access` allows a claimed path when the connected wallet holds that campaign's pledge NFT. The path can become visible only after `claimed` and at least one node | Planned |
-| 5 | Proposal API: create, open, list, detail, record a broadcast pledge, and return unsigned refund and claim spends | Planned |
-| 6 | Public campaign page with WizardConnect. Pledge, refund, and claim sign in the wallet. The path page asks for the same wallet | Planned |
-| 7 | Demo seed one pledge short of the goal, then the same crossing pledge on mainnet. Home-page BLAZE banner with the Widget Factory slides, the repo, and an EMBER2026 address | Planned |
+| 2 | CashScript contract. `contracts/path-funding/scenario.mjs` runs pledge, refund, the crossing pledge, claim, and expiry in the BCH virtual machine. A funded refund and an expired claim fail. Chipnet broadcast is still outstanding | Implemented in the VM |
+| 3 | `sync_path_proposals` reads the campaign coin and pledge NFTs through `payments/bch_client.py` and upserts rows. Running it twice does not duplicate pledges | Implemented |
+| 4 | `user_has_path_access` allows a claimed path when the connected wallet holds that campaign's pledge NFT. The path can become visible only after `claimed` and at least one node | Implemented |
+| 5 | Proposal API: create, open, list, detail, record a broadcast pledge, and return unsigned refund and claim spends | Implemented |
+| 6 | Public campaign page with WizardConnect. Pledge, refund, and claim sign in the wallet. The path page asks for the same wallet | Implemented |
+| 7 | `seed_path_funding_demo` creates an English draft and one text lesson. The home page shows the BLAZE banner with the Widget Factory slides, the repo, and `VITE_BLAZE_EMBER_ADDRESS` | Implemented |
 
 Stretch goals, comments, a campaign editor, platform fees, and an XO port are outside this sequence.
 
 ## BLAZE eligibility
 
-The hackathon requires a public page where a judge can send a useful Bitcoin Cash mainnet transaction, with WizardConnect or an XO template. Registration is already closed. Roll call is a separate queue. The submission deadline is 22 November 2026 at 14:00 UTC (9:00 AM Guayaquil). Chipnet proves the contract. The demo cut repeats the crossing pledge on mainnet.
+The hackathon requires a public page where a judge can send a useful Bitcoin Cash mainnet transaction, with WizardConnect or an XO template. Registration is already closed. Roll call is a separate queue. The submission deadline is 22 November 2026 at 14:00 UTC (9:00 AM Guayaquil). The virtual machine proves the contract. The public campaign page is where a judge connects a wallet and sends the mainnet pledge.

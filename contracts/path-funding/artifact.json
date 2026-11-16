@@ -1,0 +1,241 @@
+{
+  "contractName": "PathFunding",
+  "constructorInputs": [
+    {
+      "name": "proposalId",
+      "type": "int"
+    },
+    {
+      "name": "goalSats",
+      "type": "int"
+    },
+    {
+      "name": "deadline",
+      "type": "int"
+    },
+    {
+      "name": "authorLockingBytecode",
+      "type": "bytes"
+    }
+  ],
+  "abi": [
+    {
+      "name": "pledge",
+      "inputs": []
+    },
+    {
+      "name": "refund",
+      "inputs": []
+    },
+    {
+      "name": "expire",
+      "inputs": []
+    },
+    {
+      "name": "claim",
+      "inputs": []
+    }
+  ],
+  "bytecode": "OP_4 OP_PICK OP_0 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCOMMITMENT 00 OP_EQUALVERIFY OP_TXOUTPUTCOUNT OP_2 OP_NUMEQUAL OP_TXOUTPUTCOUNT OP_3 OP_NUMEQUAL OP_BOOLOR OP_VERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_SUB OP_DUP 1027 OP_GREATERTHANOREQUAL OP_VERIFY OP_0 OP_UTXOVALUE e803 OP_SUB OP_DUP OP_0 OP_GREATERTHANOREQUAL OP_VERIFY OP_OVER OP_ADD 00 OP_SWAP OP_4 OP_ROLL OP_GREATERTHANOREQUAL OP_IF OP_DROP OP_1 OP_ENDIF OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_EQUALVERIFY OP_0 OP_UTXOTOKENCATEGORY 20 OP_SPLIT OP_DROP OP_1 OP_OUTPUTTOKENCATEGORY OP_EQUALVERIFY OP_1 OP_OUTPUTVALUE e803 OP_NUMEQUALVERIFY OP_1 OP_OUTPUTTOKENCOMMITMENT OP_ROT OP_8 OP_NUM2BIN OP_ROT OP_8 OP_NUM2BIN OP_CAT OP_EQUALVERIFY OP_TXINPUTCOUNT OP_2 OP_GREATERTHANOREQUAL OP_VERIFY OP_1 OP_OUTPUTBYTECODE OP_1 OP_UTXOBYTECODE OP_EQUALVERIFY OP_TXOUTPUTCOUNT OP_3 OP_NUMEQUAL OP_IF OP_2 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_ENDIF OP_2DROP OP_DROP OP_1 OP_ELSE OP_4 OP_PICK OP_1 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_TXINPUTCOUNT OP_2 OP_NUMEQUALVERIFY OP_TXOUTPUTCOUNT OP_2 OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCOMMITMENT OP_DUP 00 OP_EQUAL OP_OVER OP_2 OP_EQUAL OP_BOOLOR OP_VERIFY OP_1 OP_UTXOTOKENCOMMITMENT OP_DUP OP_8 OP_SPLIT OP_DROP OP_BIN2NUM OP_3 OP_ROLL OP_NUMEQUALVERIFY OP_8 OP_SPLIT OP_NIP OP_BIN2NUM OP_DUP OP_0 OP_GREATERTHAN OP_VERIFY OP_0 OP_UTXOTOKENCATEGORY 20 OP_SPLIT OP_DROP OP_1 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_ROT OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_2 OP_PICK OP_SUB OP_NUMEQUALVERIFY OP_1 OP_OUTPUTBYTECODE OP_1 OP_UTXOBYTECODE OP_EQUALVERIFY OP_1 OP_OUTPUTVALUE OP_NUMEQUALVERIFY OP_1 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_2DROP OP_2DROP OP_1 OP_ELSE OP_4 OP_PICK OP_2 OP_NUMEQUAL OP_IF OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCOMMITMENT 00 OP_EQUALVERIFY OP_ROT OP_CHECKLOCKTIMEVERIFY OP_DROP OP_0 OP_UTXOVALUE e803 OP_SUB OP_ROT OP_LESSTHAN OP_VERIFY OP_0 OP_OUTPUTBYTECODE OP_0 OP_UTXOBYTECODE OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_UTXOTOKENCATEGORY OP_EQUALVERIFY OP_0 OP_OUTPUTTOKENCOMMITMENT OP_2 OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_NUMEQUALVERIFY OP_TXINPUTCOUNT OP_1 OP_NUMEQUAL OP_TXINPUTCOUNT OP_2 OP_NUMEQUAL OP_BOOLOR OP_VERIFY OP_TXOUTPUTCOUNT OP_TXINPUTCOUNT OP_NUMEQUALVERIFY OP_TXINPUTCOUNT OP_2 OP_NUMEQUAL OP_IF OP_1 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_ENDIF OP_2DROP OP_DROP OP_1 OP_ELSE OP_4 OP_ROLL OP_3 OP_NUMEQUALVERIFY OP_INPUTINDEX OP_0 OP_NUMEQUALVERIFY OP_0 OP_UTXOTOKENCOMMITMENT OP_1 OP_EQUALVERIFY OP_0 OP_OUTPUTBYTECODE OP_4 OP_ROLL OP_EQUALVERIFY OP_0 OP_OUTPUTVALUE OP_0 OP_UTXOVALUE OP_NUMEQUALVERIFY OP_0 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_TXINPUTCOUNT OP_1 OP_NUMEQUAL OP_TXINPUTCOUNT OP_2 OP_NUMEQUAL OP_BOOLOR OP_VERIFY OP_TXOUTPUTCOUNT OP_TXINPUTCOUNT OP_NUMEQUALVERIFY OP_TXINPUTCOUNT OP_2 OP_NUMEQUAL OP_IF OP_1 OP_OUTPUTTOKENCATEGORY OP_0 OP_EQUALVERIFY OP_ENDIF OP_2DROP OP_DROP OP_1 OP_ENDIF OP_ENDIF OP_ENDIF",
+  "source": "// Knowledge-path funding campaign.\n//\n// The campaign coin carries a minting NFT. Its commitment is one byte:\n// 0x00 open, 0x01 funded, 0x02 expired. Each pledge mints an immutable NFT\n// whose commitment is bytes8(proposalId) + bytes8(amount): two little-endian\n// script numbers.\n//\n// See docs/hackathon/knowledge-path-funding.md.\n\npragma cashscript ^0.12.0;\n\ncontract PathFunding(int proposalId, int goalSats, int deadline, bytes authorLockingBytecode) {\n    function pledge() {\n        require(this.activeInputIndex == 0);\n        require(tx.inputs[0].nftCommitment == 0x00);\n        require(tx.outputs.length == 2 || tx.outputs.length == 3);\n\n        int added = tx.outputs[0].value - tx.inputs[0].value;\n        require(added >= 10000);\n        int raised = tx.inputs[0].value - 1000;\n        require(raised >= 0);\n        int newRaised = raised + added;\n\n        bytes nextState = 0x00;\n        if (newRaised >= goalSats) {\n            nextState = 0x01;\n        }\n\n        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);\n        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);\n        require(tx.outputs[0].nftCommitment == nextState);\n\n        bytes category = tx.inputs[0].tokenCategory.split(32)[0];\n        require(tx.outputs[1].tokenCategory == category);\n        require(tx.outputs[1].value == 1000);\n        require(tx.outputs[1].nftCommitment == bytes8(proposalId) + bytes8(added));\n        require(tx.inputs.length >= 2);\n        require(tx.outputs[1].lockingBytecode == tx.inputs[1].lockingBytecode);\n\n        if (tx.outputs.length == 3) {\n            require(tx.outputs[2].tokenCategory == 0x);\n        }\n    }\n\n    function refund() {\n        require(this.activeInputIndex == 0);\n        require(tx.inputs.length == 2);\n        require(tx.outputs.length == 2);\n\n        bytes state = tx.inputs[0].nftCommitment;\n        bool stillOpen = state == 0x00;\n        bool expired = state == 0x02;\n        require(stillOpen || expired);\n        // CashScript can require a locktime only with tx.time >= T. A pledge\n        // stays possible after the deadline until expire() flips the state.\n\n        bytes receipt = tx.inputs[1].nftCommitment;\n        require(int(receipt.split(8)[0]) == proposalId);\n        int amount = int(receipt.split(8)[1]);\n        require(amount > 0);\n\n        bytes category = tx.inputs[0].tokenCategory.split(32)[0];\n        require(tx.inputs[1].tokenCategory == category);\n\n        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);\n        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);\n        require(tx.outputs[0].nftCommitment == state);\n        require(tx.outputs[0].value == tx.inputs[0].value - amount);\n\n        require(tx.outputs[1].lockingBytecode == tx.inputs[1].lockingBytecode);\n        require(tx.outputs[1].value == amount);\n        require(tx.outputs[1].tokenCategory == 0x);\n    }\n\n    function expire() {\n        require(this.activeInputIndex == 0);\n        require(tx.inputs[0].nftCommitment == 0x00);\n        require(tx.time >= deadline);\n        int raised = tx.inputs[0].value - 1000;\n        require(goalSats > raised);\n\n        require(tx.outputs[0].lockingBytecode == tx.inputs[0].lockingBytecode);\n        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);\n        require(tx.outputs[0].nftCommitment == 0x02);\n        require(tx.outputs[0].value == tx.inputs[0].value);\n\n        // A second input can pay the miner. Its change, if any, carries no token.\n        require(tx.inputs.length == 1 || tx.inputs.length == 2);\n        require(tx.outputs.length == tx.inputs.length);\n        if (tx.inputs.length == 2) {\n            require(tx.outputs[1].tokenCategory == 0x);\n        }\n    }\n\n    function claim() {\n        require(this.activeInputIndex == 0);\n        require(tx.inputs[0].nftCommitment == 0x01);\n        require(tx.outputs[0].lockingBytecode == authorLockingBytecode);\n        require(tx.outputs[0].value == tx.inputs[0].value);\n        require(tx.outputs[0].tokenCategory == 0x);\n\n        // A second input can pay the miner. Its change, if any, carries no token.\n        require(tx.inputs.length == 1 || tx.inputs.length == 2);\n        require(tx.outputs.length == tx.inputs.length);\n        if (tx.inputs.length == 2) {\n            require(tx.outputs[1].tokenCategory == 0x);\n        }\n    }\n}\n",
+  "debug": {
+    "bytecode": "5479009c63c0009d00cf010088c4529cc4539c9b6900cc00c69476021027a26900c602e803947600a269789301007c547aa26375516800cd00c78800d100ce8800d28800ce01207f7551d18851cc02e8039d51d27b58807b58807e88c352a26951cd51c788c4539c6352d10088686d7551675479519c63c0009dc3529dc4529d00cf760100877852879b6951cf76587f7581537a9d587f77817600a06900ce01207f7551ce8800cd00c78800d100ce8800d27b8800cc00c65279949d51cd51c78851cc9d51d100886d6d51675479529c63c0009d00cf0100887bb17500c602e803947b9f6900cd00c78800d100ce8800d2528800cc00c69dc3519cc3529c9b69c4c39dc3529c6351d10088686d755167547a539dc0009d00cf518800cd547a8800cc00c69d00d10088c3519cc3529c9b69c4c39dc3529c6351d10088686d7551686868",
+    "sourceMap": "13:4:43:5;;;;;14:16:14:37;:41::42;:8::44:1;15:26:15:27:0;:16::42:1;:46::50:0;:8::52:1;16:16:16:33:0;:37::38;:16:::1;:42::59:0;:63::64;:42:::1;:16;:8::66;18:31:18:32:0;:20::39:1;:52::53:0;:42::60:1;:20;19:16:19:21:0;:25::30;:16:::1;:8::32;20:31:20::0;:21::39:1;:42::46:0;:21:::1;21:16:21:22:0;:26::27;:16:::1;:8::29;22:33:22:38:0;:24:::1;24:26:24:30:0;25:12:25:21;:25::33;;:12:::1;:35:27:9:0;26:12:26:29:1;;25:35:27:9;29:27:29:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;30:27:30:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;31:27:31:28:0;:16::43:1;:8::58;33:35:33:36:0;:25::51:1;:58::60:0;:25::61:1;:::64;34:27:34:28:0;:16::43:1;:8::57;35:27:35:28:0;:16::35:1;:39::43:0;:8::45:1;36:27:36:28:0;:16::43:1;:54::64:0;:47::65:1;;:75::80:0;:68::81:1;;:47;:8::83;37:16:37:32:0;:36::37;:16:::1;:8::39;38:27:38:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;40:12:40:29:0;:33::34;:12:::1;:36:42:9:0;41:31:41:32;:20::47:1;:51::53:0;:12::55:1;40:36:42:9;13:4:43:5;;;;45::73::0;;;;;46:16:46:37;:41::42;:8::44:1;47:16:47:32:0;:36::37;:8::39:1;48:16:48:33:0;:37::38;:8::40:1;50:32:50:33:0;:22::48:1;51:25:51:30:0;:34::38;:25:::1;52:23:52:28:0;:32::36;:23:::1;53:16:53;:8::38;57:34:57:35:0;:24::50:1;58:20:58:27:0;:34::35;:20::36:1;:::39;:16::40;:44::54:0;;:8::56:1;59:39:59:40:0;:25::41:1;:::44;:21::45;60:16:60:22:0;:25::26;:16:::1;:8::28;62:35:62:36:0;:25::51:1;:58::60:0;:25::61:1;:::64;63:26:63:27:0;:16::42:1;:8::56;65:27:65:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;66:27:66:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;67:27:67:28:0;:16::43:1;:47::52:0;:8::54:1;68:27:68:28:0;:16::35:1;:49::50:0;:39::57:1;:60::66:0;;:39:::1;:8::68;70:27:70:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;71:27:71:28:0;:16::35:1;:8::47;72:27:72:28:0;:16::43:1;:47::49:0;:8::51:1;45:4:73:5;;;;75::93::0;;;;;76:16:76:37;:41::42;:8::44:1;77:26:77:27:0;:16::42:1;:46::50:0;:8::52:1;78:27:78:35:0;:8::37:1;;79:31:79:32:0;:21::39:1;:42::46:0;:21:::1;80:16:80:24:0;:::33:1;:8::35;82:27:82:28:0;:16::45:1;:59::60:0;:49::77:1;:8::79;83:27:83:28:0;:16::43:1;:57::58:0;:47::73:1;:8::75;84:27:84:28:0;:16::43:1;:47::51:0;:8::53:1;85:27:85:28:0;:16::35:1;:49::50:0;:39::57:1;:8::59;88:16:88:32:0;:36::37;:16:::1;:41::57:0;:61::62;:41:::1;:16;:8::64;89:16:89:33:0;:37::53;:8::55:1;90:12:90:28:0;:32::33;:12:::1;:35:92:9:0;91:31:91:32;:20::47:1;:51::53:0;:12::55:1;90:35:92:9;75:4:93:5;;;;95::108::0;;;;96:16:96:37;:41::42;:8::44:1;97:26:97:27:0;:16::42:1;:46::50:0;:8::52:1;98:27:98:28:0;:16::45:1;:49::70:0;;:8::72:1;99:27:99:28:0;:16::35:1;:49::50:0;:39::57:1;:8::59;100:27:100:28:0;:16::43:1;:47::49:0;:8::51:1;103:16:103:32:0;:36::37;:16:::1;:41::57:0;:61::62;:41:::1;:16;:8::64;104:16:104:33:0;:37::53;:8::55:1;105:12:105:28:0;:32::33;:12:::1;:35:107:9:0;106:31:106:32;:20::47:1;:51::53:0;:12::55:1;105:35:107:9;95:4:108:5;;;12:0:109:1;;",
+    "logs": [],
+    "requires": [
+      {
+        "ip": 11,
+        "line": 14
+      },
+      {
+        "ip": 15,
+        "line": 15
+      },
+      {
+        "ip": 23,
+        "line": 16
+      },
+      {
+        "ip": 32,
+        "line": 19
+      },
+      {
+        "ip": 40,
+        "line": 21
+      },
+      {
+        "ip": 56,
+        "line": 29
+      },
+      {
+        "ip": 61,
+        "line": 30
+      },
+      {
+        "ip": 64,
+        "line": 31
+      },
+      {
+        "ip": 72,
+        "line": 34
+      },
+      {
+        "ip": 76,
+        "line": 35
+      },
+      {
+        "ip": 86,
+        "line": 36
+      },
+      {
+        "ip": 90,
+        "line": 37
+      },
+      {
+        "ip": 95,
+        "line": 38
+      },
+      {
+        "ip": 103,
+        "line": 41
+      },
+      {
+        "ip": 116,
+        "line": 46
+      },
+      {
+        "ip": 119,
+        "line": 47
+      },
+      {
+        "ip": 122,
+        "line": 48
+      },
+      {
+        "ip": 132,
+        "line": 53
+      },
+      {
+        "ip": 142,
+        "line": 58
+      },
+      {
+        "ip": 150,
+        "line": 60
+      },
+      {
+        "ip": 158,
+        "line": 63
+      },
+      {
+        "ip": 163,
+        "line": 65
+      },
+      {
+        "ip": 168,
+        "line": 66
+      },
+      {
+        "ip": 172,
+        "line": 67
+      },
+      {
+        "ip": 180,
+        "line": 68
+      },
+      {
+        "ip": 185,
+        "line": 70
+      },
+      {
+        "ip": 188,
+        "line": 71
+      },
+      {
+        "ip": 192,
+        "line": 72
+      },
+      {
+        "ip": 204,
+        "line": 76
+      },
+      {
+        "ip": 208,
+        "line": 77
+      },
+      {
+        "ip": 210,
+        "line": 78
+      },
+      {
+        "ip": 218,
+        "line": 80
+      },
+      {
+        "ip": 223,
+        "line": 82
+      },
+      {
+        "ip": 228,
+        "line": 83
+      },
+      {
+        "ip": 232,
+        "line": 84
+      },
+      {
+        "ip": 237,
+        "line": 85
+      },
+      {
+        "ip": 245,
+        "line": 88
+      },
+      {
+        "ip": 248,
+        "line": 89
+      },
+      {
+        "ip": 256,
+        "line": 91
+      },
+      {
+        "ip": 268,
+        "line": 96
+      },
+      {
+        "ip": 272,
+        "line": 97
+      },
+      {
+        "ip": 277,
+        "line": 98
+      },
+      {
+        "ip": 282,
+        "line": 99
+      },
+      {
+        "ip": 286,
+        "line": 100
+      },
+      {
+        "ip": 294,
+        "line": 103
+      },
+      {
+        "ip": 297,
+        "line": 104
+      },
+      {
+        "ip": 305,
+        "line": 106
+      }
+    ]
+  },
+  "compiler": {
+    "name": "cashc",
+    "version": "0.12.2"
+  },
+  "updatedAt": "2026-11-16T19:01:20.863Z"
+}

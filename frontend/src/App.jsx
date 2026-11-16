@@ -82,6 +82,9 @@ import KnowledgePathCreationForm from './knowledgePaths/KnowledgePathCreationFor
 import KnowledgePathEdit from './knowledgePaths/KnowledgePathEdit';
 import KnowledgePathList from './knowledgePaths/KnowledgePathList';
 import KnowledgePathDetail from './knowledgePaths/KnowledgePathDetail';
+import FundingList from './funding/FundingList';
+import FundingCreate from './funding/FundingCreate';
+import FundingDetail from './funding/FundingDetail';
 
 import QuizForm from './quizzes/QuizForm';
 import NodeCreate from './knowledgePaths/NodeCreate';
@@ -260,6 +263,9 @@ const AppContent = () => {
             </Route>
             <Route path="knowledge_path">
               <Route path="" element={<KnowledgePathList />} />
+              <Route path="funding" element={<FundingList />} />
+              <Route path="funding/new" element={<ProtectedRoute><FundingCreate /></ProtectedRoute>} />
+              <Route path="funding/:proposalId" element={<FundingDetail />} />
               <Route path=":pathId" element={<ProtectedRoute><KnowledgePathDetail /></ProtectedRoute>} />
               <Route path="create" element={<ProtectedRoute><KnowledgePathCreationForm /></ProtectedRoute>} />
               <Route path=":pathId/edit" element={<ProtectedRoute><KnowledgePathEdit /></ProtectedRoute>} />

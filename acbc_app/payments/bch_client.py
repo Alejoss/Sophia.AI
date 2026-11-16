@@ -6,7 +6,7 @@ import logging
 import socket
 import ssl
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -45,10 +45,85 @@ class BchApiError(Exception):
     """Raised when the public BCH API request fails."""
 
 
+def _parse_token(payload: Any) -> BchTokenInfo | None:
+    if not isinstance(payload, dict):
+        return None
+    category = str(payload.get('category') or '').strip().lower()
+    if not category:
+        return None
+    nft = payload.get('nft') if isinstance(payload.get('nft'), dict) else {}
+    return BchTokenInfo(
+        category=category,
+        capability=str((nft or {}).get('capability') or ''),
+        commitment=str((nft or {}).get('commitment') or '').strip().lower(),
+    )
+
+
+def _output_index(out: dict, fallback: int) -> int:
+    for key in ('n', 'index', 'vout'):
+        if out.get(key) is not None:
+            try:
+                return int(out[key])
+            except (TypeError, ValueError):
+                return fallback
+    return fallback
+
+
+def _parse_inputs(raw_inputs: Any) -> list[BchTxInput]:
+    parsed: list[BchTxInput] = []
+    if not isinstance(raw_inputs, list):
+        return parsed
+    for item in raw_inputs:
+        if not isinstance(item, dict):
+            continue
+        txid = str(
+            item.get('txid')
+            or item.get('transaction_hash')
+            or ''
+        ).strip().lower()
+        vout_raw = item.get('vout')
+        if vout_raw is None:
+            vout_raw = item.get('index')
+        try:
+            vout = int(vout_raw)
+        except (TypeError, ValueError):
+            continue
+        if len(txid) != 64:
+            continue
+        parsed.append(
+            BchTxInput(
+                txid=txid,
+                vout=vout,
+                token=_parse_token(
+                    item.get('tokenData') or item.get('token_data') or item.get('token')
+                ),
+            )
+        )
+    return parsed
+
+
+@dataclass
+class BchTokenInfo:
+    """CashToken attached to one transaction input or output."""
+
+    category: str
+    capability: str = ''
+    commitment: str = ''
+
+
+@dataclass
+class BchTxInput:
+    txid: str
+    vout: int
+    token: BchTokenInfo | None = None
+
+
 @dataclass
 class BchTxOutput:
     address: str
     amount_sats: int
+    vout: int = 0
+    token: BchTokenInfo | None = None
 
 
 @dataclass
@@ -57,6 +132,7 @@ class BchTransaction:
     timestamp: Optional[int]  # unix seconds
     confirmations: int
     outputs: list[BchTxOutput]
+    inputs: list[BchTxInput] = field(default_factory=list)
 
 
 def get_bch_network() -> str:
@@ -271,6 +347,7 @@ class BchPublicClient:
             tx,
             outputs_raw,
             tip_height=tip_height,
+            inputs_raw=detail.get('inputs') or [],
         )
 
     def get_transaction(
@@ -283,7 +360,13 @@ class BchPublicClient:
         tx_wrap = (data.get('data') or {}).get(txid) or {}
         tx = tx_wrap.get('transaction') or {}
         outputs_raw = tx_wrap.get('outputs') or []
-        return self._parse_blockchair_tx(str(txid), tx, outputs_raw, tip_height=tip_height)
+        return self._parse_blockchair_tx(
+            str(txid),
+            tx,
+            outputs_raw,
+            tip_height=tip_height,
+            inputs_raw=tx_wrap.get('inputs') or [],
+        )
 
     def _parse_blockchair_tx(
         self,
@@ -292,6 +375,7 @@ class BchPublicClient:
         outputs_raw: list,
         *,
         tip_height: int | None = None,
+        inputs_raw: list | None = None,
     ) -> BchTransaction:
         block_id = tx.get('block_id')
         confirmations = 0
@@ -333,13 +417,21 @@ class BchPublicClient:
                 amount_sats = int(value)
             except (TypeError, ValueError):
                 continue
-            outputs.append(BchTxOutput(address=str(recipient), amount_sats=amount_sats))
+            outputs.append(
+                BchTxOutput(
+                    address=str(recipient),
+                    amount_sats=amount_sats,
+                    vout=_output_index(out, len(outputs)),
+                    token=_parse_token(out.get('tokenData') or out.get('token_data')),
+                )
+            )
 
         return BchTransaction(
             txid=str(txid),
             timestamp=timestamp,
             confirmations=confirmations,
             outputs=outputs,
+            inputs=_parse_inputs(inputs_raw),
         )
 
 
@@ -680,9 +772,16 @@ class BchElectrumClient:
                 addresses = [spk['address']]
             if not addresses:
                 continue
+            token = _parse_token(out.get('tokenData') or out.get('token_data'))
+            vout = _output_index(out, len(outputs))
             for recipient in addresses:
                 outputs.append(
-                    BchTxOutput(address=str(recipient), amount_sats=amount_sats)
+                    BchTxOutput(
+                        address=str(recipient),
+                        amount_sats=amount_sats,
+                        vout=vout,
+                        token=token,
+                    )
                 )
 
         return BchTransaction(
@@ -690,7 +789,36 @@ class BchElectrumClient:
             timestamp=timestamp,
             confirmations=confirmations,
             outputs=outputs,
+            inputs=_parse_inputs(raw.get('vin') or raw.get('inputs')),
         )
+
+
+    def list_unspent(self, address: str) -> list[dict]:
+        """Unspent outputs for a CashAddr, including CashToken data when present."""
+        addr = (address or '').strip()
+        if not addr:
+            raise BchApiError('Address BCH vacía.')
+        try:
+            scripthash = address_to_scripthash(addr)
+        except CashAddrError as exc:
+            raise BchApiError(f'Dirección BCH inválida: {exc}') from exc
+        with self:
+            raw = self._call('blockchain.scripthash.listunspent', [scripthash]) or []
+        return [parse_unspent(item) for item in raw]
+
+
+def parse_unspent(item: dict) -> dict:
+    token = _parse_token(item.get('token_data') or item.get('tokenData'))
+    return {
+        'txid': str(item.get('tx_hash') or item.get('txid') or '').lower(),
+        'vout': int(item.get('tx_pos') if item.get('tx_pos') is not None else item.get('vout') or 0),
+        'satoshis': int(item.get('value') or item.get('satoshis') or 0),
+        'token': None if token is None else {
+            'category': token.category,
+            'capability': token.capability,
+            'commitment': token.commitment,
+        },
+    }
 
 
 class BchFailoverClient:
@@ -875,3 +1003,18 @@ class BchFailoverClient:
             f'No se pudo cargar la transacción {txid} '
             f'({" | ".join(errors[:4])})'
         )
+
+    def list_unspent(self, address: str) -> list[dict]:
+        last_err: Exception | None = None
+        for client in self.servers:
+            try:
+                return client.list_unspent(address)
+            except BchApiError as exc:
+                last_err = exc
+                logger.warning(
+                    'Electrum listunspent failed on %s:%s: %s',
+                    client.host,
+                    client.port,
+                    exc,
+                )
+        raise BchApiError(f'No se pudieron listar UTXOs: {last_err}')

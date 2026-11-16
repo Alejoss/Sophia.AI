@@ -18,14 +18,11 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from knowledge_paths.models import KnowledgePath, PathPledge, PathProposal
-from payments.bch_cashaddr import CashAddrError, decode_cashaddr
+from payments.bch_cashaddr import CashAddrError, normalize_cashaddr
 
 CONFIRMATIONS_REQUIRED = 1
 _TXID_RE = re.compile(r'^[0-9a-f]{64}$')
 _HEX_RE = re.compile(r'^[0-9a-f]*$')
-_CASHADDR_PREFIXES = frozenset({'bitcoincash', 'bchtest', 'bchreg'})
-_P2PKH = 0
-_P2SH = 1
 _COUNTED_STATUSES = (PathPledge.STATUS_CONFIRMED, PathPledge.STATUS_SETTLED)
 
 
@@ -92,6 +89,8 @@ def open_proposal(
     campaign_txid: str,
     campaign_vout: int,
     at: datetime | None = None,
+    contract_address: str = '',
+    token_category: str = '',
 ) -> PathProposal:
     """Freeze the pitch and attach the campaign coin."""
     with transaction.atomic():
@@ -106,6 +105,10 @@ def open_proposal(
         locked.frozen_pitch = path.description or ''
         locked.campaign_txid = _require_txid(campaign_txid)
         locked.campaign_vout = _require_vout(campaign_vout)
+        if contract_address:
+            locked.contract_address = _require_cashaddr(contract_address)
+        if token_category:
+            locked.token_category = _require_hex(token_category, 64, 'Token category')
         locked.status = PathProposal.STATUS_OPEN
         locked.terms_hash = ''
         locked.save()
@@ -128,6 +131,7 @@ def record_pledge(
     confirmations: int = 0,
     user=None,
     at: datetime | None = None,
+    enforce_deadline: bool = True,
 ) -> tuple[PathProposal, PathPledge]:
     """Index a pledge output. One confirmation counts toward the goal."""
     amount_sats = _positive_sats(amount_sats, 'Pledge')
@@ -143,7 +147,7 @@ def record_pledge(
     with transaction.atomic():
         locked = _lock(proposal)
         moment = _aware(at)
-        _require_accepting_pledges(locked, moment)
+        _require_accepting_pledges(locked, moment, enforce_deadline=enforce_deadline)
         if PathPledge.objects.filter(pledge_txid=pledge_txid, vout=vout).exists():
             raise ProposalError('That pledge output is already recorded.')
         if PathPledge.objects.filter(nft_txid=nft_txid, nft_vout=nft_vout).exists():
@@ -291,10 +295,15 @@ def _lock(proposal: PathProposal) -> PathProposal:
     )
 
 
-def _require_accepting_pledges(proposal: PathProposal, moment: datetime) -> None:
+def _require_accepting_pledges(
+    proposal: PathProposal,
+    moment: datetime,
+    *,
+    enforce_deadline: bool = True,
+) -> None:
     if proposal.status != PathProposal.STATUS_OPEN:
         raise ProposalError('Pledges are accepted only while the campaign is open.')
-    if moment >= proposal.deadline:
+    if enforce_deadline and moment >= proposal.deadline:
         raise ProposalError('The campaign deadline has passed.')
 
 
@@ -375,11 +384,11 @@ def _require_cashaddr(address: str) -> str:
     if ':' not in addr:
         raise ProposalError('Address must include the CashAddr prefix.')
     try:
-        prefix, version, _payload = decode_cashaddr(addr)
+        return normalize_cashaddr(addr)
     except CashAddrError as exc:
+        message = str(exc)
+        if 'prefix' in message:
+            raise ProposalError('Address prefix is not a Bitcoin Cash network.') from exc
+        if 'Unsupported' in message or 'payload' in message:
+            raise ProposalError('Address must be P2PKH or P2SH.') from exc
         raise ProposalError('Address is not a valid CashAddr.') from exc
-    if prefix not in _CASHADDR_PREFIXES:
-        raise ProposalError('Address prefix is not a Bitcoin Cash network.')
-    if (version >> 3) not in (_P2PKH, _P2SH):
-        raise ProposalError('Address must be P2PKH or P2SH.')
-    return addr.lower()

@@ -96,6 +96,8 @@ class PathProposalAdmin(admin.ModelAdmin):
         'raised_sats',
         'campaign_txid',
         'campaign_vout',
+        'contract_address',
+        'token_category',
         'settlement_txid',
         'created_at',
         'updated_at',

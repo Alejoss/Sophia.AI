@@ -29,7 +29,7 @@ def has_completed_quiz(user, quiz):
     ).exists()
 
 
-def is_node_available_for_user(node, user, book_club=None):
+def is_node_available_for_user(node, user, book_club=None, wallet_address=None):
     """
     Check if a node is available for a user based on completion of preceding nodes and quizzes,
     or if the user is the creator of the knowledge path.
@@ -48,7 +48,12 @@ def is_node_available_for_user(node, user, book_club=None):
     if node.knowledge_path.author_id == getattr(user, 'id', None):
         return True
 
-    if not user_has_path_access(user, node.knowledge_path, book_club=book_club):
+    if not user_has_path_access(
+        user,
+        node.knowledge_path,
+        book_club=book_club,
+        wallet_address=wallet_address,
+    ):
         return False
 
     if book_club:

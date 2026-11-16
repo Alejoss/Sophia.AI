@@ -493,6 +493,8 @@ class PathProposal(models.Model):
     raised_sats = models.BigIntegerField(default=0)
     campaign_txid = models.CharField(max_length=64, blank=True)
     campaign_vout = models.PositiveIntegerField(null=True, blank=True)
+    contract_address = models.CharField(max_length=128, blank=True)
+    token_category = models.CharField(max_length=64, blank=True)
     settlement_txid = models.CharField(max_length=64, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
