@@ -316,13 +316,6 @@
     "noBytes": "There are no canonical JCS bytes to download."
   },
   "funding": {
-    "bannerTitle": "Crowdfund a knowledge path with Bitcoin Cash",
-    "bannerBody": "Sophia already publishes knowledge paths. A campaign now lets supporters fund a new one in BCH. The NFT is the reclaim ticket if the goal is missed, and the access pass after the author claims the pool.",
-    "viewCampaigns": "View campaigns",
-    "slides": "Widget Factory slides",
-    "repo": "Repository",
-    "ember": "EMBER2026: {{address}}",
-    "emberMissing": "EMBER2026 address: set VITE_BLAZE_EMBER_ADDRESS",
     "listTitle": "Knowledge-path campaigns",
     "create": "New campaign",
     "open": "Open",
