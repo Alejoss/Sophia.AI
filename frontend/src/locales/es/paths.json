@@ -316,13 +316,6 @@
     "noBytes": "No hay bytes canónicos JCS para descargar."
   },
   "funding": {
-    "bannerTitle": "Financia un camino de conocimiento con Bitcoin Cash",
-    "bannerBody": "Sophia ya publica caminos de conocimiento. Una campaña ahora permite financiarlos con BCH. El NFT sirve para recuperar el aporte si no se llega a la meta, y para entrar al camino cuando el autor cobra el fondo.",
-    "viewCampaigns": "Ver campañas",
-    "slides": "Diapositivas de Widget Factory",
-    "repo": "Repositorio",
-    "ember": "EMBER2026: {{address}}",
-    "emberMissing": "Dirección EMBER2026: configura VITE_BLAZE_EMBER_ADDRESS",
     "listTitle": "Campañas de caminos",
     "create": "Nueva campaña",
     "open": "Abrir",

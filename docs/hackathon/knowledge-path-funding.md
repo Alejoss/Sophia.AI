@@ -1,6 +1,6 @@
 # Knowledge-path funding on Bitcoin Cash
 
-Status: **steps 1–7 implemented.** The campaign contract is proven in the Bitcoin Cash virtual machine. A live chipnet broadcast still needs a funded test wallet. The crossing pledge on mainnet needs a real wallet and the EMBER2026 address comes from `VITE_BLAZE_EMBER_ADDRESS`.
+Status: **steps 1–7 implemented.** The campaign contract is proven in the Bitcoin Cash virtual machine. A live chipnet broadcast still needs a funded test wallet. The crossing pledge on mainnet needs a real wallet.
 
 This is the BCH BLAZE 2026 plan for crowdfunding the creation of a knowledge path. Supporters lock Bitcoin Cash in a campaign coin and receive a CashToken NFT. That NFT is the reclaim ticket while the goal is unmet, and the access pass after the author claims a completed pool.
 
@@ -110,10 +110,12 @@ Access and publishing stay out of this step. `user_has_path_access` does not rea
 | 4 | `user_has_path_access` allows a claimed path when the connected wallet holds that campaign's pledge NFT. The path can become visible only after `claimed` and at least one node | Implemented |
 | 5 | Proposal API: create, open, list, detail, record a broadcast pledge, and return unsigned refund and claim spends | Implemented |
 | 6 | Public campaign page with WizardConnect. Pledge, refund, and claim sign in the wallet. The path page asks for the same wallet | Implemented |
-| 7 | `seed_path_funding_demo` creates an English draft and one text lesson. The home page shows the BLAZE banner with the Widget Factory slides, the repo, and `VITE_BLAZE_EMBER_ADDRESS` | Implemented |
+| 7 | `seed_path_funding_demo` creates an English draft and one text lesson. The knowledge-path list links to campaigns from its header | Implemented |
 
 Stretch goals, comments, a campaign editor, platform fees, and an XO port are outside this sequence.
 
 ## BLAZE eligibility
 
 The hackathon requires a public page where a judge can send a useful Bitcoin Cash mainnet transaction, with WizardConnect or an XO template. Registration is already closed. Roll call is a separate queue. The submission deadline is 22 November 2026 at 14:00 UTC (9:00 AM Guayaquil). The virtual machine proves the contract. The public campaign page is where a judge connects a wallet and sends the mainnet pledge.
+
+EMBER2026 is the CashToken used for the Community Choice award. A project lists a CashTokens address so people can send those tokens to it. The campaign contract, the pledge NFT, and the author payout do not use that address, so the knowledge-path page does not show it.
