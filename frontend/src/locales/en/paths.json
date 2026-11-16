@@ -26,6 +26,8 @@
   "list": {
     "title": "Knowledge paths",
     "mine": "My knowledge paths",
+    "campaigns": "Campaigns",
+    "fund": "Fund a path",
     "create": "Create new path"
   },
   "byUser": {
@@ -50,6 +52,8 @@
   },
   "create": {
     "title": "Create knowledge path",
+    "fundInstead": "To have the community fund it with Bitcoin Cash,",
+    "fundLink": "propose a campaign.",
     "descriptionRequired": "The description is required.",
     "imageError": "Image: {{message}}",
     "error": "Could not create the knowledge path",
