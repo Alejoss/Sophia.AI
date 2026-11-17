@@ -73,7 +73,7 @@ class ProposalListCreateView(APIView):
         proposals = PathProposal.objects.select_related('author', 'knowledge_path').filter(
             status__in=_PUBLIC_STATUSES,
         )
-        if request.query_params.get('mine') == '1' and request.user.is_authenticated:
+        if request.user.is_authenticated:
             mine = PathProposal.objects.select_related('author', 'knowledge_path').filter(
                 author=request.user,
             )

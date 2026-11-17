@@ -319,7 +319,15 @@
     "listTitle": "Knowledge-path campaigns",
     "create": "New campaign",
     "open": "Open",
-    "empty": "No public campaigns yet.",
+    "empty": "No campaigns yet.",
+    "statuses": {
+      "draft": "Draft",
+      "open": "Open",
+      "funded": "Funded",
+      "claimed": "Claimed",
+      "expired": "Expired",
+      "cancelled": "Cancelled"
+    },
     "loadError": "Could not load the campaigns.",
     "progress": "{{raised}} / {{goal}} sats · {{status}}",
     "createTitle": "Propose a path",
