@@ -97,7 +97,7 @@ const FundingDetail = () => {
           {t('funding.progress', {
             raised: proposal.raised_sats,
             goal: proposal.goal_sats,
-            status: proposal.status,
+            status: t(`funding.statuses.${proposal.status}`, { defaultValue: proposal.status }),
           })}
         </Typography>
         <Typography variant="body2">

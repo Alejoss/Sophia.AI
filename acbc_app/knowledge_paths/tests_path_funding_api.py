@@ -51,10 +51,11 @@ class PathFundingApiTests(TestCase):
         proposal_id = created.data['id']
         self.assertEqual(created.data['status'], 'draft')
 
-        hidden = self.client.get(reverse('knowledge_paths:path-proposal-list'))
-        self.assertEqual(hidden.data, [])
-        mine = self.client.get(reverse('knowledge_paths:path-proposal-list') + '?mine=1')
+        anonymous = APIClient().get(reverse('knowledge_paths:path-proposal-list'))
+        self.assertEqual(anonymous.data, [])
+        mine = self.client.get(reverse('knowledge_paths:path-proposal-list'))
         self.assertEqual(mine.data[0]['id'], proposal_id)
+        self.assertEqual(mine.data[0]['status'], 'draft')
 
         genesis = BchTransaction(
             txid=_txid(4),

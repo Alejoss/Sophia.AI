@@ -319,7 +319,15 @@
     "listTitle": "Campañas de caminos",
     "create": "Nueva campaña",
     "open": "Abrir",
-    "empty": "Todavía no hay campañas públicas.",
+    "empty": "Todavía no hay campañas.",
+    "statuses": {
+      "draft": "Borrador",
+      "open": "Abierta",
+      "funded": "Meta alcanzada",
+      "claimed": "Cobrada",
+      "expired": "Vencida",
+      "cancelled": "Cancelada"
+    },
     "loadError": "No se pudieron cargar las campañas.",
     "progress": "{{raised}} / {{goal}} sats · {{status}}",
     "createTitle": "Proponer un camino",
