@@ -13,12 +13,16 @@ RUN apt-get update -y \
 # Set up working directory
 WORKDIR /app
 
+# Build context is the repository root so the campaign contract can be copied in.
 # Install Python dependencies
-COPY requirements.txt /app/
+COPY acbc_app/requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project files into the Docker image
-COPY . /app
+COPY acbc_app/ /app
+
+# The dev compose file mounts this beside the app. Production has no mount.
+COPY contracts/path-funding/artifact.json /contracts/path-funding/artifact.json
 
 # Record git SHA at build time (invalidates cache when SHA changes; used by deploy.sh)
 ARG BUILD_SHA=unknown
@@ -28,7 +32,7 @@ RUN echo "${BUILD_SHA}" > /app/.build_sha
 RUN mkdir -p /app/logs
 
 # Copy entrypoint script
-COPY entrypoint.sh /app/entrypoint.sh
+COPY acbc_app/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 # Set Python path

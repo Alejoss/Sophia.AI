@@ -14,17 +14,27 @@ vi.mock('../../api/messagesApi', () => ({
 }));
 
 const mockGetProposal = vi.fn();
+const mockFindOpenWallet = vi.hoisted(() => vi.fn());
+const wizardMock = vi.hoisted(() => ({
+  state: 'disconnected',
+  manager: null,
+  error: null,
+  connect: vi.fn(),
+  disconnect: vi.fn(),
+}));
 
 vi.mock('@wizardconnect/react', () => ({
-  useWizardConnect: () => ({
-    state: 'disconnected',
-    manager: null,
-    error: null,
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-  }),
+  useWizardConnect: () => wizardMock,
   WizardConnectQRDialog: () => null,
 }));
+
+vi.mock('../buildCampaignTx', async () => {
+  const actual = await vi.importActual('../buildCampaignTx');
+  return {
+    ...actual,
+    findOpenWallet: (...args) => mockFindOpenWallet(...args),
+  };
+});
 
 vi.mock('../../api/pathFundingApi', () => ({
   default: {
@@ -70,7 +80,27 @@ function renderInvestigation() {
 describe('FundingDetail without a wallet', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    wizardMock.state = 'disconnected';
+    wizardMock.manager = null;
     localStorage.setItem('user', JSON.stringify({ username: 'Vincent' }));
+  });
+
+  it('fills the receive address from the one already saved', async () => {
+    const saved = 'bitcoincash:qzh0xfkuh6qgxmeqt3vqwjjm3qs4ga0gpvffh7kag2';
+    wizardMock.state = 'connected';
+    wizardMock.manager = { on: vi.fn(), off: vi.fn() };
+    mockFindOpenWallet.mockResolvedValue({
+      address: 'bitcoincash:qr9uthgsq5m8j20tleq27xvlqmerallnscwtj5fac7',
+      index: 0,
+      picked: { utxo: { txid: 'ab', vout: 0, satoshis: 5000 } },
+    });
+    mockGetProposal.mockResolvedValue(proposal({
+      status: 'draft',
+      author: 'Vincent',
+      author_payout_address: saved,
+    }));
+    renderInvestigation();
+    expect(await screen.findByLabelText('Dirección de recepción')).toHaveValue(saved);
   });
 
   it('shows the cover image the same way a knowledge path does', async () => {

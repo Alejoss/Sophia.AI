@@ -90,7 +90,7 @@ const FundingDetail = () => {
   const disconnectWallet = async () => {
     pairedHere.current = false;
     setDraftStep('choose');
-    setReceiveAddress('');
+    setReceiveAddress(proposal?.author_payout_address?.trim() || '');
     setWallet(null);
     await wizardRef.current.disconnect();
   };
@@ -100,6 +100,12 @@ const FundingDetail = () => {
   useEffect(() => {
     reload().catch(() => setError(t('funding.loadError')));
   }, [proposalId, t]);
+
+  useEffect(() => {
+    const saved = proposal?.author_payout_address?.trim();
+    if (!saved) return;
+    setReceiveAddress((current) => current || saved);
+  }, [proposal]);
 
   useEffect(() => {
     if (!proposal || proposal.knowledge_path_id) return undefined;

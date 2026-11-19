@@ -1,8 +1,8 @@
 services:
   backend:
     build:
-      context: ./acbc_app
-      dockerfile: backend.Dockerfile
+      context: .
+      dockerfile: acbc_app/backend.Dockerfile
     container_name: acbc_backend
     # Volumes: 
     # - Código montado para desarrollo (hot-reload), en producción el código ya está en la imagen
