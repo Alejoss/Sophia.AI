@@ -1,0 +1,299 @@
+.funding-guide {
+  --guide-orange: #ff6b2c;
+  --guide-ink: #171717;
+  --guide-paper: #f5f2eb;
+  margin: -16px -1rem 0;
+  color: var(--guide-ink);
+  background: var(--guide-paper);
+}
+
+.funding-guide-top {
+  min-height: 168px;
+  display: flex;
+  align-items: flex-end;
+  padding: 42px 28px 36px;
+  background-image:
+    linear-gradient(90deg, rgba(255,255,255,.94) 0%, rgba(255,255,255,.78) 42%, rgba(255,255,255,.28) 100%),
+    url('/images/guides/funding-guide-background.jpg');
+  background-position: center;
+  background-size: cover;
+}
+
+.funding-guide-kicker {
+  margin: 0 0 12px !important;
+  color: var(--guide-orange) !important;
+  font-size: .72rem !important;
+  font-weight: 800 !important;
+  letter-spacing: .18em !important;
+}
+
+.funding-guide-top h1 {
+  max-width: 760px;
+  margin: 0 !important;
+  color: var(--guide-ink) !important;
+  font-size: clamp(1.7rem, 3vw, 2.5rem) !important;
+  font-weight: 680 !important;
+  letter-spacing: -.035em !important;
+  line-height: 1.15 !important;
+}
+
+.funding-guide-hero {
+  padding: 72px 28px 64px;
+  background:
+    linear-gradient(105deg, rgba(17,22,25,.94) 0%, rgba(17,22,25,.88) 48%, rgba(17,22,25,.62) 100%),
+    url('/images/guides/funding-guide-background.jpg');
+  background-position: right center;
+  background-size: cover;
+  color: #f7f3eb;
+}
+
+.funding-guide-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(280px, .95fr);
+  gap: 48px;
+  align-items: center;
+}
+
+.funding-guide-hero h2 {
+  margin: 0 !important;
+  color: #f7f3eb !important;
+  font-size: clamp(2.1rem, 4vw, 3.35rem) !important;
+  font-weight: 680 !important;
+  letter-spacing: -.045em !important;
+  line-height: 1.08 !important;
+}
+
+.funding-guide-hero .funding-guide-intro {
+  max-width: 640px;
+  margin: 22px 0 0 !important;
+  color: #c9c4ba !important;
+  font-size: 1.05rem !important;
+  line-height: 1.7 !important;
+}
+
+.crowd-graph {
+  margin: 0;
+  padding: 22px 22px 18px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(17,22,25,.35);
+}
+
+.crowd-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  color: #f7f3eb;
+  font-size: .95rem;
+  font-weight: 700;
+}
+
+.crowd-track {
+  display: flex;
+  height: 28px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,.16);
+}
+
+.crowd-part-a { width: 34%; background: #ff6b2c; }
+.crowd-part-b { width: 18%; background: #ff9670; }
+.crowd-part-c { width: 12%; background: #ffd0b8; }
+
+.crowd-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  color: #f7f3eb;
+  font-size: .9rem;
+}
+
+.crowd-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 99px;
+}
+
+.crowd-swatch-a { background: #ff6b2c; }
+.crowd-swatch-b { background: #ff9670; }
+.crowd-swatch-c { background: #ffd0b8; }
+.crowd-swatch-open { background: rgba(255,255,255,.28); }
+
+.flow-node {
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.06);
+}
+
+.flow-node strong {
+  display: block;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.pledge-caption {
+  margin: 14px 0 0 !important;
+  color: #c9c4ba !important;
+  font-size: .95rem !important;
+}
+
+.funding-guide-flow,
+.funding-guide-body {
+  padding: 64px 28px;
+}
+
+.funding-guide-flow .pledge-caption {
+  margin-top: 18px !important;
+  color: #625e57 !important;
+}
+
+.funding-guide-flow h2 {
+  margin: 0 0 28px !important;
+  color: var(--guide-ink) !important;
+  font-size: clamp(1.7rem, 3vw, 2.4rem) !important;
+  font-weight: 680 !important;
+  letter-spacing: -.035em !important;
+}
+
+.outcome-graph {
+  display: grid;
+  grid-template-columns: 150px 36px 150px 36px minmax(0, 1fr);
+  align-items: center;
+}
+
+.flow-node {
+  min-height: 74px;
+  padding: 14px 16px;
+  border-color: rgba(23,23,23,.12);
+  background: #fff;
+  color: var(--guide-ink);
+}
+
+.flow-node span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--guide-orange);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.flow-arrow {
+  color: var(--guide-orange);
+  font-size: 1.4rem;
+  text-align: center;
+}
+
+.outcome-branches {
+  display: grid;
+  gap: 14px;
+}
+
+.outcome-branch {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) 22px minmax(0, 1fr) 22px minmax(0, 1fr);
+  align-items: center;
+}
+
+.outcome-branch-goal .flow-node:first-child {
+  box-shadow: inset 3px 0 0 var(--guide-orange);
+}
+
+.outcome-branch-miss .flow-node:first-child {
+  box-shadow: inset 3px 0 0 #171717;
+}
+
+.funding-guide-section {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 18px;
+  padding: 36px 0;
+  border-top: 1px solid rgba(23,23,23,.16);
+}
+
+.funding-guide-number {
+  margin: 8px 0 0 !important;
+  color: var(--guide-orange) !important;
+  font-size: .72rem !important;
+  font-weight: 800 !important;
+  letter-spacing: .15em !important;
+}
+
+.funding-guide-section h3 {
+  margin: 0 0 14px !important;
+  color: var(--guide-ink) !important;
+  font-size: clamp(1.45rem, 2.4vw, 2rem) !important;
+  font-weight: 680 !important;
+  letter-spacing: -.03em !important;
+}
+
+.funding-guide-section p {
+  margin: 0 0 14px !important;
+  color: #625e57 !important;
+  font-size: 1.05rem !important;
+  line-height: 1.75 !important;
+}
+
+.funding-guide-section p:last-child { margin-bottom: 0 !important; }
+
+.funding-guide-takeaway {
+  min-height: 360px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  padding: 64px 28px;
+  background-image:
+    linear-gradient(90deg, rgba(255,250,243,.9), rgba(255,245,232,.55) 70%, rgba(255,245,232,.2)),
+    url('/images/guides/funding-guide-takeaway.jpg');
+  background-position: center;
+  background-size: cover;
+}
+
+.funding-guide-takeaway p {
+  max-width: 720px;
+  margin: 0 !important;
+  padding: 28px 32px;
+  border-left: 4px solid var(--guide-orange);
+  background: rgba(255,250,243,.82);
+  color: var(--guide-ink) !important;
+  font-family: Georgia, 'Times New Roman', serif !important;
+  font-size: clamp(1.35rem, 2.4vw, 1.9rem) !important;
+  font-style: italic;
+  line-height: 1.45 !important;
+}
+
+.funding-guide-footer {
+  padding: 28px;
+  background: var(--guide-orange);
+}
+
+.funding-guide-footer a {
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .funding-guide-hero-grid,
+  .outcome-graph,
+  .outcome-branch {
+    grid-template-columns: 1fr;
+  }
+
+  .flow-arrow { transform: rotate(90deg); padding: 4px 0; }
+  .funding-guide-section { grid-template-columns: 1fr; gap: 8px; }
+}
+
+@media (max-width: 600px) {
+  .funding-guide-top,
+  .funding-guide-hero,
+  .funding-guide-flow,
+  .funding-guide-body,
+  .funding-guide-footer { padding-left: 18px; padding-right: 18px; }
+  .funding-guide-takeaway { padding: 48px 18px; }
+  .funding-guide-takeaway p { padding: 22px; }
+}

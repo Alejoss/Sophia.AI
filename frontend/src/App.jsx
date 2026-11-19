@@ -86,6 +86,7 @@ import FundingList from './funding/FundingList';
 import FundingCreate from './funding/FundingCreate';
 import FundingDetail from './funding/FundingDetail';
 import FundingEdit from './funding/FundingEdit';
+import FundingGuide from './funding/FundingGuide';
 
 import QuizForm from './quizzes/QuizForm';
 import NodeCreate from './knowledgePaths/NodeCreate';
@@ -266,6 +267,7 @@ const AppContent = () => {
               <Route path="" element={<KnowledgePathList />} />
               <Route path="funding" element={<FundingList />} />
               <Route path="funding/new" element={<ProtectedRoute><FundingCreate /></ProtectedRoute>} />
+              <Route path="funding/how" element={<FundingGuide />} />
               <Route path="funding/:proposalId" element={<FundingDetail />} />
               <Route path="funding/:proposalId/edit" element={<ProtectedRoute><FundingEdit /></ProtectedRoute>} />
               <Route path=":pathId" element={<ProtectedRoute><KnowledgePathDetail /></ProtectedRoute>} />
