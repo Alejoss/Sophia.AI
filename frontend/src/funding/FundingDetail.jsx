@@ -36,6 +36,7 @@ import {
 } from './buildCampaignTx';
 import { isValidCashAddr } from './cashaddr';
 import { formatUsdFromSats, useBchUsdRate } from './goalValue';
+import { fundingFill } from './progressBar';
 import { coverObjectPosition } from './coverImage';
 import { rememberFundingWallet } from './fundingWallet';
 
@@ -48,6 +49,66 @@ function visibleFundingError(err, t) {
     return t('funding.notPublished');
   }
   return message || t('funding.saveError');
+}
+
+function GoalBar({ raised, pending, goal }) {
+  const { t } = useTranslation('paths');
+  const fill = fundingFill(raised, pending, goal);
+  if (!(Number(goal) > 0)) return null;
+  return (
+    <Stack direction="row" spacing={1.5} alignItems="center">
+      <Box
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.min(100, Math.round(fill.percent))}
+        aria-label={t('funding.progressBar', { percent: fill.percent })}
+        sx={{
+          position: 'relative',
+          flex: 1,
+          height: 12,
+          borderRadius: 999,
+          overflow: 'hidden',
+          bgcolor: 'action.hover',
+        }}
+      >
+        {fill.waiting > 0 && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: `${fill.confirmed + fill.waiting}%`,
+              borderRadius: 999,
+              backgroundImage: 'repeating-linear-gradient(90deg, rgba(100,108,255,0.72) 0 8px, rgba(100,108,255,0.28) 8px 12px)',
+            }}
+          />
+        )}
+        {fill.confirmed > 0 && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: `${fill.confirmed}%`,
+              borderRadius: 999,
+              background: 'linear-gradient(90deg, #535bf2 0%, #9aa0ff 100%)',
+              boxShadow: '0 0 14px rgba(100, 108, 255, 0.45)',
+            }}
+          />
+        )}
+      </Box>
+      <Typography
+        variant="body2"
+        component="span"
+        sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', minWidth: '3rem', textAlign: 'right' }}
+      >
+        {fill.percent}%
+      </Typography>
+    </Stack>
+  );
 }
 
 const FundingDetail = () => {
@@ -321,6 +382,11 @@ const FundingDetail = () => {
             status: t(`funding.statuses.${proposal.status}`, { defaultValue: proposal.status }),
           })}
         </Typography>
+        <GoalBar
+          raised={proposal.raised_sats}
+          pending={proposal.pending_sats}
+          goal={proposal.goal_sats}
+        />
         <Typography variant="body2">
           {t('funding.by', { author: proposal.author })}
           {proposal.knowledge_path_id && (

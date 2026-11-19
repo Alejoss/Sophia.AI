@@ -41,10 +41,15 @@ const FundingList = () => {
 
   return (
     <Container sx={{ py: 3 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Typography variant="h4">{t('funding.listTitle')}</Typography>
-        <Button component={RouterLink} to="/knowledge_path/funding/new" variant="contained">
-          {t('funding.create')}
+      <Stack spacing={1} sx={{ mb: 2 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="h4">{t('funding.listTitle')}</Typography>
+          <Button component={RouterLink} to="/knowledge_path/funding/new" variant="contained">
+            {t('funding.create')}
+          </Button>
+        </Stack>
+        <Button component={RouterLink} to="/knowledge_path/funding/how" sx={{ alignSelf: 'flex-start', px: 0 }}>
+          {t('funding.guide.link')}
         </Button>
       </Stack>
       {error && <Alert severity="error">{error}</Alert>}

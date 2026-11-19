@@ -330,6 +330,7 @@
     },
     "loadError": "No se pudieron cargar las investigaciones.",
     "progress": "{{raised}} / {{goal}} sats{{goalNote}}{{pendingNote}} · {{status}}",
+    "progressBar": "{{percent}}% de la meta",
     "pending": "{{amount}} sats esperan una confirmación",
     "goalValue": "meta de unos {{amount}}",
     "createTitle": "Proponer una investigación de financiamiento colectivo",
@@ -393,11 +394,11 @@
     "receiveTitle": "Dirección de recepción",
     "receiveContinue": "Continuar",
     "openStepTitle": "Abrir la investigación de financiamiento colectivo",
-    "openStepBody": "La billetera pedirá aprobar un pago. Ese pago crea la moneda del financiamiento y paga la comisión del minero. Esta página lo publica en la red de Bitcoin Cash. No se envía nada hasta que apruebes. El Bitcoin Cash recaudado se paga a la dirección de recepción de abajo.",
-    "openStepBodyTwo": "La billetera pedirá dos aprobaciones. La primera mueve tus monedas para que la investigación pueda empezar. Esta página publica ese pago. La segunda crea la moneda del financiamiento y paga la comisión del minero. Esta página también publica ese pago. No se envía nada hasta que apruebes cada uno.",
+    "openStepBody": "La billetera pedirá aprobar un pago. Ese pago abre la investigación y paga la comisión del minero. Esta página lo publica en la red de Bitcoin Cash. No se envía nada hasta que apruebes. El Bitcoin Cash recaudado se paga a la dirección de recepción de abajo.",
+    "openStepBodyTwo": "La billetera pedirá dos aprobaciones. La primera mueve tus monedas para que la investigación pueda empezar. Esta página publica ese pago. La segunda abre la investigación y paga la comisión del minero. Esta página también publica ese pago. No se envía nada hasta que apruebes cada uno.",
     "approveMove": "Aprueba el primer pago en la billetera. Mueve tus monedas para que la investigación pueda empezar. Esta página lo publicará después de que apruebes.",
     "publishingMove": "El primer pago está firmado. Publicándolo en la red de Bitcoin Cash y esperando a que la red lo vea.",
-    "approveOpen": "Aprueba el pago de apertura en la billetera. Crea la moneda del financiamiento y paga la comisión del minero.",
+    "approveOpen": "Aprueba el pago de apertura en la billetera. Abre la investigación y paga la comisión del minero.",
     "publishingOpen": "El pago de apertura está firmado. Publicándolo en la red de Bitcoin Cash y esperando a que la red lo vea.",
     "notPublished": "La billetera aprobó el pago, pero la red de Bitcoin Cash todavía no lo tiene. Las monedas siguen en la billetera de la comisión.",
     "broadcastRejected": "La red de Bitcoin Cash rechazó el pago firmado. Las monedas siguen en la billetera de la comisión.",
@@ -409,8 +410,8 @@
     "walletTitle": "Billetera del aporte",
     "walletHelp": "Conecta tu billetera con Wizard Connect y pulsa Aportar. Solo esa transacción de Wizard Connect cuenta como aporte. Enviar Bitcoin Cash a una dirección no cuenta.",
     "walletHelpClosed": "Conecta la billetera de Wizard Connect que hizo el aporte. Si ese aporte está confirmado, puedes recuperar el aporte.",
-    "pledgeHow": "Un aporte funciona solo con Wizard Connect. La billetera conectada lo firma, suma los satoshis a la moneda del financiamiento y guarda el comprobante. Un pago de Bitcoin Cash que envíes por tu cuenta no cuenta, y su id de transacción no se puede registrar aquí.",
-    "pledgeWalletNote": "Esta billetera guarda el comprobante de un aporte hecho desde ella. No guarda la moneda del financiamiento ni recibe los fondos recaudados.",
+    "pledgeHow": "Un aporte funciona solo con Wizard Connect. La billetera conectada lo firma, esa cantidad se suma a lo recaudado y la billetera guarda un comprobante. Un pago de Bitcoin Cash que envíes por tu cuenta no cuenta, y su id de transacción no se puede registrar aquí.",
+    "pledgeWalletNote": "Esta billetera guarda el comprobante de un aporte hecho desde ella. No guarda lo recaudado ni lo recibe.",
     "connect": "Conectar billetera",
     "disconnect": "Desconectar",
     "openOnChain": "Abrir la investigación de financiamiento colectivo",
@@ -433,7 +434,7 @@
     "supportSelf": "Esta cuenta recibe los mensajes de soporte.",
     "supportError": "No se pudo enviar el mensaje.",
     "supportBody": "Investigación de financiamiento colectivo: {{title}} ({{id}})\nEstado: {{status}}",
-    "claimed": "El fondo fue cobrado. El Bitcoin Cash recaudado se paga en la dirección de cobro.",
+    "claimed": "El fondo fue cobrado. El Bitcoin Cash recaudado se pagó en la dirección de cobro.",
     "expireTitle": "La fecha límite ya pasó",
     "expireHelp": "La meta no se alcanzó. Hay que cerrar los aportes antes de poder recuperar uno. La billetera paga la comisión del minero. Después de esto ya no se puede aportar.",
     "expire": "Cerrar aportes",
@@ -444,6 +445,90 @@
     "needGenesisCoin": "Esta dirección ya tiene {{sats}} satoshis; las monedas no siguen en camino. Ese pago no puede abrir la investigación porque no es la primera salida de su transacción. Envía más de 3.000 satoshis solo a esta dirección y vuelve a intentarlo.",
     "accessTitle": "Este camino se financió con Bitcoin Cash",
     "accessBody": "El camino de conocimiento terminado queda abierto para todos.",
-    "accessSubmit": "Abrir el camino"
+    "accessSubmit": "Abrir el camino",
+    "guide": {
+      "link": "Cómo funcionan las investigaciones de financiamiento colectivo",
+      "back": "Volver a las investigaciones",
+      "title": "Cómo funcionan las investigaciones de financiamiento colectivo",
+      "intro": "Una investigación de financiamiento colectivo reúne Bitcoin Cash para un trabajo de investigación. Cualquier persona puede verla y aportar, sin una cuenta de Academia Blockchain. Crear una investigación sí requiere una cuenta.",
+      "whatTitle": "Lo que define quien la crea",
+      "whatBody": [
+        "Quien la crea le pone nombre, escribe la presentación, elige una meta en satoshis y una fecha límite. La fecha límite es a las 11:59 p. m. de ese día, en su hora local. La imagen de portada es opcional.",
+        "Guardar un borrador es gratis. La investigación puede recibir aportes solo después de que quien la crea la abre con una billetera de Wizard Connect."
+      ],
+      "pathTitle": "El camino de conocimiento puede llegar después",
+      "pathBody": [
+        "La investigación no necesita un camino de conocimiento. Puede reunir fondos aunque el camino todavía no exista.",
+        "Cuando se alcanza la meta, quien la crea puede enlazar uno de sus caminos de conocimiento. El enlace no oculta el camino ni vende el acceso. El camino terminado queda abierto para todos. Un aporte no es un pase a las lecciones."
+      ],
+      "pledgeTitle": "Cómo funciona un aporte",
+      "pledgeBody": [
+        "Un aporte funciona solo con Wizard Connect. La billetera conectada firma el pago, y esa cantidad se suma a lo que la investigación ha recaudado. La billetera guarda un comprobante del aporte. Enviar Bitcoin Cash a una dirección no cuenta. Pegar el id de esa transacción no lo convierte en un aporte.",
+        "El aporte mínimo es de 10.000 satoshis. La página suma un aporte a la meta después de una confirmación. Hasta entonces, esos satoshis están en espera.",
+        "El número que escribes es el número que aportas. Si es mayor que lo que falta, los satoshis de más se quedan en el fondo. Se pagan junto con el resto cuando se cobra el fondo. Cuando la meta ya se alcanzó, ese aporte no se puede recuperar.",
+        "La billetera que aporta guarda el comprobante. No guarda lo recaudado y no lo recibe cuando se cobra el fondo."
+      ],
+      "openTitle": "Abrir una investigación",
+      "openBody": [
+        "Quien la crea conecta una billetera de Wizard Connect y elige la dirección de cobro. Esa dirección recibe el Bitcoin Cash recaudado cuando se cobra el fondo. Los aportes no se envían ahí.",
+        "La billetera que abre la investigación paga la comisión del minero. Puede ser una dirección distinta de la dirección de cobro.",
+        "La billetera puede pedir dos confirmaciones. La primera mueve las monedas a un pago con el que la investigación puede empezar. La segunda abre la investigación. Cada confirmación paga una comisión de 1.000 satoshis al minero. Otros 1.000 satoshis quedan apartados y vuelven si se cobra el fondo. Si la meta no se alcanza, esos 1.000 satoshis se quedan en la investigación cerrada."
+      ],
+      "fixedTitle": "Lo que ya no se puede cambiar",
+      "fixedBody": [
+        "El pago de apertura registra la meta, la fecha límite y la dirección de cobro. No se pueden cambiar después de abrir la investigación. El título, la presentación y la imagen de portada sí se pueden editar."
+      ],
+      "reachedTitle": "Cuando se alcanza la meta",
+      "reachedBody": [
+        "Quien la crea cobra el fondo desde la página de la investigación. La billetera conectada en ese momento paga una comisión de 1.000 satoshis al minero. El Bitcoin Cash recaudado, incluido lo que supere la meta, se paga en la dirección de cobro elegida al abrir la investigación.",
+        "Después del cobro, la investigación ya no acepta aportes."
+      ],
+      "missedTitle": "Cuando pasa la fecha límite y la meta no se alcanzó",
+      "missedBody": [
+        "Alguien tiene que cerrar los aportes antes de que esta página permita recuperar uno. Cualquier billetera conectada puede hacerlo. La billetera paga la comisión del minero. Después de cerrar los aportes ya no se puede aportar.",
+        "Los satoshis no quedan atrapados si nadie pulsa Cerrar aportes, pero esta página espera ese paso antes de ofrecer Recuperar aporte."
+      ],
+      "reclaimTitle": "Recuperar un aporte",
+      "reclaimBody": [
+        "Usa la misma billetera de Wizard Connect que hizo el aporte. Un aporte se puede recuperar solo después de una confirmación.",
+        "Mientras la investigación sigue abierta, esa billetera puede recuperar el aporte. Después de la fecha límite, primero hay que cerrar los aportes. El monto del aporte vuelve a la billetera. Los 1.000 satoshis del comprobante pagan la comisión del minero de esa recuperación."
+      ],
+      "kicker": "BITCOIN CASH",
+      "thesis": "Las investigaciones de financiamiento colectivo abren el conocimiento colaborativo.",
+      "takeaway": "El Bitcoin Cash recaudado se paga en la dirección de cobro solo cuando se cobra el fondo. Hasta entonces, permanece en la investigación.",
+      "diagram": {
+        "wallet": "Billetera de Wizard Connect",
+        "coin": "Moneda del financiamiento",
+        "receipt": "El comprobante se queda aquí",
+        "adds": "Suma los satoshis",
+        "keeps": "Guarda el comprobante",
+        "notAddress": "Un pago a una dirección no cuenta",
+        "flowTitle": "Cómo termina",
+        "open": "Abrir",
+        "pledges": "Aportes",
+        "goal": "Se alcanza la meta",
+        "claim": "Cobrar el fondo",
+        "cashout": "Dirección de cobro",
+        "missed": "Pasa la fecha y falta la meta",
+        "close": "Cerrar aportes",
+        "reclaim": "Recuperar el aporte",
+        "sameWallet": "Para recuperar el aporte se usa la misma billetera que lo hizo.",
+        "confirmed": "Confirmado",
+        "waiting": "En espera",
+        "locked": "Queda fijo",
+        "editable": "Se puede editar",
+        "goalLabel": "Meta",
+        "deadlineLabel": "Fecha límite",
+        "titleLabel": "Título",
+        "pitchLabel": "Presentación",
+        "coverLabel": "Portada",
+        "raised": "Reunido hasta ahora",
+        "stillOpen": "Todavía falta",
+        "onePerson": "Una persona",
+        "secondPerson": "Otra persona",
+        "thirdPerson": "Una más",
+        "crowdCaption": "Cada aporte acerca la investigación a su meta."
+      }
+    }
   }
 }

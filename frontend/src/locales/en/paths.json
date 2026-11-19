@@ -330,6 +330,7 @@
     },
     "loadError": "Could not load the crowdfunded investigations.",
     "progress": "{{raised}} / {{goal}} sats{{goalNote}}{{pendingNote}} · {{status}}",
+    "progressBar": "{{percent}}% of the goal",
     "pending": "{{amount}} sats are waiting for a confirmation",
     "goalValue": "goal about {{amount}}",
     "createTitle": "Propose a crowdfunded investigation",
@@ -393,11 +394,11 @@
     "receiveTitle": "Receive address",
     "receiveContinue": "Continue",
     "openStepTitle": "Open the crowdfunded investigation",
-    "openStepBody": "The wallet will ask you to approve one payment. That payment creates the crowdfunding coin and pays the miner fee. This page then publishes it to the Bitcoin Cash network. Nothing is sent until you approve. The raised Bitcoin Cash will be paid to the receive address below.",
-    "openStepBodyTwo": "The wallet will ask twice. The first approval moves your coins so the investigation can start. This page publishes that payment. The second approval creates the crowdfunding coin and pays the miner fee. This page publishes that payment too. Nothing is sent until you approve each one.",
+    "openStepBody": "The wallet will ask you to approve one payment. That payment starts the investigation and pays the miner fee. This page then publishes it to the Bitcoin Cash network. Nothing is sent until you approve. The raised Bitcoin Cash will be paid to the receive address below.",
+    "openStepBodyTwo": "The wallet will ask twice. The first approval moves your coins so the investigation can start. This page publishes that payment. The second approval starts the investigation and pays the miner fee. This page publishes that payment too. Nothing is sent until you approve each one.",
     "approveMove": "Approve the first payment in the wallet. It moves your coins so the investigation can start. This page will publish it after you approve.",
     "publishingMove": "The first payment is signed. Publishing it to the Bitcoin Cash network, then waiting until the network can see it.",
-    "approveOpen": "Approve the opening payment in the wallet. It creates the crowdfunding coin and pays the miner fee.",
+    "approveOpen": "Approve the opening payment in the wallet. It starts the investigation and pays the miner fee.",
     "publishingOpen": "The opening payment is signed. Publishing it to the Bitcoin Cash network, then waiting until the network can see it.",
     "notPublished": "The wallet approved the payment, but the Bitcoin Cash network does not have it yet. The coins are still in the fee wallet.",
     "broadcastRejected": "The Bitcoin Cash network rejected the signed payment. The coins are still in the fee wallet.",
@@ -409,8 +410,8 @@
     "walletTitle": "Pledge wallet",
     "walletHelp": "Connect your wallet with Wizard Connect and press Pledge. Only that Wizard Connect transaction counts as a pledge. Sending Bitcoin Cash to an address does not.",
     "walletHelpClosed": "Connect the Wizard Connect wallet that made the pledge. If that pledge is confirmed, you can reclaim the pledge.",
-    "pledgeHow": "A pledge works only through Wizard Connect. The connected wallet signs it, adds the satoshis to the crowdfunding coin, and keeps the receipt. A Bitcoin Cash payment you send on your own does not count, and its transaction id cannot be recorded here.",
-    "pledgeWalletNote": "This wallet holds the receipt for a pledge made from it. It does not hold the crowdfunding coin, and it does not receive the raised funds.",
+    "pledgeHow": "A pledge works only through Wizard Connect. The connected wallet signs it, that amount is added to the total raised, and the wallet keeps a receipt. A Bitcoin Cash payment you send on your own does not count, and its transaction id cannot be recorded here.",
+    "pledgeWalletNote": "This wallet holds the receipt for a pledge made from it. It does not hold the raised funds, and it does not receive them.",
     "connect": "Connect wallet",
     "disconnect": "Disconnect",
     "openOnChain": "Open the crowdfunded investigation",
@@ -433,7 +434,7 @@
     "supportSelf": "This account receives support messages.",
     "supportError": "The message could not be sent.",
     "supportBody": "Crowdfunded investigation: {{title}} ({{id}})\nStatus: {{status}}",
-    "claimed": "The pool was claimed. The raised Bitcoin Cash is paid to the payout address.",
+    "claimed": "The pool was claimed. The raised Bitcoin Cash was paid to the payout address.",
     "expireTitle": "The deadline has passed",
     "expireHelp": "The goal was not reached. Close pledges before a pledge can be reclaimed. The wallet pays the miner fee. A new pledge is no longer possible after this.",
     "expire": "Close pledges",
@@ -444,6 +445,90 @@
     "needGenesisCoin": "This address already has {{sats}} satoshis, so the coins are not still on the way. That payment cannot open the investigation because it is not the first output of its transaction. Send more than 3,000 satoshis to this address as the only recipient, then try again.",
     "accessTitle": "This path was funded with Bitcoin Cash",
     "accessBody": "The finished knowledge path is open to everyone.",
-    "accessSubmit": "Open the path"
+    "accessSubmit": "Open the path",
+    "guide": {
+      "link": "How crowdfunded investigations work",
+      "back": "Back to crowdfunded investigations",
+      "title": "How crowdfunded investigations work",
+      "intro": "A crowdfunded investigation collects Bitcoin Cash for a piece of research. Anyone can read an open investigation and pledge. No Academia Blockchain account is required for that. Creating an investigation does require an account.",
+      "whatTitle": "What the creator sets up",
+      "whatBody": [
+        "The creator names the investigation, writes the pitch, chooses a goal in satoshis, and picks a deadline. The deadline is 11:59 PM on that date, in the creator's local time. A cover image is optional.",
+        "Saving a draft is free. The investigation can receive pledges only after the creator opens it with a Wizard Connect wallet."
+      ],
+      "pathTitle": "A knowledge path can come later",
+      "pathBody": [
+        "The investigation does not need a knowledge path. It can collect funds while the path does not exist yet.",
+        "When the goal is reached, the creator can link one of their knowledge paths. The link does not hide the path and does not sell access to it. The finished path stays open to everyone. A pledge is not a pass into the lessons."
+      ],
+      "pledgeTitle": "How a pledge works",
+      "pledgeBody": [
+        "A pledge works only through Wizard Connect. The connected wallet signs the payment, and that amount is added to what the investigation has raised. The wallet keeps a receipt of the pledge. Sending Bitcoin Cash to an address does not count. Pasting that transaction id does not turn it into a pledge.",
+        "The smallest pledge is 10,000 satoshis. The page counts a pledge toward the goal after one confirmation. Until then, those satoshis are waiting.",
+        "The number you type is the number you pledge. If it is more than what is still missing, the extra satoshis stay in the pool. They are paid out with the rest when the pool is claimed. After the goal is reached, that pledge cannot be reclaimed.",
+        "The wallet that pledges keeps the receipt. It does not hold the raised funds, and it does not receive them when the pool is claimed."
+      ],
+      "openTitle": "Opening an investigation",
+      "openBody": [
+        "The creator connects a Wizard Connect wallet and chooses the cashout address. That address receives the raised Bitcoin Cash when the pool is claimed. Pledges are not sent to it.",
+        "The wallet that opens the investigation pays the miner fee. It can be a different address from the cashout address.",
+        "The wallet may ask twice. The first approval moves the coins into a payment the investigation can start from. The second starts the investigation. Each approval pays a miner fee of 1,000 satoshis. Another 1,000 satoshis are set aside and come back if the pool is claimed. If the goal is missed, those 1,000 satoshis stay with the closed investigation."
+      ],
+      "fixedTitle": "What stays fixed",
+      "fixedBody": [
+        "The opening payment records the goal, the deadline, and the cashout address. They cannot be changed after the investigation is open. The title, the pitch, and the cover image can still be edited."
+      ],
+      "reachedTitle": "When the goal is reached",
+      "reachedBody": [
+        "The creator claims the pool from the investigation page. The wallet connected at that moment pays a miner fee of 1,000 satoshis. The raised Bitcoin Cash, including any amount above the goal, is paid to the cashout address chosen when the investigation was opened.",
+        "After the claim, the investigation no longer accepts pledges."
+      ],
+      "missedTitle": "When the deadline passes and the goal was missed",
+      "missedBody": [
+        "Someone has to close pledges before this page can reclaim one. Any connected wallet can do that. The wallet pays the miner fee. After pledges are closed, a new pledge is no longer possible.",
+        "The satoshis are not stuck if nobody presses Close pledges, but this page waits for that step before it offers Reclaim pledge."
+      ],
+      "reclaimTitle": "Reclaiming a pledge",
+      "reclaimBody": [
+        "Use the same Wizard Connect wallet that made the pledge. A pledge can be reclaimed only after it has one confirmation.",
+        "While the investigation is still open, that wallet can reclaim the pledge. After the deadline, close pledges first. The pledge amount comes back to the wallet. The receipt's 1,000 satoshis pay the miner fee for the reclaim."
+      ],
+      "kicker": "BITCOIN CASH",
+      "thesis": "Crowdfunded investigations unlock collaborative knowledge.",
+      "takeaway": "The raised Bitcoin Cash is paid to the cashout address only when the pool is claimed. Until then, it stays with the investigation.",
+      "diagram": {
+        "wallet": "Wizard Connect wallet",
+        "coin": "Crowdfunding coin",
+        "receipt": "The receipt stays here",
+        "adds": "Adds the satoshis",
+        "keeps": "Keeps the receipt",
+        "notAddress": "A payment to an address does not count",
+        "flowTitle": "How it ends",
+        "open": "Open",
+        "pledges": "Pledges",
+        "goal": "The goal is reached",
+        "claim": "Claim the pool",
+        "cashout": "Cashout address",
+        "missed": "The deadline passes short",
+        "close": "Close pledges",
+        "reclaim": "Reclaim the pledge",
+        "sameWallet": "Reclaiming uses the same wallet that made the pledge.",
+        "confirmed": "Confirmed",
+        "waiting": "Waiting",
+        "locked": "Stays fixed",
+        "editable": "Can still change",
+        "goalLabel": "Goal",
+        "deadlineLabel": "Deadline",
+        "titleLabel": "Title",
+        "pitchLabel": "Pitch",
+        "coverLabel": "Cover",
+        "raised": "Raised so far",
+        "stillOpen": "Still open",
+        "onePerson": "One person",
+        "secondPerson": "A second person",
+        "thirdPerson": "A third person",
+        "crowdCaption": "Each pledge brings the investigation closer to its goal."
+      }
+    }
   }
 }

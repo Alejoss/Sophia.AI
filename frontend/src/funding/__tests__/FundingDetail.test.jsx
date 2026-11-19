@@ -119,6 +119,7 @@ describe('FundingDetail without a wallet', () => {
   it('offers a pledge while the deadline is still ahead', async () => {
     mockGetProposal.mockResolvedValue(proposal({ pending_sats: 10000 }));
     renderInvestigation();
+    expect(await screen.findByRole('progressbar', { name: '0% de la meta' })).toHaveAttribute('aria-valuenow', '0');
     expect(await screen.findByRole('button', { name: 'Aportar' })).toBeInTheDocument();
     expect(screen.getByText(/10000 sats esperan una confirmación/)).toBeInTheDocument();
     expect(screen.getByText(/meta de unos/i)).toBeInTheDocument();
