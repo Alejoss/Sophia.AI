@@ -283,8 +283,8 @@ def confirm_pledge(
         )
         if pledge.status != PathPledge.STATUS_PENDING:
             raise ProposalError('Only a pending pledge can be confirmed.')
-        moment = _aware(at)
-        _require_accepting_pledges(locked, moment)
+        # A confirmation records a pledge that was already made. Closing the
+        # campaign does not erase it, and the pledger can still reclaim it.
         pledge.status = PathPledge.STATUS_CONFIRMED
         pledge.save(update_fields=['status', 'updated_at'])
         _sync_raised_and_maybe_fund(locked)

@@ -85,6 +85,35 @@ describe('FundingDetail without a wallet', () => {
     expect(screen.queryByRole('button', { name: 'Cobrar el fondo' })).not.toBeInTheDocument();
   });
 
+  it('tells a pledger to reclaim after pledges are closed', async () => {
+    mockGetProposal.mockResolvedValue(proposal({
+      status: 'expired',
+      raised_sats: 0,
+      pending_sats: 10000,
+    }));
+    renderInvestigation();
+    expect(await screen.findByText(/puedes recuperar el aporte/)).toBeInTheDocument();
+    expect(screen.queryByText(/pulsa Aportar/)).not.toBeInTheDocument();
+  });
+
+  it('shows a reclaimed pledge as finished', async () => {
+    mockGetProposal.mockResolvedValue(proposal({
+      status: 'expired',
+      raised_sats: 0,
+      pledges: [{
+        id: 2,
+        amount_sats: 10000,
+        status: 'refunded',
+        wallet_address: 'bitcoincash:qr9uthgsq5m8j20tleq27xvlqmerallnscwtj5fac7',
+      }],
+    }));
+    renderInvestigation();
+    const reclaimed = await screen.findByRole('button', { name: 'El aporte fue recuperado.' });
+    expect(reclaimed).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Recuperar aporte' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Contactar soporte' })).toBeInTheDocument();
+  });
+
   it('lets the owner claim once the goal is reached', async () => {
     mockGetProposal.mockResolvedValue(proposal({
       status: 'funded',

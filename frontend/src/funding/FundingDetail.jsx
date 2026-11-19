@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Button,
+  CircularProgress,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   MenuItem,
   Paper,
   Stack,
@@ -14,7 +19,10 @@ import {
 import { useWizardConnect, WizardConnectQRDialog } from '@wizardconnect/react';
 import pathFundingApi from '../api/pathFundingApi';
 import knowledgePathsApi from '../api/knowledgePathsApi';
+import { fetchOrCreateThread, sendMessage } from '../api/messagesApi';
+import { useAuth } from '../context/AuthContext';
 import { getUserFromLocalStorage } from '../context/localStorageUtils';
+import { MONERO_CONTACT_USER_ID } from '../payments/moneroPayment';
 import {
   claimTx,
   expireTx,
@@ -237,6 +245,7 @@ const FundingDetail = () => {
   const ownPledge = proposal.pledges?.find((pledge) => (
     wallet && pledge.wallet_address === wallet.address && pledge.status === 'confirmed'
   ));
+  const reclaimedPledges = (proposal.pledges || []).filter((pledge) => pledge.status === 'refunded');
   const draftPhase = wizard.state !== 'connected'
     ? 'connect'
     : !wallet
@@ -417,7 +426,9 @@ const FundingDetail = () => {
             <Stack spacing={1.5} alignItems="flex-start">
               <Typography variant="h6">{t('funding.walletTitle')}</Typography>
               <Typography variant="body2" color="text.secondary">
-                {walletReady ? wallet.address : t('funding.walletHelp')}
+                {walletReady
+                  ? wallet.address
+                  : t(proposal.status === 'expired' ? 'funding.walletHelpClosed' : 'funding.walletHelp')}
               </Typography>
               {walletReady && (
                 <Typography variant="caption" color="text.secondary">{t('funding.pledgeWalletNote')}</Typography>
@@ -516,6 +527,12 @@ const FundingDetail = () => {
           </Paper>
         )}
 
+        {reclaimedPledges.map((pledge) => (
+          <Button key={pledge.id} variant="outlined" disabled>
+            {t('funding.refunded')}
+          </Button>
+        ))}
+
         {ownPledge && (proposal.status === 'expired' || pledgesOpen) && (
           <Button
             variant="outlined"
@@ -602,6 +619,7 @@ const FundingDetail = () => {
             </Typography>
           ))}
         </Stack>
+        {proposal.status !== 'draft' && <FundingSupport proposal={proposal} />}
       </Stack>
 
       {wizard.uri && wizard.qrUri && (
@@ -615,5 +633,77 @@ const FundingDetail = () => {
     </Container>
   );
 };
+
+function FundingSupport({ proposal }) {
+  const { t } = useTranslation('paths');
+  const navigate = useNavigate();
+  const { authState } = useAuth();
+  const userId = Number(authState?.user?.id);
+  const isSelf = userId === MONERO_CONTACT_USER_ID;
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const send = async () => {
+    const text = note.trim();
+    if (busy || isSelf || !text) return;
+    setBusy(true);
+    setError('');
+    try {
+      const threadRes = await fetchOrCreateThread(MONERO_CONTACT_USER_ID);
+      const thread = threadRes?.data;
+      if (!thread?.id) throw new Error(t('funding.supportError'));
+      const status = t(`funding.statuses.${proposal.status}`, { defaultValue: proposal.status });
+      await sendMessage(thread.id, [
+        t('funding.supportBody', { title: proposal.title, id: proposal.id, status }),
+        text,
+      ].join('\n\n'));
+      setOpen(false);
+      setNote('');
+      navigate(`/messages/thread/${MONERO_CONTACT_USER_ID}`);
+    } catch (err) {
+      setError(err?.response?.data?.detail || err?.message || t('funding.supportError'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Button variant="text" onClick={() => setOpen(true)}>{t('funding.support')}</Button>
+      <Dialog open={open} onClose={() => !busy && setOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>{t('funding.supportTitle')}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography variant="body2" color="text.secondary">{t('funding.supportHelp')}</Typography>
+            {isSelf && <Alert severity="info">{t('funding.supportSelf')}</Alert>}
+            {error && <Alert severity="error">{error}</Alert>}
+            <TextField
+              label={t('funding.supportNote')}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              multiline
+              minRows={3}
+              fullWidth
+              disabled={busy || isSelf}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)} disabled={busy}>{t('common.cancel')}</Button>
+          <Button
+            variant="contained"
+            disabled={busy || isSelf || !note.trim()}
+            onClick={send}
+            startIcon={busy ? <CircularProgress size={16} color="inherit" /> : null}
+          >
+            {t('funding.supportSend')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
 
 export default FundingDetail;

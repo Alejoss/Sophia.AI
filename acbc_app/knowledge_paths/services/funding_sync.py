@@ -83,9 +83,14 @@ def sync_proposal(proposal: PathProposal, *, client=None) -> PathProposal:
             exc_info=True,
         )
         return proposal
-    for tx in reversed(list(transactions)):
-        apply_transaction(proposal, tx)
-        proposal.refresh_from_db()
+    ordered = list(reversed(list(transactions)))
+    for _ in range(len(ordered) + 1):
+        before = (proposal.campaign_txid, proposal.campaign_vout)
+        for tx in ordered:
+            apply_transaction(proposal, tx)
+            proposal.refresh_from_db()
+        if (proposal.campaign_txid, proposal.campaign_vout) == before:
+            break
     return proposal
 
 
@@ -166,15 +171,7 @@ def _record_refunds(proposal: PathProposal, tx: BchTransaction) -> None:
         if output.token and output.token.commitment
     }
     for spent in tx.inputs:
-        if not _is_receipt(proposal, spent.token):
-            continue
-        if (spent.token.category, spent.token.commitment) in surviving:
-            continue
-        pledge = PathPledge.objects.filter(
-            proposal=proposal,
-            nft_txid=spent.txid,
-            nft_vout=spent.vout,
-        ).first()
+        pledge = _pledge_spent_by(proposal, spent, surviving)
         if pledge is None:
             continue
         try:
@@ -183,7 +180,36 @@ def _record_refunds(proposal: PathProposal, tx: BchTransaction) -> None:
             logger.info('Refund %s did not apply to pledge %s', tx.txid, pledge.pk)
 
 
+def _pledge_spent_by(proposal: PathProposal, spent, surviving: set) -> PathPledge | None:
+    """Match a spent receipt. Some nodes omit the token on a spent input."""
+    if _is_receipt(proposal, spent.token):
+        if (spent.token.category, spent.token.commitment) in surviving:
+            return None
+        return PathPledge.objects.filter(
+            proposal=proposal,
+            nft_txid=spent.txid,
+            nft_vout=spent.vout,
+        ).first()
+    if not spent.txid or spent.vout is None:
+        return None
+    return PathPledge.objects.filter(
+        proposal=proposal,
+        nft_txid=spent.txid,
+        nft_vout=spent.vout,
+        status=PathPledge.STATUS_CONFIRMED,
+    ).first()
+
+
 def _apply_campaign_output(proposal: PathProposal, tx: BchTransaction, output) -> None:
+    # A transaction that spends some other coin is an older campaign state.
+    # Re-reading it must not move the page back to a coin that was already spent.
+    if tx.inputs and proposal.campaign_txid:
+        spends_current = any(
+            spent.txid == proposal.campaign_txid and spent.vout == proposal.campaign_vout
+            for spent in tx.inputs
+        )
+        if not spends_current:
+            return
     proposal.campaign_txid = tx.txid
     proposal.campaign_vout = output.vout
     fields = ['campaign_txid', 'campaign_vout', 'updated_at']

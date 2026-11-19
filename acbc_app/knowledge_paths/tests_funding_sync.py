@@ -172,6 +172,30 @@ class FundingSyncTests(TestCase):
         self.assertEqual(self.proposal.raised_sats, 0)
         self.assertEqual(self.proposal.status, PathProposal.STATUS_OPEN)
 
+    def test_a_refund_without_input_token_data_still_returns_the_pledge(self):
+        apply_transaction(self.proposal, self._pledge_tx(_txid(2), 10000))
+        pledge = PathPledge.objects.get()
+        refund = _tx(
+            _txid(4),
+            outputs=[
+                BchTxOutput(
+                    address=CONTRACT,
+                    amount_sats=1000,
+                    vout=0,
+                    token=BchTokenInfo(CATEGORY, 'minting', '00'),
+                ),
+                BchTxOutput(address=WALLET, amount_sats=10000, vout=1),
+            ],
+            inputs=[
+                BchTxInput(txid=pledge.nft_txid, vout=pledge.nft_vout),
+            ],
+        )
+        apply_transaction(self.proposal, refund)
+        pledge.refresh_from_db()
+        self.proposal.refresh_from_db()
+        self.assertEqual(pledge.status, PathPledge.STATUS_REFUNDED)
+        self.assertEqual(self.proposal.raised_sats, 0)
+
     def test_a_refund_after_the_deadline_waits_until_the_campaign_is_expired(self):
         apply_transaction(self.proposal, self._pledge_tx(_txid(2), 10000))
         pledge = PathPledge.objects.get()

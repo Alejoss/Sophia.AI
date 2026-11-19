@@ -22,7 +22,11 @@ from knowledge_paths.services.funding_contract import (
     load_artifact,
 )
 from knowledge_paths.services.funding_spend import campaign_snapshot, claim_spend, refund_spend
-from knowledge_paths.services.funding_sync import apply_transaction, refresh_recorded_payments
+from knowledge_paths.services.funding_sync import (
+    apply_transaction,
+    refresh_recorded_payments,
+    sync_proposal,
+)
 from knowledge_paths.services.proposal_service import (
     ProposalError,
     create_draft,
@@ -139,7 +143,10 @@ class ProposalDetailView(APIView):
 
     def get(self, request, proposal_id):
         proposal = _get_visible(request, proposal_id)
-        proposal = refresh_recorded_payments(proposal)
+        if proposal.contract_address:
+            proposal = sync_proposal(proposal)
+        else:
+            proposal = refresh_recorded_payments(proposal)
         return Response(_payload(proposal, include_pledges=True))
 
     def patch(self, request, proposal_id):

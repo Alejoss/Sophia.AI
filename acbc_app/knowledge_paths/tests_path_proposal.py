@@ -222,12 +222,15 @@ class PathProposalStateTests(TestCase):
         with self.assertRaises(ProposalError):
             claim_proposal(proposal, settlement_txid=_txid(5))
 
-    def test_confirm_after_the_campaign_leaves_open_is_rejected(self):
+    def test_a_pledge_confirms_after_the_campaign_is_closed(self):
         proposal = self._open()
         proposal, pledge = self._pledge(proposal, confirmations=0)
         proposal = expire_if_due(proposal, at=self.deadline + timedelta(seconds=1))
-        with self.assertRaises(ProposalError):
-            confirm_pledge(pledge.proposal, pledge, confirmations=1, at=self.deadline)
+        proposal = confirm_pledge(proposal, pledge, confirmations=1, at=self.deadline)
+        pledge.refresh_from_db()
+        self.assertEqual(pledge.status, PathPledge.STATUS_CONFIRMED)
+        self.assertEqual(proposal.status, PathProposal.STATUS_EXPIRED)
+        self.assertEqual(proposal.raised_sats, 40_000)
 
     def test_duplicate_pledge_output_is_rejected(self):
         proposal = self._open()
