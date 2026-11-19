@@ -18,6 +18,12 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
+from content.image_utils import (
+    delete_proposal_image_preview,
+    generate_proposal_image_preview,
+    validate_cover_image_size,
+    validate_image_bytes,
+)
 from knowledge_paths.models import KnowledgePath, PathPledge, PathProposal
 from payments.bch_cashaddr import CashAddrError, normalize_cashaddr
 
@@ -152,6 +158,37 @@ def update_proposal(
         return locked
 
 
+def set_proposal_cover(
+    proposal: PathProposal,
+    uploaded_file,
+    *,
+    focal_x=None,
+    focal_y=None,
+) -> PathProposal:
+    """Store a cover the same way a knowledge path stores one."""
+    _require_cover_file(uploaded_file)
+    delete_proposal_image_preview(proposal, save=False)
+    if proposal.image:
+        proposal.image.delete(save=False)
+    proposal.image = uploaded_file
+    if focal_x is not None:
+        proposal.image_focal_x = _focal(focal_x)
+    if focal_y is not None:
+        proposal.image_focal_y = _focal(focal_y)
+    proposal.save()
+    generate_proposal_image_preview(proposal)
+    proposal.refresh_from_db()
+    return proposal
+
+
+def set_proposal_focal(proposal: PathProposal, *, focal_x, focal_y) -> PathProposal:
+    """Move the cover focus without replacing the image."""
+    proposal.image_focal_x = _focal(focal_x)
+    proposal.image_focal_y = _focal(focal_y)
+    proposal.save(update_fields=['image_focal_x', 'image_focal_y', 'updated_at'])
+    return proposal
+
+
 def set_author_payout(proposal: PathProposal, author_payout_address: str) -> PathProposal:
     """Store the claim address while the investigation is still a draft."""
     payout = _require_cashaddr(author_payout_address)
@@ -237,7 +274,16 @@ def record_pledge(
     with transaction.atomic():
         locked = _lock(proposal)
         moment = _aware(at)
-        _require_accepting_pledges(locked, moment, enforce_deadline=enforce_deadline)
+        if enforce_deadline:
+            _require_accepting_pledges(locked, moment)
+        elif locked.status not in (
+            PathProposal.STATUS_OPEN,
+            PathProposal.STATUS_EXPIRED,
+            PathProposal.STATUS_FUNDED,
+        ):
+            # The chain indexer can arrive after pledges have closed. The
+            # pledge already happened, so it still has to be recorded.
+            raise ProposalError('Pledges are accepted only while the campaign is open.')
         if PathPledge.objects.filter(pledge_txid=pledge_txid, vout=vout).exists():
             raise ProposalError('That pledge output is already recorded.')
         if PathPledge.objects.filter(nft_txid=nft_txid, nft_vout=nft_vout).exists():
@@ -428,6 +474,29 @@ def _aware_deadline(deadline: datetime) -> datetime:
     if deadline is None or timezone.is_naive(deadline):
         raise ProposalError('Deadline must be timezone-aware.')
     return deadline.astimezone(dt_timezone.utc).replace(microsecond=0)
+
+
+def _require_cover_file(uploaded_file) -> None:
+    if uploaded_file is None:
+        raise ProposalError('Choose a cover image.')
+    try:
+        validate_cover_image_size(uploaded_file)
+        uploaded_file.seek(0)
+        data = uploaded_file.read()
+        uploaded_file.seek(0)
+        validate_image_bytes(data)
+    except ValueError as exc:
+        raise ProposalError(str(exc)) from exc
+
+
+def _focal(value) -> float:
+    try:
+        point = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ProposalError('The cover focus must be a number from 0 to 1.') from exc
+    if point < 0 or point > 1:
+        raise ProposalError('The cover focus must be a number from 0 to 1.')
+    return point
 
 
 def _positive_sats(value: int, label: str) -> int:

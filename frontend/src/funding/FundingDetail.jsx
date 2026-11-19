@@ -3,6 +3,7 @@ import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
+  Box,
   Button,
   CircularProgress,
   Container,
@@ -35,6 +36,7 @@ import {
 } from './buildCampaignTx';
 import { isValidCashAddr } from './cashaddr';
 import { formatUsdFromSats, useBchUsdRate } from './goalValue';
+import { coverObjectPosition } from './coverImage';
 import { rememberFundingWallet } from './fundingWallet';
 
 function visibleFundingError(err, t) {
@@ -260,6 +262,39 @@ const FundingDetail = () => {
   return (
     <Container sx={{ py: 3 }}>
       <Stack spacing={2}>
+        <Paper elevation={3} sx={{ borderRadius: 3, overflow: 'hidden' }}>
+          {proposal.image ? (
+            <Box
+              component="img"
+              src={proposal.image}
+              alt={proposal.title}
+              loading="eager"
+              sx={{
+                width: '100%',
+                height: { xs: 200, md: 300 },
+                objectFit: 'cover',
+                objectPosition: coverObjectPosition(proposal.image_focal_x, proposal.image_focal_y),
+                display: 'block',
+              }}
+            />
+          ) : (
+            <Box
+              sx={{
+                width: '100%',
+                height: { xs: 200, md: 300 },
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: { xs: '4rem', md: '6rem' },
+                color: 'white',
+                fontWeight: 700,
+              }}
+            >
+              {(proposal.title || 'K').charAt(0).toUpperCase()}
+            </Box>
+          )}
+        </Paper>
         <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
           <Typography variant="h4">{proposal.title}</Typography>
           {isAuthor && (
@@ -644,6 +679,7 @@ function FundingSupport({ proposal }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  if (!authState?.isAuthenticated) return null;
 
   const send = async () => {
     const text = note.trim();

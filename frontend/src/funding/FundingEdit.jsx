@@ -19,12 +19,15 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import pathFundingApi from '../api/pathFundingApi';
+import ImageUploadModal from '../components/ImageUploadModal';
 import { getUserFromLocalStorage } from '../context/localStorageUtils';
 import { useDateLocales } from '../hooks/useDateLocales';
 import i18n from '../i18n';
 import { deadlineWithTimezone } from './FundingCreate';
 import { isValidCashAddr } from './cashaddr';
+import { coverObjectPosition } from './coverImage';
 
 const SATS_PER_BCH = 100_000_000;
 
@@ -78,6 +81,7 @@ const FundingEditForm = ({ proposal, onSaved }) => {
   const [generalError, setGeneralError] = useState('');
   const [notice, setNotice] = useState('');
   const [usdPerBch, setUsdPerBch] = useState(null);
+  const [coverOpen, setCoverOpen] = useState(false);
   const {
     register,
     control,
@@ -122,6 +126,18 @@ const FundingEditForm = ({ proposal, onSaved }) => {
     return t('funding.goalUsd', { amount: formatted });
   };
 
+  const saveCover = async (payload) => {
+    setGeneralError('');
+    setNotice('');
+    try {
+      const updated = await pathFundingApi.updateProposal(proposal.id, payload);
+      onSaved(updated);
+      setNotice(t('funding.saved'));
+    } catch (err) {
+      setGeneralError(err?.response?.data?.error || t('funding.saveError'));
+    }
+  };
+
   const onSubmit = async (form) => {
     setGeneralError('');
     setNotice('');
@@ -163,6 +179,60 @@ const FundingEditForm = ({ proposal, onSaved }) => {
             <Stack spacing={2.5}>
               {generalError && <Alert severity="error">{generalError}</Alert>}
               {notice && <Alert severity="success">{notice}</Alert>}
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'flex-start' }}>
+                <Box
+                  sx={{
+                    width: { xs: '100%', sm: 280 },
+                    height: 158,
+                    borderRadius: 2,
+                    bgcolor: 'grey.300',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                  }}
+                >
+                  {proposal.image ? (
+                    <Box
+                      component="img"
+                      src={proposal.image}
+                      alt={proposal.title || t('edit.coverAlt')}
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        objectPosition: coverObjectPosition(proposal.image_focal_x, proposal.image_focal_y),
+                      }}
+                    />
+                  ) : (
+                    <Box
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '3rem',
+                        color: 'text.secondary',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {(proposal.title || 'K').charAt(0).toUpperCase()}
+                    </Box>
+                  )}
+                </Box>
+                <Box>
+                  <Button
+                    variant="outlined"
+                    startIcon={<PhotoCameraIcon />}
+                    onClick={() => setCoverOpen(true)}
+                    sx={{ textTransform: 'none', borderRadius: 2, mb: 1 }}
+                  >
+                    {t('edit.changeCover')}
+                  </Button>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {t('edit.coverHint')}
+                  </Typography>
+                </Box>
+              </Stack>
               <TextField
                 label={t('common.title')}
                 {...register('title')}
@@ -244,6 +314,23 @@ const FundingEditForm = ({ proposal, onSaved }) => {
           </Box>
         </CardContent>
       </Card>
+      <ImageUploadModal
+        open={coverOpen}
+        handleClose={() => setCoverOpen(false)}
+        handleImageUpload={(file, focalX, focalY) => saveCover({
+          image: file,
+          image_focal_x: focalX,
+          image_focal_y: focalY,
+        })}
+        existingImageUrl={proposal.image}
+        existingFocalX={proposal.image_focal_x ?? 0.5}
+        existingFocalY={proposal.image_focal_y ?? 0.5}
+        onFocalOnlyUpdate={(focalX, focalY) => saveCover({
+          image_focal_x: focalX,
+          image_focal_y: focalY,
+        })}
+        entityLabel={t('funding.coverEntity')}
+      />
     </Container>
   );
 };

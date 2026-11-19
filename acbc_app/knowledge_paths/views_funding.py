@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -34,9 +35,12 @@ from knowledge_paths.services.proposal_service import (
     network_cashaddr_prefix,
     open_proposal,
     set_author_payout,
+    set_proposal_cover,
+    set_proposal_focal,
     update_proposal,
 )
 from payments.bch_client import BchApiError, BchTransaction, build_bch_client
+from content.utils import build_media_url
 
 class _PublicJWTAuthentication(JWTAuthentication):
     """A rejected login token leaves the visitor anonymous. It does not hide a public page."""
@@ -101,6 +105,7 @@ class ProposalContractView(APIView):
 
 class ProposalListCreateView(APIView):
     authentication_classes = [_PublicJWTAuthentication]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_permissions(self):
         if self.request.method == 'POST':
@@ -116,9 +121,11 @@ class ProposalListCreateView(APIView):
                 author=request.user,
             )
             proposals = (proposals | mine).distinct()
-        return Response([_payload(item) for item in proposals.order_by('-created_at')])
+        return Response([_payload(item, request) for item in proposals.order_by('-created_at')])
 
     def post(self, request):
+        uploaded = request.FILES.get('image')
+        proposal = None
         try:
             proposal = create_draft(
                 author=request.user,
@@ -128,13 +135,23 @@ class ProposalListCreateView(APIView):
                 deadline=_as_deadline(request.data.get('deadline')),
                 author_payout_address=request.data.get('author_payout_address') or '',
             )
+            if uploaded:
+                proposal = set_proposal_cover(
+                    proposal,
+                    uploaded,
+                    focal_x=request.data.get('image_focal_x'),
+                    focal_y=request.data.get('image_focal_y'),
+                )
         except ProposalError as exc:
+            if uploaded and proposal is not None:
+                proposal.delete()
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(_payload(proposal), status=status.HTTP_201_CREATED)
+        return Response(_payload(proposal, request), status=status.HTTP_201_CREATED)
 
 
 class ProposalDetailView(APIView):
     authentication_classes = [_PublicJWTAuthentication]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_permissions(self):
         if self.request.method == 'PATCH':
@@ -147,7 +164,7 @@ class ProposalDetailView(APIView):
             proposal = sync_proposal(proposal)
         else:
             proposal = refresh_recorded_payments(proposal)
-        return Response(_payload(proposal, include_pledges=True))
+        return Response(_payload(proposal, request, include_pledges=True))
 
     def patch(self, request, proposal_id):
         proposal = get_object_or_404(PathProposal, pk=proposal_id, author=request.user)
@@ -177,9 +194,23 @@ class ProposalDetailView(APIView):
                 )
             if 'knowledge_path_id' in request.data:
                 proposal = link_knowledge_path(proposal, request.data.get('knowledge_path_id'))
+            uploaded = request.FILES.get('image')
+            if uploaded:
+                proposal = set_proposal_cover(
+                    proposal,
+                    uploaded,
+                    focal_x=request.data.get('image_focal_x'),
+                    focal_y=request.data.get('image_focal_y'),
+                )
+            elif 'image_focal_x' in request.data or 'image_focal_y' in request.data:
+                proposal = set_proposal_focal(
+                    proposal,
+                    focal_x=request.data.get('image_focal_x', proposal.image_focal_x),
+                    focal_y=request.data.get('image_focal_y', proposal.image_focal_y),
+                )
         except ProposalError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(_payload(proposal, include_pledges=True))
+        return Response(_payload(proposal, request, include_pledges=True))
 
 
 class ProposalCampaignView(APIView):
@@ -230,7 +261,7 @@ class ProposalOpenView(APIView):
             return _chain_error(exc)
         except ProposalError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(_payload(proposal))
+        return Response(_payload(proposal, request))
 
 
 class ProposalPledgeView(APIView):
@@ -253,7 +284,7 @@ class ProposalPledgeView(APIView):
                 pledge_txid=tx.txid,
                 user__isnull=True,
             ).update(user=request.user)
-        return Response(_payload(proposal, include_pledges=True))
+        return Response(_payload(proposal, request, include_pledges=True))
 
 
 class ProposalRefundView(APIView):
@@ -303,7 +334,17 @@ def _get_visible(request, proposal_id) -> PathProposal:
     return get_object_or_404(PathProposal, pk=0)
 
 
-def _payload(proposal: PathProposal, *, include_pledges: bool = False) -> dict:
+def _proposal_image_urls(proposal: PathProposal, request) -> tuple[str | None, str | None]:
+    image = build_media_url(proposal.image, request) if proposal.image else None
+    preview = build_media_url(proposal.image_preview, request) if proposal.image_preview else None
+    if preview and proposal.updated_at:
+        sep = '&' if '?' in preview else '?'
+        preview = f'{preview}{sep}t={int(proposal.updated_at.timestamp())}'
+    return image, preview
+
+
+def _payload(proposal: PathProposal, request, *, include_pledges: bool = False) -> dict:
+    image, preview = _proposal_image_urls(proposal, request)
     data = {
         'id': proposal.pk,
         'status': proposal.status,
@@ -320,6 +361,10 @@ def _payload(proposal: PathProposal, *, include_pledges: bool = False) -> dict:
         'deadline': proposal.deadline.isoformat(),
         'author': proposal.author.username,
         'author_payout_address': proposal.author_payout_address,
+        'image': image,
+        'image_preview': preview,
+        'image_focal_x': proposal.image_focal_x,
+        'image_focal_y': proposal.image_focal_y,
         'network_prefix': network_cashaddr_prefix(),
         'knowledge_path_id': proposal.knowledge_path_id,
         'contract_address': proposal.contract_address,

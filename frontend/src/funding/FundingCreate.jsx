@@ -18,6 +18,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import pathFundingApi from '../api/pathFundingApi';
 import { applyApiErrorsToForm } from '../utils/apiFormErrors';
 import { useDateLocales } from '../hooks/useDateLocales';
@@ -90,6 +91,8 @@ const FundingCreate = () => {
   const [generalError, setGeneralError] = useState(null);
   const [deadlineValue, setDeadlineValue] = useState(null);
   const [usdPerBch, setUsdPerBch] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const {
     register,
     control,
@@ -102,6 +105,14 @@ const FundingCreate = () => {
     defaultValues,
   });
   const goalSats = watch('goal_sats');
+  const titleValue = watch('title');
+
+  const handleImageUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setSelectedImage(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
 
   useEffect(() => {
     let active = true;
@@ -136,6 +147,7 @@ const FundingCreate = () => {
         pitch: form.pitch.trim(),
         goal_sats: Number(form.goal_sats),
         deadline: deadlineWithTimezone(form.deadline),
+        ...(selectedImage ? { image: selectedImage } : {}),
       });
       navigate(`/knowledge_path/funding/${created.id}`);
     } catch (err) {
@@ -166,6 +178,70 @@ const FundingCreate = () => {
                   {generalError}
                 </Alert>
               )}
+              <Box>
+                <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                  {t('create.cover')}
+                </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'flex-start' }}>
+                  <Box
+                    sx={{
+                      width: { xs: '100%', sm: 240 },
+                      height: 135,
+                      borderRadius: 2,
+                      bgcolor: 'grey.300',
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {imagePreview ? (
+                      <Box
+                        component="img"
+                        src={imagePreview}
+                        alt={t('edit.coverAlt')}
+                        sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '3rem',
+                          color: 'text.secondary',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {titleValue ? titleValue.charAt(0).toUpperCase() : 'K'}
+                      </Box>
+                    )}
+                  </Box>
+                  <Box>
+                    <input
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      id="funding-cover-upload"
+                      type="file"
+                      onChange={handleImageUpload}
+                    />
+                    <label htmlFor="funding-cover-upload">
+                      <Button
+                        component="span"
+                        variant="outlined"
+                        startIcon={<PhotoCameraIcon />}
+                        disabled={isSubmitting}
+                        sx={{ textTransform: 'none', borderRadius: 2 }}
+                      >
+                        {t('create.uploadCover')}
+                      </Button>
+                    </label>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                      {t('create.coverHint')}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
               <TextField
                 label={t('common.title')}
                 {...register('title')}

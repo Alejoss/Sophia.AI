@@ -196,6 +196,89 @@ class FundingSyncTests(TestCase):
         self.assertEqual(pledge.status, PathPledge.STATUS_REFUNDED)
         self.assertEqual(self.proposal.raised_sats, 0)
 
+    def test_a_spent_receipt_without_a_repayment_stays_confirmed(self):
+        apply_transaction(self.proposal, self._pledge_tx(_txid(2), 10000))
+        pledge = PathPledge.objects.get()
+        moved = _tx(
+            _txid(4),
+            outputs=[
+                BchTxOutput(address=WALLET, amount_sats=1000, vout=0),
+            ],
+            inputs=[BchTxInput(txid=pledge.nft_txid, vout=pledge.nft_vout)],
+        )
+        apply_transaction(self.proposal, moved)
+        pledge.refresh_from_db()
+        self.proposal.refresh_from_db()
+        self.assertEqual(pledge.status, PathPledge.STATUS_CONFIRMED)
+        self.assertEqual(self.proposal.raised_sats, 10000)
+
+    def test_a_pledge_is_indexed_after_the_campaign_is_expired(self):
+        self.proposal.status = PathProposal.STATUS_EXPIRED
+        self.proposal.save(update_fields=['status', 'updated_at'])
+        apply_transaction(self.proposal, self._pledge_tx(_txid(2), 10000))
+        pledge = PathPledge.objects.get()
+        self.proposal.refresh_from_db()
+        self.assertEqual(pledge.status, PathPledge.STATUS_CONFIRMED)
+        self.assertEqual(self.proposal.status, PathProposal.STATUS_EXPIRED)
+        self.assertEqual(self.proposal.raised_sats, 10000)
+
+    def test_an_older_transaction_does_not_move_the_campaign_backward(self):
+        pledge = self._pledge_tx(_txid(2), 10000)
+        pledge.inputs = [BchTxInput(txid=_txid(1), vout=0)]
+        apply_transaction(self.proposal, pledge)
+        self.proposal.refresh_from_db()
+        self.assertEqual(self.proposal.campaign_txid, _txid(2))
+
+        older = _tx(
+            _txid(1),
+            outputs=[
+                BchTxOutput(
+                    address=CONTRACT,
+                    amount_sats=1000,
+                    vout=0,
+                    token=BchTokenInfo(CATEGORY, 'minting', '00'),
+                ),
+            ],
+            inputs=[BchTxInput(txid=_txid(9), vout=0)],
+        )
+        apply_transaction(self.proposal, older)
+        self.proposal.refresh_from_db()
+        self.assertEqual(self.proposal.campaign_txid, _txid(2))
+        self.assertEqual(self.proposal.campaign_vout, 0)
+        self.assertEqual(self.proposal.raised_sats, 10000)
+
+    def test_sync_records_a_refund_when_history_is_not_oldest_first(self):
+        pledge_tx = self._pledge_tx(_txid(2), 10000)
+        pledge_tx.inputs = [BchTxInput(txid=_txid(1), vout=0)]
+        refund_tx = _tx(
+            _txid(4),
+            outputs=[
+                BchTxOutput(
+                    address=CONTRACT,
+                    amount_sats=1000,
+                    vout=0,
+                    token=BchTokenInfo(CATEGORY, 'minting', '00'),
+                ),
+                BchTxOutput(address=WALLET, amount_sats=10000, vout=1),
+            ],
+            inputs=[
+                BchTxInput(txid=_txid(2), vout=0),
+                BchTxInput(txid=_txid(2), vout=1),
+            ],
+        )
+
+        class FakeChain:
+            def list_recent_transactions(self, address, limit=25):
+                return [pledge_tx, refund_tx]
+
+        sync_proposal(self.proposal, client=FakeChain())
+        pledge = PathPledge.objects.get()
+        self.proposal.refresh_from_db()
+        self.assertEqual(pledge.status, PathPledge.STATUS_REFUNDED)
+        self.assertEqual(pledge.refund_txid, _txid(4))
+        self.assertEqual(self.proposal.raised_sats, 0)
+        self.assertEqual(self.proposal.campaign_txid, _txid(4))
+
     def test_a_refund_after_the_deadline_waits_until_the_campaign_is_expired(self):
         apply_transaction(self.proposal, self._pledge_tx(_txid(2), 10000))
         pledge = PathPledge.objects.get()

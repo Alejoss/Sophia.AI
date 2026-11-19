@@ -1,5 +1,15 @@
 import axiosInstance from './axiosConfig';
 
+function proposalBody(payload) {
+  if (!(payload?.image instanceof File)) return payload;
+  const formData = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    formData.append(key, value instanceof File ? value : String(value));
+  });
+  return formData;
+}
+
 const pathFundingApi = {
   listProposals: async ({ mine = false } = {}) => {
     const response = await axiosInstance.get('/knowledge_paths/proposals/', {
@@ -36,7 +46,7 @@ const pathFundingApi = {
   },
 
   createProposal: async (payload) => {
-    const response = await axiosInstance.post('/knowledge_paths/proposals/', payload);
+    const response = await axiosInstance.post('/knowledge_paths/proposals/', proposalBody(payload));
     return response.data;
   },
 
@@ -51,7 +61,7 @@ const pathFundingApi = {
   updateProposal: async (proposalId, payload) => {
     const response = await axiosInstance.patch(
       `/knowledge_paths/proposals/${proposalId}/`,
-      payload,
+      proposalBody(payload),
     );
     return response.data;
   },

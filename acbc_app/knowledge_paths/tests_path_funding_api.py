@@ -1,11 +1,15 @@
+import io
+import tempfile
 from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 from rest_framework.test import APIClient
 
 from knowledge_paths.models import PathPledge, PathProposal
@@ -28,6 +32,12 @@ CATEGORY = 'ab' * 32
 
 def _txid(byte: int) -> str:
     return f'{byte:02x}' * 32
+
+
+def _png():
+    buffer = io.BytesIO()
+    Image.new('RGB', (32, 18), (20, 40, 80)).save(buffer, format='PNG')
+    return SimpleUploadedFile('cover.png', buffer.getvalue(), content_type='image/png')
 
 
 class FakeChain:
@@ -121,6 +131,53 @@ class PathFundingApiTests(TestCase):
         self.assertEqual(saved.data['pitch'], 'Revised pitch')
         self.assertEqual(saved.data['goal_sats'], 30000)
         self.assertEqual(saved.data['author_payout_address'], PAYOUT)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_a_cover_image_is_stored_with_a_preview_and_a_focus(self):
+        self.client.force_authenticate(self.author)
+        created = self.client.post(
+            reverse('knowledge_paths:path-proposal-list'),
+            {
+                'title': 'Covered',
+                'pitch': 'Pitch',
+                'goal_sats': 20000,
+                'deadline': self.deadline.isoformat(),
+                'image': _png(),
+            },
+        )
+        self.assertEqual(created.status_code, 201, created.data)
+        self.assertIn(f'proposal_{created.data["id"]}_', created.data['image'])
+        self.assertIn('preview.webp', created.data['image_preview'])
+        self.assertEqual(created.data['image_focal_x'], 0.5)
+        self.assertEqual(created.data['image_focal_y'], 0.5)
+
+        moved = self.client.patch(
+            reverse('knowledge_paths:path-proposal-detail', args=[created.data['id']]),
+            {'image_focal_x': 0.2, 'image_focal_y': 0.8},
+            format='json',
+        )
+        self.assertEqual(moved.status_code, 200, moved.data)
+        self.assertEqual(moved.data['image_focal_x'], 0.2)
+        self.assertEqual(moved.data['image_focal_y'], 0.8)
+        self.assertEqual(moved.data['title'], 'Covered')
+
+        too_big = SimpleUploadedFile(
+            'big.png',
+            b'x' * (3 * 1024 * 1024 + 1),
+            content_type='image/png',
+        )
+        rejected = self.client.post(
+            reverse('knowledge_paths:path-proposal-list'),
+            {
+                'title': 'Too big',
+                'pitch': 'Pitch',
+                'goal_sats': 20000,
+                'deadline': self.deadline.isoformat(),
+                'image': too_big,
+            },
+        )
+        self.assertEqual(rejected.status_code, 400, rejected.data)
+        self.assertFalse(PathProposal.objects.filter(frozen_title='Too big').exists())
 
     def test_bch_price_returns_the_client_rate(self):
         fake = FakeChain({})

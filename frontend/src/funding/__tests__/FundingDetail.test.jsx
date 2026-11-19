@@ -1,8 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import FundingDetail from '../FundingDetail';
-import { renderWithProviders } from '../../test/formTestUtils';
+import { renderWithProviders, unauthenticatedAuth } from '../../test/formTestUtils';
+
+const mockThread = vi.fn();
+const mockSend = vi.fn();
+
+vi.mock('../../api/messagesApi', () => ({
+  fetchOrCreateThread: (...args) => mockThread(...args),
+  sendMessage: (...args) => mockSend(...args),
+}));
 
 const mockGetProposal = vi.fn();
 
@@ -52,6 +61,7 @@ function renderInvestigation() {
   return renderWithProviders(
     <Routes>
       <Route path="/knowledge_path/funding/:proposalId" element={<FundingDetail />} />
+      <Route path="/messages/thread/:userId" element={<div>thread</div>} />
     </Routes>,
     { route: '/knowledge_path/funding/4' },
   );
@@ -61,6 +71,19 @@ describe('FundingDetail without a wallet', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.setItem('user', JSON.stringify({ username: 'Vincent' }));
+  });
+
+  it('shows the cover image the same way a knowledge path does', async () => {
+    mockGetProposal.mockResolvedValue(proposal({
+      image: 'http://localhost/media/cover.jpg',
+      image_preview: 'http://localhost/media/cover-preview.webp',
+      image_focal_x: 0.2,
+      image_focal_y: 0.8,
+    }));
+    renderInvestigation();
+    const cover = await screen.findByRole('img', { name: 'Crowdfunded investigation' });
+    expect(cover).toHaveAttribute('src', 'http://localhost/media/cover.jpg');
+    expect(cover).toHaveStyle({ objectPosition: '20.0% 80.0%' });
   });
 
   it('offers a pledge while the deadline is still ahead', async () => {
@@ -112,6 +135,35 @@ describe('FundingDetail without a wallet', () => {
     expect(reclaimed).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Recuperar aporte' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Contactar soporte' })).toBeInTheDocument();
+  });
+
+  it('sends a support message about this investigation to user 2', async () => {
+    mockThread.mockResolvedValue({ data: { id: 9 } });
+    mockSend.mockResolvedValue({});
+    mockGetProposal.mockResolvedValue(proposal({ status: 'expired' }));
+    renderInvestigation();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Contactar soporte' }));
+    await user.type(screen.getByLabelText('Mensaje'), 'El aporte no aparece');
+    await user.click(screen.getByRole('button', { name: 'Enviar' }));
+    await waitFor(() => expect(mockThread).toHaveBeenCalledWith(2));
+    expect(mockSend).toHaveBeenCalledWith(
+      9,
+      expect.stringContaining('Crowdfunded investigation'),
+    );
+    expect(mockSend.mock.calls[0][1]).toContain('El aporte no aparece');
+  });
+
+  it('hides contact support until someone is signed in', async () => {
+    mockGetProposal.mockResolvedValue(proposal({ status: 'expired' }));
+    renderWithProviders(
+      <Routes>
+        <Route path="/knowledge_path/funding/:proposalId" element={<FundingDetail />} />
+      </Routes>,
+      { route: '/knowledge_path/funding/4', auth: unauthenticatedAuth() },
+    );
+    expect(await screen.findByText('Crowdfunded investigation')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Contactar soporte' })).not.toBeInTheDocument();
   });
 
   it('lets the owner claim once the goal is reached', async () => {

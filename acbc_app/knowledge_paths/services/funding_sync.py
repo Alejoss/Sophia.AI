@@ -174,6 +174,8 @@ def _record_refunds(proposal: PathProposal, tx: BchTransaction) -> None:
         pledge = _pledge_spent_by(proposal, spent, surviving)
         if pledge is None:
             continue
+        if spent.token is None and not _pays_pledge_back(tx, pledge):
+            continue
         try:
             refund_pledge(proposal, pledge, refund_txid=tx.txid)
         except ProposalError:
@@ -198,6 +200,14 @@ def _pledge_spent_by(proposal: PathProposal, spent, surviving: set) -> PathPledg
         nft_vout=spent.vout,
         status=PathPledge.STATUS_CONFIRMED,
     ).first()
+
+
+def _pays_pledge_back(tx: BchTransaction, pledge: PathPledge) -> bool:
+    """A node that omits the receipt token must still show the sats going back."""
+    return any(
+        output.token is None and output.amount_sats == pledge.amount_sats
+        for output in tx.outputs
+    )
 
 
 def _apply_campaign_output(proposal: PathProposal, tx: BchTransaction, output) -> None:

@@ -202,3 +202,18 @@ def generate_knowledge_path_image_preview(knowledge_path, save=True):
 
 def delete_knowledge_path_image_preview(knowledge_path, save=False):
     delete_image_field(knowledge_path, 'image_preview', save=save)
+
+
+def generate_proposal_image_preview(proposal, save=True):
+    return save_listing_preview_from_field(
+        proposal,
+        'image',
+        'image_preview',
+        f'proposal_{proposal.id}_preview.webp',
+        save=save,
+        log_context=f'proposal_id={proposal.id}',
+    )
+
+
+def delete_proposal_image_preview(proposal, save=False):
+    delete_image_field(proposal, 'image_preview', save=save)
