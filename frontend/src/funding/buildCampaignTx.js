@@ -127,9 +127,9 @@ export function cashscriptArgs(constructorArgs) {
   return [BigInt(proposalId), BigInt(goalSats), BigInt(deadline), authorLockingBytecode];
 }
 
-function inputPaths(inputs, addressIndex) {
-  return inputs.map((input) => (
-    input.unlocker?.contract ? [0, 'receive', 0] : [0, 'receive', addressIndex]
+export function inputPaths(inputs, addressIndex) {
+  return inputs.flatMap((input, index) => (
+    input.unlocker?.contract ? [] : [[index, 'receive', addressIndex]]
   ));
 }
 
@@ -156,20 +156,55 @@ export function relaySignTransaction(wcObject) {
   };
 }
 
+function describeSignRequest(relayTx, paths, prompt) {
+  return {
+    prompt,
+    inputPaths: paths,
+    transactionHex: relayTx.transaction,
+    sourceOutputs: (relayTx.sourceOutputs || []).map((output) => ({
+      outpointTransactionHash: output.outpointTransactionHash,
+      outpointIndex: output.outpointIndex,
+      valueSatoshis: output.valueSatoshis,
+      lockingBytecode: output.lockingBytecode,
+      token: output.token || null,
+      contractFunction: output.contract?.abiFunction?.name || '',
+      redeemScript: output.contract?.redeemScript || '',
+    })),
+  };
+}
+
 async function walletSign(manager, builder, addressIndex, prompt) {
   const wcObject = builder.generateWcTransactionObject({
     broadcast: true,
     userPrompt: prompt,
   });
-  const response = await manager.signTransaction({
-    transaction: relaySignTransaction(wcObject),
-    inputPaths: inputPaths(builder.inputs, addressIndex),
-  });
-  if (response?.error) {
-    throw new Error(response.error);
+  const paths = inputPaths(builder.inputs, addressIndex);
+  const relayTx = relaySignTransaction(wcObject);
+  const request = describeSignRequest(relayTx, paths, prompt);
+  console.info('[funding] wallet sign request', request);
+  try {
+    const response = await manager.signTransaction({
+      transaction: relayTx,
+      inputPaths: paths,
+    });
+    console.info('[funding] wallet sign response', {
+      prompt,
+      error: response?.error || '',
+      signedTransaction: response?.signedTransaction || '',
+    });
+    if (response?.error) {
+      throw new Error(response.error);
+    }
+    const rawHex = response.signedTransaction;
+    return { txid: txidFromRaw(rawHex), rawHex };
+  } catch (err) {
+    console.error('[funding] wallet sign failed', {
+      prompt,
+      message: err?.message,
+      request,
+    });
+    throw err;
   }
-  const rawHex = response.signedTransaction;
-  return { txid: txidFromRaw(rawHex), rawHex };
 }
 
 export async function prepareOpenCoinTx({

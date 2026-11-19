@@ -4,13 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Button, CircularProgress, Container, Paper, Stack, Typography } from '@mui/material';
 import pathFundingApi from '../api/pathFundingApi';
 import { AuthContext } from '../context/AuthContext';
+import { formatUsdFromSats, useBchUsdRate } from './goalValue';
 
 const FundingList = () => {
-  const { t } = useTranslation('paths');
+  const { t, i18n } = useTranslation('paths');
   const { authState, authInitialized } = useContext(AuthContext);
   const [proposals, setProposals] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const usdPerBch = useBchUsdRate();
 
   useEffect(() => {
     if (!authInitialized) return undefined;
@@ -31,6 +33,11 @@ const FundingList = () => {
     };
   }, [authInitialized, authState.isAuthenticated, t]);
 
+  const goalNote = (goalSats) => {
+    const amount = formatUsdFromSats(goalSats, usdPerBch, i18n.language);
+    return amount ? ` · ${t('funding.goalValue', { amount })}` : '';
+  };
+
   return (
     <Container sx={{ py: 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
@@ -49,6 +56,10 @@ const FundingList = () => {
               {t('funding.progress', {
                 raised: proposal.raised_sats,
                 goal: proposal.goal_sats,
+                goalNote: goalNote(proposal.goal_sats),
+                pendingNote: Number(proposal.pending_sats) > 0
+                  ? ` · ${t('funding.pending', { amount: proposal.pending_sats })}`
+                  : '',
                 status: t(`funding.statuses.${proposal.status}`, { defaultValue: proposal.status }),
               })}
             </Typography>

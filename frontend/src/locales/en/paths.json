@@ -328,7 +328,9 @@
       "cancelled": "Cancelled"
     },
     "loadError": "Could not load the crowdfunded investigations.",
-    "progress": "{{raised}} / {{goal}} sats · {{status}}",
+    "progress": "{{raised}} / {{goal}} sats{{goalNote}}{{pendingNote}} · {{status}}",
+    "pending": "{{amount}} sats are waiting for a confirmation",
+    "goalValue": "goal about {{amount}}",
     "createTitle": "Propose a crowdfunded investigation",
     "createHelp": "Saving a draft is free. On the next page, connect the WizardConnect wallet that holds the satoshis and pays the miner fee.",
     "titlePlaceholder": "Name the investigation",

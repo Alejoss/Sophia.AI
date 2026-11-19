@@ -9,6 +9,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from knowledge_paths.models import PathPledge, PathProposal
+from knowledge_paths.services.funding_sync import apply_transaction
 from knowledge_paths.services.proposal_service import create_draft, open_proposal
 from payments.bch_cashaddr import encode_cashaddr
 from payments.bch_client import (
@@ -392,6 +393,63 @@ class PathFundingApiTests(TestCase):
             )
         self.assertEqual(recorded.status_code, 200, recorded.data)
         self.assertEqual(chain.raw_tx, 'cd' * 40)
+
+    def test_an_unconfirmed_pledge_is_shown_and_counts_after_one_confirmation(self):
+        proposal = open_proposal(
+            create_draft(
+                author=self.author,
+                title='Open',
+                pitch='Open',
+                goal_sats=10000,
+                deadline=self.deadline,
+                author_payout_address=PAYOUT,
+            ),
+            campaign_txid=_txid(1),
+            campaign_vout=0,
+            token_category=CATEGORY,
+            at=self.deadline - timedelta(days=1),
+        )
+        receipt = proposal.pk.to_bytes(8, 'little').hex() + (10000).to_bytes(8, 'little').hex()
+        tx = BchTransaction(
+            txid=_txid(5),
+            timestamp=1,
+            confirmations=0,
+            outputs=[
+                BchTxOutput(
+                    address=PAYOUT,
+                    amount_sats=11000,
+                    vout=0,
+                    token=BchTokenInfo(CATEGORY, 'minting', '01'),
+                ),
+                BchTxOutput(
+                    address=WALLET,
+                    amount_sats=1000,
+                    vout=1,
+                    token=BchTokenInfo(CATEGORY, 'none', receipt),
+                ),
+            ],
+        )
+        apply_transaction(proposal, tx)
+
+        class Chain:
+            def get_transaction(self, txid, **kwargs):
+                return tx
+
+        detail = reverse('knowledge_paths:path-proposal-detail', args=[proposal.pk])
+        with patch('knowledge_paths.services.funding_sync.build_bch_client', return_value=Chain()):
+            waiting = self.client.get(detail)
+        self.assertEqual(waiting.status_code, 200, waiting.data)
+        self.assertEqual(waiting.data['raised_sats'], 0)
+        self.assertEqual(waiting.data['pending_sats'], 10000)
+        self.assertEqual(waiting.data['status'], 'open')
+
+        tx.confirmations = 1
+        with patch('knowledge_paths.services.funding_sync.build_bch_client', return_value=Chain()):
+            confirmed = self.client.get(detail)
+        self.assertEqual(confirmed.status_code, 200, confirmed.data)
+        self.assertEqual(confirmed.data['raised_sats'], 10000)
+        self.assertEqual(confirmed.data['pending_sats'], 0)
+        self.assertEqual(confirmed.data['status'], 'funded')
 
     def test_a_missing_opening_payment_does_not_dump_node_errors(self):
         self.client.force_authenticate(self.author)

@@ -20,6 +20,7 @@ vi.mock('@wizardconnect/react', () => ({
 vi.mock('../../api/pathFundingApi', () => ({
   default: {
     getProposal: (...args) => mockGetProposal(...args),
+    getBchUsdRate: () => Promise.resolve({ usd_per_bch: '500' }),
   },
 }));
 
@@ -63,9 +64,12 @@ describe('FundingDetail without a wallet', () => {
   });
 
   it('offers a pledge while the deadline is still ahead', async () => {
-    mockGetProposal.mockResolvedValue(proposal());
+    mockGetProposal.mockResolvedValue(proposal({ pending_sats: 10000 }));
     renderInvestigation();
     expect(await screen.findByRole('button', { name: 'Aportar' })).toBeInTheDocument();
+    expect(screen.getByText(/10000 sats esperan una confirmación/)).toBeInTheDocument();
+    expect(screen.getByText(/meta de unos/i)).toBeInTheDocument();
+    expect(screen.getByText(/60,00/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cerrar aportes' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Editar' })).toBeInTheDocument();
   });
@@ -90,6 +94,19 @@ describe('FundingDetail without a wallet', () => {
     expect(await screen.findByRole('button', { name: 'Cobrar el fondo' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aportar' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cerrar aportes' })).not.toBeInTheDocument();
+  });
+
+  it('hides the pledge wallet after the pool is claimed', async () => {
+    mockGetProposal.mockResolvedValue(proposal({
+      status: 'claimed',
+      raised_sats: 10000,
+      goal_sats: 10000,
+    }));
+    renderInvestigation();
+    expect(await screen.findByText('Crowdfunded investigation')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Conectar billetera' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Billetera del aporte')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Aportar' })).not.toBeInTheDocument();
   });
 
   it('hides the claim from a visitor', async () => {

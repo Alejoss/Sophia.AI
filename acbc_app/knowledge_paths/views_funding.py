@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -21,7 +22,7 @@ from knowledge_paths.services.funding_contract import (
     load_artifact,
 )
 from knowledge_paths.services.funding_spend import campaign_snapshot, claim_spend, refund_spend
-from knowledge_paths.services.funding_sync import apply_transaction
+from knowledge_paths.services.funding_sync import apply_transaction, refresh_recorded_payments
 from knowledge_paths.services.proposal_service import (
     ProposalError,
     create_draft,
@@ -138,6 +139,7 @@ class ProposalDetailView(APIView):
 
     def get(self, request, proposal_id):
         proposal = _get_visible(request, proposal_id)
+        proposal = refresh_recorded_payments(proposal)
         return Response(_payload(proposal, include_pledges=True))
 
     def patch(self, request, proposal_id):
@@ -302,6 +304,12 @@ def _payload(proposal: PathProposal, *, include_pledges: bool = False) -> dict:
         'pitch': proposal.frozen_pitch or (proposal.knowledge_path.description if proposal.knowledge_path_id else ''),
         'goal_sats': proposal.goal_sats,
         'raised_sats': proposal.raised_sats,
+        'pending_sats': (
+            proposal.pledges.filter(status=PathPledge.STATUS_PENDING)
+            .aggregate(total=Sum('amount_sats'))
+            .get('total')
+            or 0
+        ),
         'deadline': proposal.deadline.isoformat(),
         'author': proposal.author.username,
         'author_payout_address': proposal.author_payout_address,

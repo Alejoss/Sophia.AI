@@ -44,6 +44,31 @@ def sync_open_proposals(*, client=None) -> int:
     return synced
 
 
+def refresh_recorded_payments(proposal: PathProposal, *, client=None) -> PathProposal:
+    """Re-read unconfirmed pledges so one confirmation updates the total."""
+    txids = list(dict.fromkeys(
+        proposal.pledges.filter(status=PathPledge.STATUS_PENDING)
+        .exclude(pledge_txid='')
+        .values_list('pledge_txid', flat=True)
+    ))
+    if not txids:
+        return proposal
+    chain = client or build_bch_client()
+    for txid in txids:
+        try:
+            tx = chain.get_transaction(txid)
+        except BchApiError:
+            logger.info(
+                'Could not refresh pledge %s for proposal %s',
+                txid,
+                proposal.pk,
+            )
+            continue
+        apply_transaction(proposal, tx)
+        proposal.refresh_from_db()
+    return proposal
+
+
 def sync_proposal(proposal: PathProposal, *, client=None) -> PathProposal:
     """Read recent transactions for one campaign address, oldest first."""
     if not proposal.contract_address:

@@ -328,7 +328,9 @@
       "cancelled": "Cancelada"
     },
     "loadError": "No se pudieron cargar las investigaciones.",
-    "progress": "{{raised}} / {{goal}} sats · {{status}}",
+    "progress": "{{raised}} / {{goal}} sats{{goalNote}}{{pendingNote}} · {{status}}",
+    "pending": "{{amount}} sats esperan una confirmación",
+    "goalValue": "meta de unos {{amount}}",
     "createTitle": "Proponer una investigación de financiamiento colectivo",
     "createHelp": "Guardar un borrador es gratis. En la página siguiente conectas la billetera con WizardConnect que tiene los satoshis y paga la comisión del minero.",
     "titlePlaceholder": "Nombre de la investigación",

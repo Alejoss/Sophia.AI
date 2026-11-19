@@ -26,6 +26,7 @@ import {
   selectOpenCoin,
 } from './buildCampaignTx';
 import { isValidCashAddr } from './cashaddr';
+import { formatUsdFromSats, useBchUsdRate } from './goalValue';
 import { rememberFundingWallet } from './fundingWallet';
 
 function visibleFundingError(err, t) {
@@ -40,7 +41,7 @@ function visibleFundingError(err, t) {
 }
 
 const FundingDetail = () => {
-  const { t } = useTranslation('paths');
+  const { t, i18n } = useTranslation('paths');
   const { proposalId } = useParams();
   const [proposal, setProposal] = useState(null);
   const [error, setError] = useState('');
@@ -56,6 +57,7 @@ const FundingDetail = () => {
   const [pathChoices, setPathChoices] = useState([]);
   const [pathChoice, setPathChoice] = useState('');
   const [balanceCheck, setBalanceCheck] = useState(0);
+  const usdPerBch = useBchUsdRate();
   const pairedHere = useRef(false);
   const wizard = useWizardConnect({ dappName: 'Academia Blockchain' });
   const wizardRef = useRef(wizard);
@@ -146,6 +148,7 @@ const FundingDetail = () => {
       await action();
       await reload();
     } catch (err) {
+      console.error('[funding] action failed', err);
       setNotice('');
       setStatusNote('');
       setError(visibleFundingError(err, t));
@@ -243,6 +246,7 @@ const FundingDetail = () => {
         : draftStep === 'confirm'
           ? 'confirm'
           : 'choose';
+  const goalAmount = formatUsdFromSats(proposal.goal_sats, usdPerBch, i18n.language);
 
   return (
     <Container sx={{ py: 3 }}>
@@ -260,6 +264,10 @@ const FundingDetail = () => {
           {t('funding.progress', {
             raised: proposal.raised_sats,
             goal: proposal.goal_sats,
+            goalNote: goalAmount ? ` · ${t('funding.goalValue', { amount: goalAmount })}` : '',
+            pendingNote: Number(proposal.pending_sats) > 0
+              ? ` · ${t('funding.pending', { amount: proposal.pending_sats })}`
+              : '',
             status: t(`funding.statuses.${proposal.status}`, { defaultValue: proposal.status }),
           })}
         </Typography>
@@ -404,7 +412,7 @@ const FundingDetail = () => {
           <Typography color="text.secondary">{t('funding.draftClosed')}</Typography>
         )}
 
-        {proposal.status !== 'draft' && (
+        {proposal.status !== 'draft' && proposal.status !== 'claimed' && (
           <Paper sx={{ p: 2 }}>
             <Stack spacing={1.5} alignItems="flex-start">
               <Typography variant="h6">{t('funding.walletTitle')}</Typography>
@@ -443,6 +451,15 @@ const FundingDetail = () => {
                 ]);
                 const pledgeAmount = Number(amount);
                 const utxo = await chooseUtxo(pledgeAmount + 3000);
+                console.info('[funding] pledge', {
+                  proposalId: proposal.id,
+                  amount: pledgeAmount,
+                  goalSats: proposal.goal_sats,
+                  wallet: wallet.address,
+                  addressIndex: wallet.index,
+                  campaign,
+                  utxo,
+                });
                 const signed = await pledgeTx({
                   manager: wizard.manager,
                   artifact: contractInfo.artifact,

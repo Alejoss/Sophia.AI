@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { hexToBin } from '@bitauth/libauth';
-import { addressFromPublicKey, chooseFundedWallet, relaySignTransaction, selectOpenCoin } from '../buildCampaignTx';
+import { addressFromPublicKey, chooseFundedWallet, inputPaths, relaySignTransaction, selectOpenCoin } from '../buildCampaignTx';
 
 describe('selectOpenCoin', () => {
   it('uses a first-payment coin that is already large enough', () => {
@@ -66,5 +66,15 @@ describe('relaySignTransaction', () => {
     expect(encoded).toContain('<bigint: 10000n>');
     expect(encoded).toContain('2823000000000000');
     expect(typeof relay.transaction).toBe('string');
+  });
+});
+
+describe('inputPaths', () => {
+  it('asks the wallet to sign only its own coin, at that coin’s position', () => {
+    const inputs = [
+      { unlocker: { contract: {} } },
+      { unlocker: {} },
+    ];
+    expect(inputPaths(inputs, 4)).toEqual([[1, 'receive', 4]]);
   });
 });

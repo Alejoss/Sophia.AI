@@ -379,7 +379,7 @@ def terms_hash(proposal: PathProposal) -> str:
 
 def _lock(proposal: PathProposal) -> PathProposal:
     return (
-        PathProposal.objects.select_for_update()
+        PathProposal.objects.select_for_update(of=('self',))
         .select_related('knowledge_path')
         .get(pk=proposal.pk)
     )
