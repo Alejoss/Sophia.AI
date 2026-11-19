@@ -23,9 +23,7 @@ One campaign output holds the pool. Each pledge adds satoshis to that output and
 
 `cancelled` is reachable only from `draft`.
 
-The pledge that reaches `goal_sats` rewrites the campaign output to `funded` in that same transaction. Refunds close then, so the pool cannot be drained while the author is about to claim. A missed deadline moves an underfunded campaign to `expired` when someone calls `expire()`. CashScript 0.12 can require `tx.time >= deadline`, and it cannot forbid a spend after a time. A pledge can still land in the window after the deadline and before `expire()` is mined. `expire()` and `claim()` accept an optional second input so that input can pay the miner fee. The refund spend checks the campaign state and returns each pledge only to the NFT holder. Claiming spends the pot to the author and leaves every unburned NFT in place. Those NFTs unlock the path.
-
-Losing the NFT loses the refund and, after a claim, access. A Sophia login cannot replace it.
+The pledge that reaches `goal_sats` rewrites the campaign output to `funded` in that same transaction. Refunds close then, so the pool cannot be drained while the author is about to claim. A missed deadline moves an underfunded campaign to `expired` when someone calls `expire()`. CashScript 0.12 can require `tx.time >= deadline`, and it cannot forbid a spend after a time. A pledge can still land in the window after the deadline and before `expire()` is mined. `expire()` and `claim()` accept an optional second input so that input can pay the miner fee. The refund spend checks the campaign state and returns each pledge only to the NFT holder. Claiming spends the pot to the author and leaves every unburned NFT in place. Those NFTs are the refund receipts. They do not unlock the path. After the campaign is claimed, the knowledge path is open to everyone.
 
 Pledges count toward `raised_sats` only after one confirmation. `raised_sats` is the sum of pledges in `confirmed` or `settled`. A `pending` or `refunded` pledge is excluded.
 
@@ -89,7 +87,7 @@ The Django row is an index. After the campaign is on chain, the coin and the NFT
 
 Implemented in `proposal_service`:
 
-1. `create_draft` creates the hidden path and a `draft` proposal.
+1. `create_draft` creates a `draft` proposal. It does not create a knowledge path.
 2. `cancel_draft` moves `draft` to `cancelled`.
 3. `open_proposal` freezes the pitch, stores the campaign outpoint, and sets `terms_hash`.
 4. `record_pledge` adds a pledge while `open` and before the deadline. One confirmation counts it. Crossing `goal_sats` sets `funded`.
@@ -98,7 +96,7 @@ Implemented in `proposal_service`:
 7. `expire_if_due` moves an underfunded `open` campaign to `expired` at the deadline. A campaign already at its goal becomes `funded` instead.
 8. `claim_proposal` moves `funded` to `claimed` and every `confirmed` pledge to `settled`.
 
-Access and publishing stay out of this step. `user_has_path_access` does not read pledges yet. The path stays invisible.
+A claimed path is open to everyone. `user_has_path_access` does not read pledges. The path stays invisible until it is published after `claimed`.
 
 ## Implementation sequence
 
@@ -107,9 +105,9 @@ Access and publishing stay out of this step. `user_has_path_access` does not rea
 | 1 | `PathProposal`, `PathPledge`, and `proposal_service`, tested with fake chain events | Implemented |
 | 2 | CashScript contract. `contracts/path-funding/scenario.mjs` runs pledge, refund, the crossing pledge, claim, and expiry in the BCH virtual machine. A funded refund and an expired claim fail. Chipnet broadcast is still outstanding | Implemented in the VM |
 | 3 | `sync_path_proposals` reads the campaign coin and pledge NFTs through `payments/bch_client.py` and upserts rows. Running it twice does not duplicate pledges | Implemented |
-| 4 | `user_has_path_access` allows a claimed path when the connected wallet holds that campaign's pledge NFT. The path can become visible only after `claimed` and at least one node | Implemented |
+| 4 | `user_has_path_access` opens a claimed path to everyone. A pledge receipt reclaims the pledge and does not unlock the lessons. The path can become visible only after `claimed` and at least one node | Implemented |
 | 5 | Proposal API: create, open, list, detail, record a broadcast pledge, and return unsigned refund and claim spends | Implemented |
-| 6 | Public campaign page with WizardConnect. Pledge, refund, and claim sign in the wallet. The path page asks for the same wallet | Implemented |
+| 6 | Public campaign page with WizardConnect. Pledge, refund, and claim sign in the wallet. The finished path does not ask for that wallet | Implemented |
 | 7 | `seed_path_funding_demo` creates an English draft and one text lesson. The knowledge-path list links to campaigns from its header | Implemented |
 
 Stretch goals, comments, a campaign editor, platform fees, and an XO port are outside this sequence.

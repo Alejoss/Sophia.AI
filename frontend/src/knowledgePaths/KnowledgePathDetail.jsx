@@ -37,7 +37,6 @@ import {
   Payments,
 } from '@mui/icons-material';
 import knowledgePathsApi from '../api/knowledgePathsApi';
-import { readFundingWallet, rememberFundingWallet } from '../funding/fundingWallet';
 import certificatesApi from '../api/certificatesApi';
 import commentsApi from '../api/commentsApi';
 import { AuthContext } from '../context/AuthContext';
@@ -86,8 +85,6 @@ const KnowledgePathDetail = () => {
   const [pathPurchaseId, setPathPurchaseId] = useState(null);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [purchaseError, setPurchaseError] = useState(null);
-  const [fundingWallet, setFundingWallet] = useState(readFundingWallet);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -126,7 +123,7 @@ const KnowledgePathDetail = () => {
       setError(null);
 
       try {
-        const data = await knowledgePathsApi.getKnowledgePath(pathId, { club: clubSlug, wallet: readFundingWallet() });
+        const data = await knowledgePathsApi.getKnowledgePath(pathId, { club: clubSlug });
         if (cancelled) return;
 
         setKnowledgePath(data);
@@ -246,7 +243,7 @@ const KnowledgePathDetail = () => {
       const purchase = await knowledgePathsApi.createOrGetPurchase(pathId);
       setPathPurchaseId(purchase.id);
       if (purchase.is_paid || purchase.payment_status === 'PAID') {
-        const data = await knowledgePathsApi.getKnowledgePath(pathId, { club: clubSlug, wallet: readFundingWallet() });
+        const data = await knowledgePathsApi.getKnowledgePath(pathId, { club: clubSlug });
         setKnowledgePath(data);
         return;
       }
@@ -262,7 +259,7 @@ const KnowledgePathDetail = () => {
 
   const handlePaymentComplete = async () => {
     try {
-      const data = await knowledgePathsApi.getKnowledgePath(pathId, { club: clubSlug, wallet: readFundingWallet() });
+      const data = await knowledgePathsApi.getKnowledgePath(pathId, { club: clubSlug });
       setKnowledgePath(data);
       setPathPurchaseId(data.user_purchase_id || pathPurchaseId);
       setShowPaymentModal(false);
@@ -691,32 +688,6 @@ const KnowledgePathDetail = () => {
           {knowledgePath.description}
         </Typography>
       </Paper>
-
-      {knowledgePath.funding_proposal && !knowledgePath.user_has_access && !isCreator && (
-        <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
-          <Stack spacing={2}>
-            <Typography variant="h5" sx={{ fontWeight: 600 }}>{t('funding.accessTitle')}</Typography>
-            <Typography variant="body1" color="text.secondary">{t('funding.accessBody')}</Typography>
-            <TextField
-              label={t('funding.payout')}
-              value={fundingWallet}
-              onChange={(event) => setFundingWallet(event.target.value)}
-            />
-            <Button
-              variant="contained"
-              onClick={() => {
-                rememberFundingWallet(fundingWallet.trim());
-                knowledgePathsApi.getKnowledgePath(pathId, {
-                  club: clubSlug,
-                  wallet: fundingWallet.trim(),
-                }).then(setKnowledgePath).catch(() => {});
-              }}
-            >
-              {t('funding.accessSubmit')}
-            </Button>
-          </Stack>
-        </Paper>
-      )}
 
       {needsPurchase && (
         <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 2 }}>

@@ -120,47 +120,31 @@ const KnowledgePathList = () => {
               </Typography>
             </Link>
             }
-            <Link
+            <Button
+            component={Link}
             to="/knowledge_path/funding"
-            style={{ textDecoration: 'none' }}>
+            variant="outlined"
+            color="primary"
+            sx={{
+              textDecoration: 'none',
+              width: { xs: '100%', md: 'auto' }
+            }}>
             
-              <Typography
-              component="span"
-              sx={{
-                color: 'primary.main',
-                '&:hover': { textDecoration: 'underline' }
-              }}>
-              
-                {t('list.campaigns')}
-              </Typography>
-            </Link>
+              {t('list.investigations')}
+            </Button>
             {authState.isAuthenticated &&
-            <>
-              <Button
-              component={Link}
-              to="/knowledge_path/funding/new"
-              variant="outlined"
-              color="primary"
-              sx={{
-                textDecoration: 'none',
-                width: { xs: '100%', md: 'auto' }
-              }}>
-              
-                {t('list.fund')}
-              </Button>
-              <Button
-              component={Link}
-              to="/knowledge_path/create"
-              variant="contained"
-              color="primary"
-              sx={{
-                textDecoration: 'none',
-                width: { xs: '100%', md: 'auto' }
-              }}>
-              
-                {t('list.create')}
-              </Button>
-            </>
+            <Button
+            component={Link}
+            to="/knowledge_path/create"
+            variant="contained"
+            color="primary"
+            sx={{
+              textDecoration: 'none',
+              width: { xs: '100%', md: 'auto' }
+            }}>
+            
+              {t('list.create')}
+            </Button>
             }
           </Stack>
       </Box>

@@ -136,12 +136,12 @@ const KnowledgePathsUser = () => {
           </Button>
           <Button
             component={Link}
-            to="/knowledge_path/funding/new"
+            to="/knowledge_path/funding"
             variant="outlined"
             color="primary"
             sx={{ textTransform: 'none', width: { xs: '100%', md: 'auto' } }}>
             
-            {t('list.fund')}
+            {t('list.investigations')}
           </Button>
           <Button
             component={Link}

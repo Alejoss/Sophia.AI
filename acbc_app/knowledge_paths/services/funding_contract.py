@@ -36,11 +36,13 @@ def constructor_args(proposal: PathProposal) -> list:
     if timezone.is_naive(deadline):
         raise ValueError('Deadline must be timezone-aware.')
     deadline = deadline.astimezone(dt_timezone.utc).replace(microsecond=0)
+    payout = proposal.author_payout_address
+    script = address_locking_script(payout).hex() if payout else ''
     return [
         int(proposal.pk),
         int(proposal.goal_sats),
         int(deadline.timestamp()),
-        address_locking_script(proposal.author_payout_address).hex(),
+        script,
     ]
 
 

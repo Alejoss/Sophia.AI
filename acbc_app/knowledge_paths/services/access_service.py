@@ -1,7 +1,6 @@
 """Access control for paid knowledge paths."""
 
-from knowledge_paths.models import KnowledgePath, KnowledgePathPurchase, PathPledge, PathProposal
-from payments.bch_cashaddr import CashAddrError, normalize_cashaddr
+from knowledge_paths.models import KnowledgePath, KnowledgePathPurchase
 
 
 def user_has_path_access(
@@ -18,14 +17,9 @@ def user_has_path_access(
     for non-staff, non-author viewers). Otherwise a PAID KnowledgePathPurchase
     is required.
 
-    A path created by a funding proposal stays closed until the campaign is
-    claimed. After that, the author still has access, and a learner has access
-    when the connected wallet holds a settled pledge NFT.
+    A crowdfunded investigation does not change this. Linking an investigation
+    to a path does not turn the pledge receipt into a pass.
     """
-    proposal = _funding_proposal(knowledge_path)
-    if proposal is not None:
-        return _funding_access(user, knowledge_path, proposal, wallet_address)
-
     if not knowledge_path.is_paid_path:
         return True
 
@@ -93,38 +87,6 @@ def wallet_from_request(request) -> str | None:
 
 
 def funding_visibility_error(knowledge_path: KnowledgePath) -> str | None:
-    """Spanish message when a funding path cannot be published yet."""
-    proposal = _funding_proposal(knowledge_path)
-    if proposal is None or proposal.status == PathProposal.STATUS_CLAIMED:
-        return None
-    return (
-        'El camino se publica cuando la campaña fue cobrada y tiene al menos un nodo.'
-    )
-
-
-def _funding_proposal(knowledge_path: KnowledgePath):
-    try:
-        return knowledge_path.funding_proposal
-    except PathProposal.DoesNotExist:
-        return None
-
-
-def _funding_access(user, knowledge_path, proposal, wallet_address) -> bool:
-    if (
-        user is not None
-        and getattr(user, 'is_authenticated', False)
-        and knowledge_path.author_id == user.id
-    ):
-        return True
-    if proposal.status != PathProposal.STATUS_CLAIMED:
-        return False
-    if not wallet_address:
-        return False
-    try:
-        wallet = normalize_cashaddr(wallet_address)
-    except CashAddrError:
-        return False
-    return proposal.pledges.filter(
-        status=PathPledge.STATUS_SETTLED,
-        wallet_address=wallet,
-    ).exists()
+    """A linked investigation does not decide when the path can be published."""
+    del knowledge_path
+    return None

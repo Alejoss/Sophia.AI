@@ -446,11 +446,11 @@ class KnowledgePathSnapshotAnchor(models.Model):
 
 
 class PathProposal(models.Model):
-    """Funding contract for creating a knowledge path.
+    """A crowdfunded investigation.
 
-    The linked path is the curriculum and stays hidden until a later step
-    publishes it after the campaign is claimed. Funding state lives here.
-    See docs/hackathon/knowledge-path-funding.md.
+    It can collect funds before any knowledge path exists. After the goal is
+    reached, the author can link one of their knowledge paths. The pledge
+    receipt does not control that path.
     """
 
     STATUS_DRAFT = 'draft'
@@ -470,8 +470,10 @@ class PathProposal(models.Model):
 
     knowledge_path = models.OneToOneField(
         KnowledgePath,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name='funding_proposal',
+        null=True,
+        blank=True,
     )
     author = models.ForeignKey(
         User,
@@ -482,7 +484,7 @@ class PathProposal(models.Model):
     frozen_pitch = models.TextField(blank=True)
     goal_sats = models.BigIntegerField()
     deadline = models.DateTimeField()
-    author_payout_address = models.CharField(max_length=128)
+    author_payout_address = models.CharField(max_length=128, blank=True)
     terms_hash = models.CharField(max_length=64, blank=True)
     status = models.CharField(
         max_length=16,

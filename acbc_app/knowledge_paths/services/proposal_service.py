@@ -13,6 +13,7 @@ import hashlib
 import re
 from datetime import datetime, timezone as dt_timezone
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
@@ -40,7 +41,7 @@ def create_draft(
     author_payout_address: str,
     at: datetime | None = None,
 ) -> PathProposal:
-    """Create a hidden knowledge path and a draft proposal."""
+    """Create a draft investigation. A knowledge path is linked later, after the goal is reached."""
     title = (title or '').strip()
     if not title:
         raise ProposalError('Title is required.')
@@ -51,25 +52,40 @@ def create_draft(
     moment = _aware(at)
     if deadline <= moment:
         raise ProposalError('Deadline must be in the future.')
-    payout = _require_cashaddr(author_payout_address)
+    raw_payout = (author_payout_address or '').strip()
+    payout = _require_cashaddr(raw_payout) if raw_payout else ''
 
     with transaction.atomic():
-        path = KnowledgePath.objects.create(
-            title=title,
-            description=pitch or '',
-            author=author,
-            is_visible=False,
-            sales_enabled=False,
-            reference_price=0,
-        )
         return PathProposal.objects.create(
-            knowledge_path=path,
             author=author,
+            frozen_title=title,
+            frozen_pitch=pitch or '',
             goal_sats=goal_sats,
             deadline=deadline,
             author_payout_address=payout,
             status=PathProposal.STATUS_DRAFT,
         )
+
+
+def link_knowledge_path(proposal: PathProposal, knowledge_path_id) -> PathProposal:
+    """Attach one of the author's knowledge paths after the goal is reached."""
+    try:
+        path_id = int(knowledge_path_id)
+    except (TypeError, ValueError) as exc:
+        raise ProposalError('Choose one of your knowledge paths.') from exc
+    with transaction.atomic():
+        locked = _lock(proposal)
+        if locked.status not in (PathProposal.STATUS_FUNDED, PathProposal.STATUS_CLAIMED):
+            raise ProposalError('Link a knowledge path after the goal is reached.')
+        path = KnowledgePath.objects.filter(pk=path_id, author_id=locked.author_id).first()
+        if path is None:
+            raise ProposalError('Choose one of your knowledge paths.')
+        already = PathProposal.objects.filter(knowledge_path=path).exclude(pk=locked.pk).exists()
+        if already:
+            raise ProposalError('That knowledge path is already linked to another investigation.')
+        locked.knowledge_path = path
+        locked.save(update_fields=['knowledge_path', 'updated_at'])
+        return locked
 
 
 def cancel_draft(proposal: PathProposal) -> PathProposal:
@@ -80,6 +96,75 @@ def cancel_draft(proposal: PathProposal) -> PathProposal:
             raise ProposalError('Only a draft proposal can be cancelled.')
         locked.status = PathProposal.STATUS_CANCELLED
         locked.save(update_fields=['status', 'updated_at'])
+        return locked
+
+
+def update_proposal(
+    proposal: PathProposal,
+    *,
+    title: str,
+    pitch: str,
+    goal_sats: int | None = None,
+    deadline: datetime | None = None,
+    author_payout_address: str | None = None,
+    at: datetime | None = None,
+) -> PathProposal:
+    """Update the investigation. The opening payment freezes the goal, deadline, and payout."""
+    title = (title or '').strip()
+    if not title:
+        raise ProposalError('Title is required.')
+    if len(title) > 200:
+        raise ProposalError('Title is too long.')
+    chain_fields = goal_sats is not None or deadline is not None or author_payout_address is not None
+    with transaction.atomic():
+        locked = _lock(proposal)
+        if locked.status == PathProposal.STATUS_CANCELLED:
+            raise ProposalError('A cancelled investigation cannot be edited.')
+        if locked.status != PathProposal.STATUS_DRAFT and chain_fields:
+            raise ProposalError(
+                'The goal, the deadline, and the payout address were recorded in the opening payment.'
+            )
+        locked.frozen_title = title
+        locked.frozen_pitch = pitch or ''
+        update_fields = ['frozen_title', 'frozen_pitch', 'updated_at']
+        if goal_sats is not None:
+            locked.goal_sats = _positive_sats(goal_sats, 'Goal')
+            update_fields.append('goal_sats')
+        if deadline is not None:
+            parsed = _aware_deadline(deadline)
+            if parsed <= _aware(at):
+                raise ProposalError('Deadline must be in the future.')
+            locked.deadline = parsed
+            update_fields.append('deadline')
+        if author_payout_address is not None:
+            raw_payout = author_payout_address.strip()
+            if raw_payout:
+                payout = _require_cashaddr(raw_payout)
+                prefix = payout.split(':', 1)[0]
+                expected = network_cashaddr_prefix()
+                if prefix != expected:
+                    raise ProposalError(f'Use a {expected}: address.')
+                locked.author_payout_address = payout
+            else:
+                locked.author_payout_address = ''
+            update_fields.append('author_payout_address')
+        locked.save(update_fields=update_fields)
+        return locked
+
+
+def set_author_payout(proposal: PathProposal, author_payout_address: str) -> PathProposal:
+    """Store the claim address while the investigation is still a draft."""
+    payout = _require_cashaddr(author_payout_address)
+    prefix = payout.split(':', 1)[0]
+    expected = network_cashaddr_prefix()
+    if prefix != expected:
+        raise ProposalError(f'Use a {expected}: address.')
+    with transaction.atomic():
+        locked = _lock(proposal)
+        if locked.status != PathProposal.STATUS_DRAFT:
+            raise ProposalError('The cashout address can only be set on a draft.')
+        locked.author_payout_address = payout
+        locked.save(update_fields=['author_payout_address', 'updated_at'])
         return locked
 
 
@@ -97,12 +182,17 @@ def open_proposal(
         locked = _lock(proposal)
         if locked.status != PathProposal.STATUS_DRAFT:
             raise ProposalError('Only a draft proposal can be opened.')
+        if not locked.author_payout_address:
+            raise ProposalError('Set the cashout address before opening the investigation.')
         moment = _aware(at)
         if locked.deadline <= moment:
             raise ProposalError('Deadline must be in the future.')
-        path = locked.knowledge_path
-        locked.frozen_title = path.title
-        locked.frozen_pitch = path.description or ''
+        if not locked.frozen_title:
+            path = locked.knowledge_path
+            if path is None:
+                raise ProposalError('Title is required.')
+            locked.frozen_title = path.title
+            locked.frozen_pitch = path.description or ''
         locked.campaign_txid = _require_txid(campaign_txid)
         locked.campaign_vout = _require_vout(campaign_vout)
         if contract_address:
@@ -255,7 +345,7 @@ def claim_proposal(
     *,
     settlement_txid: str,
 ) -> PathProposal:
-    """Record the author claim. Confirmed pledges become settled access tickets."""
+    """Record the author claim. Confirmed pledges are closed with the pool."""
     settlement_txid = _require_txid(settlement_txid)
     with transaction.atomic():
         locked = _lock(proposal)
@@ -377,6 +467,16 @@ def _require_commitment(value: str) -> str:
     if not hex_value or len(hex_value) > 80 or len(hex_value) % 2 or not _HEX_RE.match(hex_value):
         raise ProposalError('NFT commitment must be 1 to 40 bytes of hex.')
     return hex_value
+
+
+def network_cashaddr_prefix() -> str:
+    """CashAddr prefix for the server's Bitcoin Cash network."""
+    network = getattr(settings, 'BCH_NETWORK', 'chipnet')
+    if network == 'mainnet':
+        return 'bitcoincash'
+    if network == 'regtest':
+        return 'bchreg'
+    return 'bchtest'
 
 
 def _require_cashaddr(address: str) -> str:
