@@ -37,6 +37,7 @@ import {
 import { isValidCashAddr } from './cashaddr';
 import { formatUsdFromSats, useBchUsdRate } from './goalValue';
 import { fundingFill } from './progressBar';
+import { PitchText } from './pitchText';
 import { coverObjectPosition } from './coverImage';
 import { rememberFundingWallet } from './fundingWallet';
 
@@ -110,6 +111,14 @@ function GoalBar({ raised, pending, goal }) {
     </Stack>
   );
 }
+
+const pathNoticeSx = {
+  p: { xs: 2.5, md: 3 },
+  borderRadius: 2,
+  border: '1px solid',
+  borderColor: 'primary.main',
+  bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(100, 108, 255, 0.16)' : 'rgba(100, 108, 255, 0.1)'),
+};
 
 const FundingDetail = () => {
   const { t, i18n } = useTranslation('paths');
@@ -370,7 +379,32 @@ const FundingDetail = () => {
             </Button>
           )}
         </Stack>
-        <Typography color="text.secondary">{proposal.pitch}</Typography>
+        {(proposal.status === 'funded' || proposal.status === 'claimed') && proposal.knowledge_path_id && (
+          <Paper elevation={0} sx={pathNoticeSx}>
+            <Stack spacing={2}>
+              <Typography variant="h5" sx={{ fontWeight: 600, lineHeight: 1.35 }}>
+                {t('funding.pathReady')}
+              </Typography>
+              <Button
+                component={RouterLink}
+                to={`/knowledge_path/${proposal.knowledge_path_id}`}
+                variant="contained"
+                size="large"
+                sx={{ alignSelf: 'flex-start' }}
+              >
+                {t('funding.openPath')}
+              </Button>
+            </Stack>
+          </Paper>
+        )}
+        {(proposal.status === 'funded' || proposal.status === 'claimed') && !proposal.knowledge_path_id && !isAuthor && (
+          <Paper elevation={0} sx={pathNoticeSx}>
+            <Typography variant="h5" sx={{ fontWeight: 600, lineHeight: 1.35 }}>
+              {t('funding.pathComing', { author: proposal.author })}
+            </Typography>
+          </Paper>
+        )}
+        <PitchText text={proposal.pitch} />
         <Typography>
           {t('funding.progress', {
             raised: proposal.raised_sats,

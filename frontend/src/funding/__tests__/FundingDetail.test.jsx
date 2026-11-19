@@ -231,5 +231,20 @@ describe('FundingDetail without a wallet', () => {
     expect(await screen.findByText('Crowdfunded investigation')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cobrar el fondo' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Editar' })).not.toBeInTheDocument();
+    expect(screen.getByText('Pronto Vincent terminará esta investigación y vinculará un camino de conocimiento.')).toBeInTheDocument();
+  });
+
+  it('links a claimed investigation to its knowledge path', async () => {
+    mockGetProposal.mockResolvedValue(proposal({
+      status: 'claimed',
+      raised_sats: 10000,
+      goal_sats: 10000,
+      knowledge_path_id: 12,
+    }));
+    renderInvestigation();
+    expect(await screen.findByText('El camino de conocimiento de esta investigación ya está listo.')).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: 'Abrir el camino de conocimiento' });
+    expect(link).toHaveAttribute('href', '/knowledge_path/12');
+    expect(screen.queryByText(/Pronto Vincent/)).not.toBeInTheDocument();
   });
 });
