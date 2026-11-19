@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 
 from content.utils import build_media_url
 from events.models import Event, FeaturedEvent
+from events.serializers import _landing_page_for_event
 
 MAX_BANNER_BYTES = 5 * 1024 * 1024
 EVENT_CHOICE_LIMIT = 300
@@ -26,6 +27,14 @@ def _schedule(event):
     }
 
 
+def _banner_path(event):
+    """Send judges straight to the crowdfunded investigations when that is the link."""
+    landing = _landing_page_for_event(event)
+    if landing and landing.get('path') == '/knowledge_path/funding':
+        return landing['path']
+    return f'/events/{event.id}'
+
+
 def featured_payload(placement, request):
     event = placement.event
     return {
@@ -34,7 +43,7 @@ def featured_payload(placement, request):
         'title': event.title,
         'desktop_image': build_media_url(placement.desktop_image, request),
         'mobile_image': build_media_url(placement.mobile_image, request),
-        'path': f'/events/{event.id}',
+        'path': _banner_path(event),
         'is_active': placement.is_active,
         **_schedule(event),
     }

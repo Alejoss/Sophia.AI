@@ -212,9 +212,11 @@ class Course(models.Model):
 
     @property
     def landing_path(self):
-        """Public URL of this course page. Empty until the page is published."""
+        """Public URL this event destination opens. Empty until it is published."""
         if not self.public_landing:
             return ''
+        if self.code == 'crowdfunded-investigations':
+            return '/knowledge_path/funding'
         return f'/cursos/{self.code}'
 
 

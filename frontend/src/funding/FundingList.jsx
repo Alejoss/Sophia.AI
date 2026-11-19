@@ -48,7 +48,12 @@ const FundingList = () => {
             {t('funding.create')}
           </Button>
         </Stack>
-        <Button component={RouterLink} to="/knowledge_path/funding/how" sx={{ alignSelf: 'flex-start', px: 0 }}>
+        <Button
+          component={RouterLink}
+          to="/knowledge_path/funding/how"
+          variant="outlined"
+          sx={{ alignSelf: 'flex-start' }}
+        >
           {t('funding.guide.link')}
         </Button>
       </Stack>

@@ -448,7 +448,9 @@ const EventDetail = () => {
             <SchoolOutlinedIcon color="primary" sx={{ fontSize: 36 }} />
             <Box>
               <Typography variant="overline" color="primary.main" sx={{ lineHeight: 1.2 }}>
-                {t('card.courseBannerKicker')}
+                {t(event.landing_page.path === '/knowledge_path/funding'
+                  ? 'card.fundingBannerKicker'
+                  : 'card.courseBannerKicker')}
               </Typography>
               <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.25 }}>
                 {event.landing_page.title}
@@ -470,7 +472,9 @@ const EventDetail = () => {
               fontWeight: 700,
             }}
           >
-            {t('card.viewCoursePage')}
+            {t(event.landing_page.path === '/knowledge_path/funding'
+              ? 'card.viewFundingPage'
+              : 'card.viewCoursePage')}
             <ArrowForwardIcon fontSize="small" />
           </Box>
         </Paper>

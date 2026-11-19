@@ -2300,6 +2300,8 @@ class CoursePurchasePaymentTests(TestCase):
         bitcoin = next(item for item in response.data if item['code'] == 'real-historia-bitcoin')
         self.assertEqual(bitcoin['path'], '/cursos/real-historia-bitcoin')
         self.assertIn('title', bitcoin)
+        funding = next(item for item in response.data if item['code'] == 'crowdfunded-investigations')
+        self.assertEqual(funding['path'], '/knowledge_path/funding')
 
     def test_public_course_hides_private_events(self):
         course = Course.objects.get(code='real-historia-bitcoin')
