@@ -135,6 +135,8 @@
     "schedule": "Schedule:",
     "courseBannerKicker": "This event is part of the course",
     "viewCoursePage": "View course page",
+    "fundingBannerKicker": "This event opens the crowdfunded investigations",
+    "viewFundingPage": "Open the investigations",
     "eventPrice": "Event price"
   },
   "registration": {

@@ -135,6 +135,8 @@
     "schedule": "Horario:",
     "courseBannerKicker": "Este evento pertenece al curso",
     "viewCoursePage": "Ver página del curso",
+    "fundingBannerKicker": "Este evento abre las investigaciones de financiamiento colectivo",
+    "viewFundingPage": "Abrir las investigaciones",
     "eventPrice": "Precio del evento"
   },
   "registration": {

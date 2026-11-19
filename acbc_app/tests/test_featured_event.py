@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from events.models import FeaturedEvent
+from payments.models import Course, CourseEvent
 from tests.factories.events import EventFactory
 from tests.factories.users import UserFactory
 
@@ -106,6 +107,19 @@ class FeaturedEventAPITest(APITestCase):
         self.assertEqual(response.data['event_id'], self.event.id)
         self.assertEqual(response.data['path'], f'/events/{self.event.id}')
         self.assertEqual(response.data['title'], self.event.title)
+        self.assertTrue(response.data['desktop_image'])
+        self.assertTrue(response.data['mobile_image'])
+
+    def test_banner_opens_the_crowdfunded_investigations_when_that_is_the_link(self):
+        course = Course.objects.get(code='crowdfunded-investigations')
+        CourseEvent.objects.create(course=course, event=self.event)
+        self._publish()
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(self.current_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['path'], '/knowledge_path/funding')
         self.assertTrue(response.data['desktop_image'])
         self.assertTrue(response.data['mobile_image'])
 
