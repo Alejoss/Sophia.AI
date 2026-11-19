@@ -1,5 +1,15 @@
 import axiosInstance from './axiosConfig';
 
+function proposalBody(payload) {
+  if (!(payload?.image instanceof File)) return payload;
+  const formData = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    formData.append(key, value instanceof File ? value : String(value));
+  });
+  return formData;
+}
+
 const pathFundingApi = {
   listProposals: async ({ mine = false } = {}) => {
     const response = await axiosInstance.get('/knowledge_paths/proposals/', {
@@ -10,6 +20,11 @@ const pathFundingApi = {
 
   getProposal: async (proposalId) => {
     const response = await axiosInstance.get(`/knowledge_paths/proposals/${proposalId}/`);
+    return response.data;
+  },
+
+  getBchUsdRate: async () => {
+    const response = await axiosInstance.get('/knowledge_paths/proposals/bch-price/');
     return response.data;
   },
 
@@ -31,7 +46,38 @@ const pathFundingApi = {
   },
 
   createProposal: async (payload) => {
-    const response = await axiosInstance.post('/knowledge_paths/proposals/', payload);
+    const response = await axiosInstance.post('/knowledge_paths/proposals/', proposalBody(payload));
+    return response.data;
+  },
+
+  linkKnowledgePath: async (proposalId, knowledgePathId) => {
+    const response = await axiosInstance.patch(
+      `/knowledge_paths/proposals/${proposalId}/`,
+      { knowledge_path_id: knowledgePathId },
+    );
+    return response.data;
+  },
+
+  updateProposal: async (proposalId, payload) => {
+    const response = await axiosInstance.patch(
+      `/knowledge_paths/proposals/${proposalId}/`,
+      proposalBody(payload),
+    );
+    return response.data;
+  },
+
+  setPayoutAddress: async (proposalId, authorPayoutAddress) => {
+    const response = await axiosInstance.patch(
+      `/knowledge_paths/proposals/${proposalId}/`,
+      { author_payout_address: authorPayoutAddress },
+    );
+    return response.data;
+  },
+
+  broadcast: async (rawTx) => {
+    const response = await axiosInstance.post('/knowledge_paths/proposals/broadcast/', {
+      raw_tx: rawTx,
+    });
     return response.data;
   },
 
@@ -43,10 +89,10 @@ const pathFundingApi = {
     return response.data;
   },
 
-  recordPledge: async (proposalId, txid) => {
+  recordPledge: async (proposalId, txid, rawTx = '') => {
     const response = await axiosInstance.post(
       `/knowledge_paths/proposals/${proposalId}/pledges/`,
-      { txid },
+      { txid, raw_tx: rawTx },
     );
     return response.data;
   },

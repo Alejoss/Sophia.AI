@@ -9,13 +9,14 @@ from knowledge_paths.serializers import KnowledgePathCreateSerializer
 from knowledge_paths.services.access_service import user_has_path_access
 from knowledge_paths.services.funding_sync import apply_transaction, sync_proposal
 from knowledge_paths.services.proposal_service import (
-    claim_proposal,
     create_draft,
     open_proposal,
 )
 from payments.bch_cashaddr import encode_cashaddr
 from payments.bch_client import (
+    BchApiError,
     BchElectrumClient,
+    BchPublicClient,
     BchTokenInfo,
     BchTransaction,
     BchTxInput,
@@ -171,6 +172,161 @@ class FundingSyncTests(TestCase):
         self.assertEqual(self.proposal.raised_sats, 0)
         self.assertEqual(self.proposal.status, PathProposal.STATUS_OPEN)
 
+    def test_a_refund_without_input_token_data_still_returns_the_pledge(self):
+        apply_transaction(self.proposal, self._pledge_tx(_txid(2), 10000))
+        pledge = PathPledge.objects.get()
+        refund = _tx(
+            _txid(4),
+            outputs=[
+                BchTxOutput(
+                    address=CONTRACT,
+                    amount_sats=1000,
+                    vout=0,
+                    token=BchTokenInfo(CATEGORY, 'minting', '00'),
+                ),
+                BchTxOutput(address=WALLET, amount_sats=10000, vout=1),
+            ],
+            inputs=[
+                BchTxInput(txid=pledge.nft_txid, vout=pledge.nft_vout),
+            ],
+        )
+        apply_transaction(self.proposal, refund)
+        pledge.refresh_from_db()
+        self.proposal.refresh_from_db()
+        self.assertEqual(pledge.status, PathPledge.STATUS_REFUNDED)
+        self.assertEqual(self.proposal.raised_sats, 0)
+
+    def test_a_spent_receipt_without_a_repayment_stays_confirmed(self):
+        apply_transaction(self.proposal, self._pledge_tx(_txid(2), 10000))
+        pledge = PathPledge.objects.get()
+        moved = _tx(
+            _txid(4),
+            outputs=[
+                BchTxOutput(address=WALLET, amount_sats=1000, vout=0),
+            ],
+            inputs=[BchTxInput(txid=pledge.nft_txid, vout=pledge.nft_vout)],
+        )
+        apply_transaction(self.proposal, moved)
+        pledge.refresh_from_db()
+        self.proposal.refresh_from_db()
+        self.assertEqual(pledge.status, PathPledge.STATUS_CONFIRMED)
+        self.assertEqual(self.proposal.raised_sats, 10000)
+
+    def test_a_pledge_is_indexed_after_the_campaign_is_expired(self):
+        self.proposal.status = PathProposal.STATUS_EXPIRED
+        self.proposal.save(update_fields=['status', 'updated_at'])
+        apply_transaction(self.proposal, self._pledge_tx(_txid(2), 10000))
+        pledge = PathPledge.objects.get()
+        self.proposal.refresh_from_db()
+        self.assertEqual(pledge.status, PathPledge.STATUS_CONFIRMED)
+        self.assertEqual(self.proposal.status, PathProposal.STATUS_EXPIRED)
+        self.assertEqual(self.proposal.raised_sats, 10000)
+
+    def test_an_older_transaction_does_not_move_the_campaign_backward(self):
+        pledge = self._pledge_tx(_txid(2), 10000)
+        pledge.inputs = [BchTxInput(txid=_txid(1), vout=0)]
+        apply_transaction(self.proposal, pledge)
+        self.proposal.refresh_from_db()
+        self.assertEqual(self.proposal.campaign_txid, _txid(2))
+
+        older = _tx(
+            _txid(1),
+            outputs=[
+                BchTxOutput(
+                    address=CONTRACT,
+                    amount_sats=1000,
+                    vout=0,
+                    token=BchTokenInfo(CATEGORY, 'minting', '00'),
+                ),
+            ],
+            inputs=[BchTxInput(txid=_txid(9), vout=0)],
+        )
+        apply_transaction(self.proposal, older)
+        self.proposal.refresh_from_db()
+        self.assertEqual(self.proposal.campaign_txid, _txid(2))
+        self.assertEqual(self.proposal.campaign_vout, 0)
+        self.assertEqual(self.proposal.raised_sats, 10000)
+
+    def test_sync_records_a_refund_when_history_is_not_oldest_first(self):
+        pledge_tx = self._pledge_tx(_txid(2), 10000)
+        pledge_tx.inputs = [BchTxInput(txid=_txid(1), vout=0)]
+        refund_tx = _tx(
+            _txid(4),
+            outputs=[
+                BchTxOutput(
+                    address=CONTRACT,
+                    amount_sats=1000,
+                    vout=0,
+                    token=BchTokenInfo(CATEGORY, 'minting', '00'),
+                ),
+                BchTxOutput(address=WALLET, amount_sats=10000, vout=1),
+            ],
+            inputs=[
+                BchTxInput(txid=_txid(2), vout=0),
+                BchTxInput(txid=_txid(2), vout=1),
+            ],
+        )
+
+        class FakeChain:
+            def list_recent_transactions(self, address, limit=25):
+                return [pledge_tx, refund_tx]
+
+        sync_proposal(self.proposal, client=FakeChain())
+        pledge = PathPledge.objects.get()
+        self.proposal.refresh_from_db()
+        self.assertEqual(pledge.status, PathPledge.STATUS_REFUNDED)
+        self.assertEqual(pledge.refund_txid, _txid(4))
+        self.assertEqual(self.proposal.raised_sats, 0)
+        self.assertEqual(self.proposal.campaign_txid, _txid(4))
+
+    def test_a_refund_after_the_deadline_waits_until_the_campaign_is_expired(self):
+        apply_transaction(self.proposal, self._pledge_tx(_txid(2), 10000))
+        pledge = PathPledge.objects.get()
+        self.proposal.deadline = self.now - timedelta(days=1)
+        self.proposal.save(update_fields=['deadline'])
+        refund = _tx(
+            _txid(4),
+            outputs=[
+                BchTxOutput(
+                    address=CONTRACT,
+                    amount_sats=1000,
+                    vout=0,
+                    token=BchTokenInfo(CATEGORY, 'minting', '00'),
+                ),
+                BchTxOutput(address=WALLET, amount_sats=10000, vout=1),
+            ],
+            inputs=[
+                BchTxInput(
+                    txid=pledge.nft_txid,
+                    vout=pledge.nft_vout,
+                    token=BchTokenInfo(CATEGORY, 'none', pledge.nft_commitment),
+                ),
+            ],
+        )
+        apply_transaction(self.proposal, refund)
+        pledge.refresh_from_db()
+        self.proposal.refresh_from_db()
+        self.assertEqual(pledge.status, PathPledge.STATUS_CONFIRMED)
+        self.assertEqual(self.proposal.status, PathProposal.STATUS_OPEN)
+
+        apply_transaction(self.proposal, _tx(
+            _txid(5),
+            outputs=[
+                BchTxOutput(
+                    address=CONTRACT,
+                    amount_sats=11000,
+                    vout=0,
+                    token=BchTokenInfo(CATEGORY, 'minting', '02'),
+                ),
+            ],
+        ))
+        apply_transaction(self.proposal, refund)
+        pledge.refresh_from_db()
+        self.proposal.refresh_from_db()
+        self.assertEqual(self.proposal.status, PathProposal.STATUS_EXPIRED)
+        self.assertEqual(pledge.status, PathPledge.STATUS_REFUNDED)
+        self.assertEqual(self.proposal.raised_sats, 0)
+
     def test_expire_and_claim_follow_the_chain(self):
         apply_transaction(self.proposal, self._pledge_tx(_txid(2), 10000))
         self.proposal.deadline = self.now - timedelta(days=1)
@@ -292,63 +448,31 @@ class FundingAccessTests(TestCase):
             token_category=CATEGORY,
             at=self.now,
         )
+        self.path = KnowledgePath.objects.create(
+            title='Lessons',
+            description='Open to everyone',
+            author=self.author,
+        )
         Node.objects.create(
-            knowledge_path=self.proposal.knowledge_path,
+            knowledge_path=self.path,
             title='Lesson',
             media_type='TEXT',
             order=1,
         )
 
-    def test_wallet_gate_and_visibility(self):
-        path = self.proposal.knowledge_path
-        self.assertTrue(user_has_path_access(self.author, path))
-        self.assertFalse(user_has_path_access(self.learner, path, wallet_address=WALLET))
-
-        apply_transaction(
-            self.proposal,
-            _tx(
-                _txid(2),
-                outputs=[
-                    BchTxOutput(
-                        address=CONTRACT,
-                        amount_sats=11000,
-                        vout=0,
-                        token=BchTokenInfo(CATEGORY, 'minting', '01'),
-                    ),
-                    BchTxOutput(
-                        address=WALLET,
-                        amount_sats=1000,
-                        vout=1,
-                        token=BchTokenInfo(CATEGORY, 'none', _receipt(self.proposal.pk, 10000)),
-                    ),
-                ],
-            ),
-        )
-        self.proposal.refresh_from_db()
-        claim_proposal(self.proposal, settlement_txid=_txid(3))
-        path.refresh_from_db()
-
-        self.assertFalse(user_has_path_access(self.learner, path))
-        self.assertTrue(user_has_path_access(self.learner, path, wallet_address=WALLET))
-        self.assertTrue(user_has_path_access(self.author, path))
-
-        self.proposal.status = PathProposal.STATUS_OPEN
+    def test_a_linked_path_stays_open_to_everyone(self):
+        self.assertIsNone(self.proposal.knowledge_path_id)
+        self.assertTrue(user_has_path_access(None, self.path))
+        self.proposal.status = PathProposal.STATUS_FUNDED
         self.proposal.save(update_fields=['status'])
-        path = KnowledgePath.objects.get(pk=path.pk)
-        blocked = KnowledgePathCreateSerializer(
-            instance=path,
-            data={'title': path.title, 'description': path.description, 'is_visible': True},
-            partial=True,
-        )
-        self.assertFalse(blocked.is_valid())
-        self.assertIn('cobrada', str(blocked.errors))
-
-        self.proposal.status = PathProposal.STATUS_CLAIMED
-        self.proposal.save(update_fields=['status'])
-        path = KnowledgePath.objects.get(pk=path.pk)
+        from knowledge_paths.services.proposal_service import link_knowledge_path
+        link_knowledge_path(self.proposal, self.path.pk)
+        self.path.refresh_from_db()
+        self.assertTrue(user_has_path_access(self.learner, self.path, wallet_address=WALLET))
+        self.assertTrue(user_has_path_access(None, self.path))
         allowed = KnowledgePathCreateSerializer(
-            instance=path,
-            data={'title': path.title, 'description': path.description, 'is_visible': True},
+            instance=self.path,
+            data={'title': self.path.title, 'description': self.path.description, 'is_visible': True},
             partial=True,
         )
         self.assertTrue(allowed.is_valid(), allowed.errors)
@@ -365,3 +489,12 @@ class CashAddrTokenTests(TestCase):
         token = encode_cashaddr('bitcoincash', 2, raw)
         self.assertEqual(normalize_cashaddr(token), WALLET)
         self.assertEqual(len(payload), 20)
+
+
+class MissingCampaignTransactionTests(TestCase):
+    def test_an_unknown_payment_is_not_described_as_a_campaign(self):
+        client = BchPublicClient(api_base='https://api.blockchair.com/bitcoin-cash')
+        client._get = lambda path: {'data': {}, 'context': {'results': 0}}
+        with self.assertRaises(BchApiError) as caught:
+            client.get_transaction('ab' * 32)
+        self.assertIn('not on the Bitcoin Cash network', str(caught.exception))

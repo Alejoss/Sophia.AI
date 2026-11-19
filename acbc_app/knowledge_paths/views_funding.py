@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from django.db.models import Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken
 
 from knowledge_paths.models import PathPledge, PathProposal
 from knowledge_paths.services.funding_contract import (
@@ -18,13 +23,34 @@ from knowledge_paths.services.funding_contract import (
     load_artifact,
 )
 from knowledge_paths.services.funding_spend import campaign_snapshot, claim_spend, refund_spend
-from knowledge_paths.services.funding_sync import apply_transaction
+from knowledge_paths.services.funding_sync import (
+    apply_transaction,
+    refresh_recorded_payments,
+    sync_proposal,
+)
 from knowledge_paths.services.proposal_service import (
     ProposalError,
     create_draft,
+    link_knowledge_path,
+    network_cashaddr_prefix,
     open_proposal,
+    set_author_payout,
+    set_proposal_cover,
+    set_proposal_focal,
+    update_proposal,
 )
 from payments.bch_client import BchApiError, BchTransaction, build_bch_client
+from content.utils import build_media_url
+
+class _PublicJWTAuthentication(JWTAuthentication):
+    """A rejected login token leaves the visitor anonymous. It does not hide a public page."""
+
+    def authenticate(self, request):
+        try:
+            return super().authenticate(request)
+        except (InvalidToken, AuthenticationFailed):
+            return None
+
 
 _PUBLIC_STATUSES = (
     PathProposal.STATUS_OPEN,
@@ -35,6 +61,7 @@ _PUBLIC_STATUSES = (
 
 
 class ProposalUtxoView(APIView):
+    authentication_classes = [_PublicJWTAuthentication]
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -51,7 +78,20 @@ class ProposalUtxoView(APIView):
         return Response({'utxos': utxos})
 
 
+class ProposalBchPriceView(APIView):
+    authentication_classes = [_PublicJWTAuthentication]
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            rate = build_bch_client().get_bch_usd_rate()
+        except BchApiError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response({'usd_per_bch': str(rate)})
+
+
 class ProposalContractView(APIView):
+    authentication_classes = [_PublicJWTAuthentication]
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -64,6 +104,9 @@ class ProposalContractView(APIView):
 
 
 class ProposalListCreateView(APIView):
+    authentication_classes = [_PublicJWTAuthentication]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
     def get_permissions(self):
         if self.request.method == 'POST':
             return [IsAuthenticated()]
@@ -73,14 +116,16 @@ class ProposalListCreateView(APIView):
         proposals = PathProposal.objects.select_related('author', 'knowledge_path').filter(
             status__in=_PUBLIC_STATUSES,
         )
-        if request.query_params.get('mine') == '1' and request.user.is_authenticated:
+        if request.user.is_authenticated:
             mine = PathProposal.objects.select_related('author', 'knowledge_path').filter(
                 author=request.user,
             )
             proposals = (proposals | mine).distinct()
-        return Response([_payload(item) for item in proposals.order_by('-created_at')])
+        return Response([_payload(item, request) for item in proposals.order_by('-created_at')])
 
     def post(self, request):
+        uploaded = request.FILES.get('image')
+        proposal = None
         try:
             proposal = create_draft(
                 author=request.user,
@@ -90,20 +135,86 @@ class ProposalListCreateView(APIView):
                 deadline=_as_deadline(request.data.get('deadline')),
                 author_payout_address=request.data.get('author_payout_address') or '',
             )
+            if uploaded:
+                proposal = set_proposal_cover(
+                    proposal,
+                    uploaded,
+                    focal_x=request.data.get('image_focal_x'),
+                    focal_y=request.data.get('image_focal_y'),
+                )
         except ProposalError as exc:
+            if uploaded and proposal is not None:
+                proposal.delete()
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(_payload(proposal), status=status.HTTP_201_CREATED)
+        return Response(_payload(proposal, request), status=status.HTTP_201_CREATED)
 
 
 class ProposalDetailView(APIView):
-    permission_classes = [AllowAny]
+    authentication_classes = [_PublicJWTAuthentication]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_permissions(self):
+        if self.request.method == 'PATCH':
+            return [IsAuthenticated()]
+        return [AllowAny()]
 
     def get(self, request, proposal_id):
         proposal = _get_visible(request, proposal_id)
-        return Response(_payload(proposal, include_pledges=True))
+        if proposal.contract_address:
+            proposal = sync_proposal(proposal)
+        else:
+            proposal = refresh_recorded_payments(proposal)
+        return Response(_payload(proposal, request, include_pledges=True))
+
+    def patch(self, request, proposal_id):
+        proposal = get_object_or_404(PathProposal, pk=proposal_id, author=request.user)
+        try:
+            if any(key in request.data for key in ('title', 'pitch', 'goal_sats', 'deadline')):
+                proposal = update_proposal(
+                    proposal,
+                    title=request.data.get('title') or '',
+                    pitch=request.data.get('pitch') or '',
+                    goal_sats=(
+                        _as_int(request.data.get('goal_sats'), 'Goal')
+                        if 'goal_sats' in request.data else None
+                    ),
+                    deadline=(
+                        _as_deadline(request.data.get('deadline'))
+                        if 'deadline' in request.data else None
+                    ),
+                    author_payout_address=(
+                        request.data.get('author_payout_address') or ''
+                        if 'author_payout_address' in request.data else None
+                    ),
+                )
+            elif request.data.get('author_payout_address'):
+                proposal = set_author_payout(
+                    proposal,
+                    request.data.get('author_payout_address') or '',
+                )
+            if 'knowledge_path_id' in request.data:
+                proposal = link_knowledge_path(proposal, request.data.get('knowledge_path_id'))
+            uploaded = request.FILES.get('image')
+            if uploaded:
+                proposal = set_proposal_cover(
+                    proposal,
+                    uploaded,
+                    focal_x=request.data.get('image_focal_x'),
+                    focal_y=request.data.get('image_focal_y'),
+                )
+            elif 'image_focal_x' in request.data or 'image_focal_y' in request.data:
+                proposal = set_proposal_focal(
+                    proposal,
+                    focal_x=request.data.get('image_focal_x', proposal.image_focal_x),
+                    focal_y=request.data.get('image_focal_y', proposal.image_focal_y),
+                )
+        except ProposalError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(_payload(proposal, request, include_pledges=True))
 
 
 class ProposalCampaignView(APIView):
+    authentication_classes = [_PublicJWTAuthentication]
     permission_classes = [AllowAny]
 
     def get(self, request, proposal_id):
@@ -116,15 +227,28 @@ class ProposalCampaignView(APIView):
             return Response({'error': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
 
+class ProposalBroadcastView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        raw_tx = str(request.data.get('raw_tx') or '').strip()
+        try:
+            tx = _load_signed_payment(raw_tx, '')
+        except BchApiError as exc:
+            return _chain_error(exc)
+        return Response({'txid': tx.txid})
+
+
 class ProposalOpenView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, proposal_id):
         proposal = get_object_or_404(PathProposal, pk=proposal_id, author=request.user)
         txid = request.data.get('campaign_txid') or ''
+        raw_tx = str(request.data.get('raw_tx') or '').strip()
         try:
             vout = _as_int(request.data.get('campaign_vout'), 'Output index')
-            tx = build_bch_client().get_transaction(txid)
+            tx = _load_signed_payment(raw_tx, txid)
             output = _require_open_output(tx, vout)
             proposal = open_proposal(
                 proposal,
@@ -133,20 +257,23 @@ class ProposalOpenView(APIView):
                 contract_address=output.address,
                 token_category=output.token.category,
             )
-        except (ProposalError, BchApiError) as exc:
-            code = status.HTTP_502_BAD_GATEWAY if isinstance(exc, BchApiError) else status.HTTP_400_BAD_REQUEST
-            return Response({'error': str(exc)}, status=code)
-        return Response(_payload(proposal))
+        except BchApiError as exc:
+            return _chain_error(exc)
+        except ProposalError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(_payload(proposal, request))
 
 
 class ProposalPledgeView(APIView):
+    authentication_classes = [_PublicJWTAuthentication]
     permission_classes = [AllowAny]
 
     def post(self, request, proposal_id):
         proposal = get_object_or_404(PathProposal, pk=proposal_id)
         txid = request.data.get('txid') or ''
+        raw_tx = str(request.data.get('raw_tx') or '').strip()
         try:
-            tx = build_bch_client().get_transaction(txid)
+            tx = _load_signed_payment(raw_tx, txid) if raw_tx else build_bch_client().get_transaction(txid)
             apply_transaction(proposal, tx)
         except BchApiError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
@@ -157,10 +284,11 @@ class ProposalPledgeView(APIView):
                 pledge_txid=tx.txid,
                 user__isnull=True,
             ).update(user=request.user)
-        return Response(_payload(proposal, include_pledges=True))
+        return Response(_payload(proposal, request, include_pledges=True))
 
 
 class ProposalRefundView(APIView):
+    authentication_classes = [_PublicJWTAuthentication]
     permission_classes = [AllowAny]
 
     def post(self, request, proposal_id):
@@ -180,6 +308,7 @@ class ProposalRefundView(APIView):
 
 
 class ProposalClaimView(APIView):
+    authentication_classes = [_PublicJWTAuthentication]
     permission_classes = [AllowAny]
 
     def post(self, request, proposal_id):
@@ -205,17 +334,38 @@ def _get_visible(request, proposal_id) -> PathProposal:
     return get_object_or_404(PathProposal, pk=0)
 
 
-def _payload(proposal: PathProposal, *, include_pledges: bool = False) -> dict:
+def _proposal_image_urls(proposal: PathProposal, request) -> tuple[str | None, str | None]:
+    image = build_media_url(proposal.image, request) if proposal.image else None
+    preview = build_media_url(proposal.image_preview, request) if proposal.image_preview else None
+    if preview and proposal.updated_at:
+        sep = '&' if '?' in preview else '?'
+        preview = f'{preview}{sep}t={int(proposal.updated_at.timestamp())}'
+    return image, preview
+
+
+def _payload(proposal: PathProposal, request, *, include_pledges: bool = False) -> dict:
+    image, preview = _proposal_image_urls(proposal, request)
     data = {
         'id': proposal.pk,
         'status': proposal.status,
-        'title': proposal.frozen_title or proposal.knowledge_path.title,
-        'pitch': proposal.frozen_pitch or proposal.knowledge_path.description,
+        'title': proposal.frozen_title or (proposal.knowledge_path.title if proposal.knowledge_path_id else ''),
+        'pitch': proposal.frozen_pitch or (proposal.knowledge_path.description if proposal.knowledge_path_id else ''),
         'goal_sats': proposal.goal_sats,
         'raised_sats': proposal.raised_sats,
+        'pending_sats': (
+            proposal.pledges.filter(status=PathPledge.STATUS_PENDING)
+            .aggregate(total=Sum('amount_sats'))
+            .get('total')
+            or 0
+        ),
         'deadline': proposal.deadline.isoformat(),
         'author': proposal.author.username,
         'author_payout_address': proposal.author_payout_address,
+        'image': image,
+        'image_preview': preview,
+        'image_focal_x': proposal.image_focal_x,
+        'image_focal_y': proposal.image_focal_y,
+        'network_prefix': network_cashaddr_prefix(),
         'knowledge_path_id': proposal.knowledge_path_id,
         'contract_address': proposal.contract_address,
         'token_category': proposal.token_category,
@@ -239,6 +389,25 @@ def _payload(proposal: PathProposal, *, include_pledges: bool = False) -> dict:
             for pledge in proposal.pledges.all()
         ]
     return data
+
+
+def _chain_error(exc: BchApiError):
+    code = exc.code or 'chain_unavailable'
+    if 'no such mempool' in str(exc).lower() or 'no se pudo cargar la transacci' in str(exc).lower():
+        code = 'not_published'
+    message = {
+        'not_published': 'The signed payment is not on the Bitcoin Cash network yet.',
+        'broadcast_rejected': 'The Bitcoin Cash network rejected the signed payment.',
+    }.get(code, 'The Bitcoin Cash network could not be reached.')
+    http_status = status.HTTP_400_BAD_REQUEST if code == 'broadcast_rejected' else status.HTTP_502_BAD_GATEWAY
+    return Response({'code': code, 'error': message}, status=http_status)
+
+
+def _load_signed_payment(raw_tx: str, txid: str) -> BchTransaction:
+    client = build_bch_client()
+    if raw_tx and hasattr(client, 'publish'):
+        return client.publish(raw_tx)
+    return client.get_transaction(txid)
 
 
 def _as_int(value, label: str) -> int:

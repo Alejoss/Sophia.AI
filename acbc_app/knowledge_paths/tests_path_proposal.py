@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from knowledge_paths.models import PathPledge, PathProposal
+from knowledge_paths.models import KnowledgePath, PathPledge, PathProposal
 from knowledge_paths.services.proposal_service import (
     ProposalError,
     cancel_draft,
@@ -12,6 +12,7 @@ from knowledge_paths.services.proposal_service import (
     confirm_pledge,
     create_draft,
     expire_if_due,
+    link_knowledge_path,
     open_proposal,
     record_pledge,
     refund_pledge,
@@ -77,15 +78,12 @@ class PathProposalStateTests(TestCase):
         params.update(overrides)
         return record_pledge(proposal, **params)
 
-    def test_create_draft_hides_the_path_and_leaves_the_pitch_unfrozen(self):
+    def test_create_draft_does_not_create_a_knowledge_path(self):
         proposal = self._draft()
-        path = proposal.knowledge_path
         self.assertEqual(proposal.status, PathProposal.STATUS_DRAFT)
-        self.assertFalse(path.is_visible)
-        self.assertFalse(path.sales_enabled)
-        self.assertEqual(path.author, self.author)
-        self.assertEqual(path.title, 'Bitcoin for beginners')
-        self.assertEqual(proposal.frozen_title, '')
+        self.assertIsNone(proposal.knowledge_path_id)
+        self.assertEqual(proposal.frozen_title, 'Bitcoin for beginners')
+        self.assertEqual(proposal.frozen_pitch, 'A path we will write if funded.')
         self.assertEqual(proposal.terms_hash, '')
         self.assertEqual(proposal.deadline.microsecond, 0)
 
@@ -96,13 +94,9 @@ class PathProposalStateTests(TestCase):
         with self.assertRaises(ProposalError):
             cancel_draft(opened)
 
-    def test_open_freezes_the_pitch_and_hashes_the_terms(self):
+    def test_open_keeps_the_pitch_without_a_knowledge_path(self):
         proposal = self._open()
-        path = proposal.knowledge_path
-        path.title = 'Changed after open'
-        path.description = 'Changed pitch'
-        path.save(update_fields=['title', 'description'])
-        proposal.refresh_from_db()
+        self.assertIsNone(proposal.knowledge_path_id)
         self.assertEqual(proposal.status, PathProposal.STATUS_OPEN)
         self.assertEqual(proposal.frozen_title, 'Bitcoin for beginners')
         self.assertEqual(proposal.frozen_pitch, 'A path we will write if funded.')
@@ -117,6 +111,12 @@ class PathProposalStateTests(TestCase):
         with self.assertRaises(ProposalError):
             self._draft(deadline=self.now - timedelta(minutes=1))
         proposal = self._open()
+        with self.assertRaises(ProposalError):
+            self._open(proposal)
+
+    def test_open_requires_a_cashout_address(self):
+        proposal = self._draft(author_payout_address='')
+        self.assertEqual(proposal.author_payout_address, '')
         with self.assertRaises(ProposalError):
             self._open(proposal)
 
@@ -195,6 +195,20 @@ class PathProposalStateTests(TestCase):
         proposal = expire_if_due(proposal, at=after)
         self.assertEqual(proposal.status, PathProposal.STATUS_FUNDED)
 
+    def test_the_author_links_a_path_only_after_the_goal(self):
+        proposal = self._open()
+        path = KnowledgePath.objects.create(title='The investigation', description='Lessons', author=self.author)
+        with self.assertRaises(ProposalError):
+            link_knowledge_path(proposal, path.pk)
+        proposal, _pledge = self._pledge(proposal, amount=100_000)
+        self.assertEqual(proposal.status, PathProposal.STATUS_FUNDED)
+        linked = link_knowledge_path(proposal, path.pk)
+        self.assertEqual(linked.knowledge_path_id, path.pk)
+        other = User.objects.create_user(username='other-author', password='secret')
+        foreign = KnowledgePath.objects.create(title='Not mine', author=other)
+        with self.assertRaises(ProposalError):
+            link_knowledge_path(linked, foreign.pk)
+
     def test_claim_settles_confirmed_pledges_and_keeps_the_raised_total(self):
         proposal = self._open()
         proposal, _pledge = self._pledge(proposal, amount=100_000)
@@ -202,18 +216,21 @@ class PathProposalStateTests(TestCase):
         self.assertEqual(proposal.status, PathProposal.STATUS_CLAIMED)
         self.assertEqual(proposal.settlement_txid, _txid(4))
         self.assertEqual(proposal.raised_sats, 100_000)
-        self.assertFalse(proposal.knowledge_path.is_visible)
+        self.assertIsNone(proposal.knowledge_path_id)
         pledge = proposal.pledges.get()
         self.assertEqual(pledge.status, PathPledge.STATUS_SETTLED)
         with self.assertRaises(ProposalError):
             claim_proposal(proposal, settlement_txid=_txid(5))
 
-    def test_confirm_after_the_campaign_leaves_open_is_rejected(self):
+    def test_a_pledge_confirms_after_the_campaign_is_closed(self):
         proposal = self._open()
         proposal, pledge = self._pledge(proposal, confirmations=0)
         proposal = expire_if_due(proposal, at=self.deadline + timedelta(seconds=1))
-        with self.assertRaises(ProposalError):
-            confirm_pledge(pledge.proposal, pledge, confirmations=1, at=self.deadline)
+        proposal = confirm_pledge(proposal, pledge, confirmations=1, at=self.deadline)
+        pledge.refresh_from_db()
+        self.assertEqual(pledge.status, PathPledge.STATUS_CONFIRMED)
+        self.assertEqual(proposal.status, PathProposal.STATUS_EXPIRED)
+        self.assertEqual(proposal.raised_sats, 40_000)
 
     def test_duplicate_pledge_output_is_rejected(self):
         proposal = self._open()

@@ -32,6 +32,22 @@ def knowledge_path_image_preview_path(instance, filename):
     return f"knowledge_path_images/path_{instance.id}_preview.webp"
 
 
+def upload_proposal_image(instance, filename):
+    """Cover image for a crowdfunded investigation. Same storage rules as a path."""
+    import os
+    name, ext = os.path.splitext(filename)
+    if len(name) > 80:
+        name = name[:80]
+    if getattr(instance, 'id', None):
+        return f"knowledge_path_images/proposal_{instance.id}_{name}{ext}"
+    return f"knowledge_path_images/temp_{name}{ext}"
+
+
+def proposal_image_preview_path(instance, filename):
+    """Downsized WebP for crowdfunded investigation list cards."""
+    return f"knowledge_path_images/proposal_{instance.id}_preview.webp"
+
+
 class KnowledgePath(models.Model):
     """Editable knowledge path, not an immutable certified published version.
 
@@ -446,11 +462,11 @@ class KnowledgePathSnapshotAnchor(models.Model):
 
 
 class PathProposal(models.Model):
-    """Funding contract for creating a knowledge path.
+    """A crowdfunded investigation.
 
-    The linked path is the curriculum and stays hidden until a later step
-    publishes it after the campaign is claimed. Funding state lives here.
-    See docs/hackathon/knowledge-path-funding.md.
+    It can collect funds before any knowledge path exists. After the goal is
+    reached, the author can link one of their knowledge paths. The pledge
+    receipt does not control that path.
     """
 
     STATUS_DRAFT = 'draft'
@@ -470,8 +486,10 @@ class PathProposal(models.Model):
 
     knowledge_path = models.OneToOneField(
         KnowledgePath,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name='funding_proposal',
+        null=True,
+        blank=True,
     )
     author = models.ForeignKey(
         User,
@@ -482,7 +500,23 @@ class PathProposal(models.Model):
     frozen_pitch = models.TextField(blank=True)
     goal_sats = models.BigIntegerField()
     deadline = models.DateTimeField()
-    author_payout_address = models.CharField(max_length=128)
+    author_payout_address = models.CharField(max_length=128, blank=True)
+    image = models.ImageField(
+        upload_to=upload_proposal_image,
+        null=True,
+        blank=True,
+        max_length=255,
+        help_text="Cover image for the crowdfunded investigation",
+    )
+    image_preview = models.ImageField(
+        upload_to=proposal_image_preview_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        help_text="Auto-generated downsized cover for list/card views.",
+    )
+    image_focal_x = models.FloatField(default=0.5, blank=True)
+    image_focal_y = models.FloatField(default=0.5, blank=True)
     terms_hash = models.CharField(max_length=64, blank=True)
     status = models.CharField(
         max_length=16,
@@ -518,6 +552,13 @@ class PathProposal(models.Model):
 
     def __str__(self):
         return f'PathProposal {self.pk} [{self.status}] goal={self.goal_sats}'
+
+    def delete(self, *args, **kwargs):
+        if self.image_preview:
+            self.image_preview.delete(save=False)
+        if self.image:
+            self.image.delete(save=False)
+        super().delete(*args, **kwargs)
 
 
 class PathPledge(models.Model):

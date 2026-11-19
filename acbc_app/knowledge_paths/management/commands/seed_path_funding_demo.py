@@ -13,12 +13,11 @@ from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-from knowledge_paths.models import Node
 from knowledge_paths.services.proposal_service import ProposalError, create_draft
 
 
 class Command(BaseCommand):
-    help = 'Seed a draft knowledge-path funding campaign and one text lesson.'
+    help = 'Seed a draft crowdfunded investigation. It has no knowledge path yet.'
 
     def add_arguments(self, parser):
         parser.add_argument('--username', required=True)
@@ -50,13 +49,6 @@ class Command(BaseCommand):
             )
         except ProposalError as exc:
             raise CommandError(str(exc)) from exc
-        Node.objects.create(
-            knowledge_path=proposal.knowledge_path,
-            title='What this campaign funds',
-            description=pitch,
-            media_type='TEXT',
-            order=1,
-        )
         self.stdout.write(self.style.SUCCESS(
-            f'Draft proposal {proposal.pk} for path {proposal.knowledge_path_id}.'
+            f'Draft proposal {proposal.pk}. Link a knowledge path after the goal is reached.'
         ))

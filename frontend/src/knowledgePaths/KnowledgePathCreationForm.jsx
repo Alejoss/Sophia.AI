@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -98,6 +98,10 @@ const KnowledgePathCreationForm = () => {
             <Box sx={{ mb: 2 }}>
               <Typography variant="h4" component="h1" sx={{ mb: 1.5 }}>
                 {t('create.title')}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                {t('create.fundInstead')}{' '}
+                <RouterLink to="/knowledge_path/funding/new">{t('create.fundLink')}</RouterLink>
               </Typography>
               {generalError && (
                 <Alert severity="error" sx={{ whiteSpace: 'pre-line' }}>

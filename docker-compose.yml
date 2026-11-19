@@ -9,6 +9,8 @@ services:
     # - static_volume y media_volume para persistir archivos estáticos y media
     volumes:
       - ./acbc_app:/app
+      # Campaign artifact lives beside the app. BASE_DIR is /app, so this is /contracts.
+      - ./contracts:/contracts:ro
       - static_volume:/app/staticfiles
       - media_volume:/app/media
       # Hides ./acbc_app/logs so recreate does not depend on the bind mount.

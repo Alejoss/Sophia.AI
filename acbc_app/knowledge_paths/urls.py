@@ -3,12 +3,14 @@ from django.urls import path
 from content.views_social_preview import KnowledgePathSocialPreviewView
 
 from .views_funding import (
+    ProposalBchPriceView,
     ProposalCampaignView,
     ProposalClaimView,
     ProposalContractView,
     ProposalUtxoView,
     ProposalDetailView,
     ProposalListCreateView,
+    ProposalBroadcastView,
     ProposalOpenView,
     ProposalPledgeView,
     ProposalRefundView,
@@ -42,8 +44,10 @@ urlpatterns = [
         KnowledgePathSocialPreviewView.as_view(),
         name='knowledge-path-social-preview',
     ),
+    path('proposals/bch-price/', ProposalBchPriceView.as_view(), name='path-proposal-bch-price'),
     path('proposals/contract/', ProposalContractView.as_view(), name='path-proposal-contract'),
     path('proposals/utxos/', ProposalUtxoView.as_view(), name='path-proposal-utxos'),
+    path('proposals/broadcast/', ProposalBroadcastView.as_view(), name='path-proposal-broadcast'),
     path('proposals/', ProposalListCreateView.as_view(), name='path-proposal-list'),
     path('proposals/<int:proposal_id>/', ProposalDetailView.as_view(), name='path-proposal-detail'),
     path('proposals/<int:proposal_id>/open/', ProposalOpenView.as_view(), name='path-proposal-open'),

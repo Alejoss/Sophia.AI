@@ -1,6 +1,7 @@
 """Public Bitcoin Cash chain/price clients — on-demand verification only."""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import socket
@@ -43,6 +44,26 @@ COINGECKO_BCH_PRICE_URL = (
 
 class BchApiError(Exception):
     """Raised when the public BCH API request fails."""
+
+    def __init__(self, message, *, code: str = ''):
+        super().__init__(message)
+        self.code = code
+
+
+def txid_from_raw(raw_hex: str) -> str:
+    raw = bytes.fromhex(raw_hex)
+    return hashlib.sha256(hashlib.sha256(raw).digest()).digest()[::-1].hex()
+
+
+def _already_published(message: str) -> bool:
+    text = message.lower()
+    return any(piece in text for piece in (
+        'already in the mempool',
+        'txn-already-in-mempool',
+        'txn-already-known',
+        'transaction already in block chain',
+        'already known',
+    ))
 
 
 def _parse_token(payload: Any) -> BchTokenInfo | None:
@@ -360,6 +381,10 @@ class BchPublicClient:
         tx_wrap = (data.get('data') or {}).get(txid) or {}
         tx = tx_wrap.get('transaction') or {}
         outputs_raw = tx_wrap.get('outputs') or []
+        if not tx or not outputs_raw:
+            raise BchApiError(
+                f'Transaction {txid} is not on the Bitcoin Cash network yet.'
+            )
         return self._parse_blockchair_tx(
             str(txid),
             tx,
@@ -684,6 +709,20 @@ class BchElectrumClient:
             )
         return results
 
+    def broadcast(self, raw_tx_hex: str) -> str:
+        raw = (raw_tx_hex or '').strip().lower()
+        if len(raw) < 20 or any(char not in '0123456789abcdef' for char in raw):
+            raise BchApiError('The signed payment is not a Bitcoin Cash transaction.', code='broadcast_rejected')
+        try:
+            result = self._call('blockchain.transaction.broadcast', [raw])
+        except BchApiError as exc:
+            if _already_published(str(exc)):
+                return txid_from_raw(raw)
+            raise
+        if isinstance(result, str) and len(result) == 64:
+            return result.lower()
+        return txid_from_raw(raw)
+
     def get_transaction(
         self,
         txid: str,
@@ -999,9 +1038,49 @@ class BchFailoverClient:
                 return tx
             except BchApiError as exc:
                 errors.append(f'blockchair={exc}')
+        logger.error(
+            'BCH tx %s was not visible. Attempts: %s',
+            txid,
+            ' | '.join(errors[:4]),
+        )
         raise BchApiError(
-            f'No se pudo cargar la transacción {txid} '
-            f'({" | ".join(errors[:4])})'
+            'The signed payment is not on the Bitcoin Cash network yet.',
+            code='not_published',
+        )
+
+    def publish(self, raw_tx_hex: str) -> BchTransaction:
+        """Broadcast a signed payment, then read it back from the node that accepted it."""
+        last_error: BchApiError | None = None
+        for client in self.servers:
+            try:
+                txid = client.broadcast(raw_tx_hex)
+            except BchApiError as exc:
+                if _already_published(str(exc)):
+                    txid = txid_from_raw(raw_tx_hex)
+                else:
+                    last_error = exc
+                    logger.warning(
+                        'Electrum broadcast failed on %s:%s: %s',
+                        client.host,
+                        client.port,
+                        exc,
+                    )
+                    continue
+            for _attempt in range(5):
+                try:
+                    return client.get_transaction(txid)
+                except BchApiError as exc:
+                    last_error = exc
+                    time.sleep(1)
+        if last_error is not None and not _already_published(str(last_error)):
+            if 'reject' in str(last_error).lower() or 'bad-txns' in str(last_error).lower():
+                raise BchApiError(
+                    'The Bitcoin Cash network rejected the signed payment.',
+                    code='broadcast_rejected',
+                ) from last_error
+        raise BchApiError(
+            'The signed payment is not on the Bitcoin Cash network yet.',
+            code='not_published',
         )
 
     def list_unspent(self, address: str) -> list[dict]:

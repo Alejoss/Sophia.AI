@@ -81,7 +81,7 @@ Security practices and guidelines:
 
 - **[Ethereum hackathon specification](hackathon/hackathon-ethereum-credentials.md)** — Agreed NFT credentials, IPFS course snapshots, and transcript registry scope (planned).
 - **[Ethereum hackathon development plan](hackathon/hackathon-ethereum-development-plan.md)** — Implementation sequence and acceptance criteria.
-- **[Knowledge-path funding (BCH BLAZE)](hackathon/knowledge-path-funding.md)** — Crowdfund a knowledge path with a pledge NFT that reclaims funds or unlocks the path.
+- **[Knowledge-path funding (BCH BLAZE)](hackathon/knowledge-path-funding.md)** — Crowdfund a knowledge path. A pledge receipt reclaims funds. The finished path is open to everyone.
 
 - **Getting Started**: [Setup Guide](../Setup.md)
 - **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)

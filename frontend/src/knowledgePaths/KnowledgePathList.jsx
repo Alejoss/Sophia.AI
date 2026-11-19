@@ -17,7 +17,6 @@ import {
 '@mui/material';
 import knowledgePathsApi from '../api/knowledgePathsApi';
 import FeaturedEventBanner from '../events/FeaturedEventBanner';
-import BlazeBanner from '../funding/BlazeBanner';
 import VoteComponent from '../votes/VoteComponent';
 import { AuthContext } from '../context/AuthContext';
 import { useDateLocales } from '../hooks/useDateLocales';
@@ -104,8 +103,8 @@ const KnowledgePathList = () => {
         <Typography variant="h4" component="h1" sx={{ mb: { xs: 2, md: 0 } }}>
           {t('list.title')}
         </Typography>
-        {authState.isAuthenticated &&
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
+            {authState.isAuthenticated &&
             <Link
             to="/profiles/my_profile?section=knowledge-paths"
             style={{ textDecoration: 'none' }}>
@@ -120,6 +119,20 @@ const KnowledgePathList = () => {
                 {t('list.mine')}
               </Typography>
             </Link>
+            }
+            <Button
+            component={Link}
+            to="/knowledge_path/funding"
+            variant="outlined"
+            color="primary"
+            sx={{
+              textDecoration: 'none',
+              width: { xs: '100%', md: 'auto' }
+            }}>
+            
+              {t('list.investigations')}
+            </Button>
+            {authState.isAuthenticated &&
             <Button
             component={Link}
             to="/knowledge_path/create"
@@ -132,8 +145,8 @@ const KnowledgePathList = () => {
             
               {t('list.create')}
             </Button>
+            }
           </Stack>
-        }
       </Box>
 
       <Grid container spacing={3}>
@@ -332,7 +345,6 @@ const KnowledgePathList = () => {
   return (
     <Container sx={{ py: { xs: 2, md: 3 }, px: { xs: 1, md: 3 } }}>
       <FeaturedEventBanner />
-      <BlazeBanner />
       {body}
     </Container>
   );
