@@ -22,6 +22,8 @@ map $http_user_agent $is_social_crawler {
 # HTTP → canonical HTTPS (single hop)
 server {
     listen 80;
+    # CVE-2026-123007 and CVE-2026-123633 need HTTP/2. Leave it off.
+    http2 off;
     server_name APEX_HOST_PLACEHOLDER CANONICAL_HOST_PLACEHOLDER;
     return 301 https://CANONICAL_HOST_PLACEHOLDER$request_uri;
 }
@@ -29,6 +31,8 @@ server {
 # HTTPS apex → canonical (www and apex must not both serve the app)
 server {
     listen 443 ssl;
+    # CVE-2026-123007 and CVE-2026-123633 need HTTP/2. Leave it off.
+    http2 off;
     server_name APEX_HOST_PLACEHOLDER;
 
     ssl_certificate     /etc/letsencrypt/live/SSL_DOMAIN_PLACEHOLDER/fullchain.pem;
@@ -42,6 +46,8 @@ server {
 # HTTPS – canonical host only
 server {
     listen 443 ssl;
+    # CVE-2026-123007 and CVE-2026-123633 need HTTP/2. Leave it off.
+    http2 off;
     server_name CANONICAL_HOST_PLACEHOLDER;
 
     # Allow large uploads (e.g. videos, documentaries) for /api/content/upload-content/

@@ -93,7 +93,10 @@ server {
 
 # Configuración HTTPS
 server {
-    listen 443 ssl http2;
+    # HTTP/2 apagado. CVE-2026-123007 y CVE-2026-123633 (18 nov 2026)
+    # permiten ejecución de código sin autenticación si HTTP/2 está
+    # activo en nginx anterior a 1.30.7 (stable) o 1.31.9 (mainline).
+    listen 443 ssl;
     server_name tudominio.com www.tudominio.com;
 
     # SSL (se configurará después con Let's Encrypt)

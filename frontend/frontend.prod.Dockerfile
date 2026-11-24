@@ -33,8 +33,10 @@ ARG BUILD_SHA=unknown
 ENV VITE_BUILD_SHA=${BUILD_SHA}
 RUN npm run build
 
-# Stage 2: Serve with nginx
-FROM nginx:alpine
+# Stage 2: Serve with nginx.
+# Stable 1.30.8 fixes CVE-2026-123007 and CVE-2026-123633 (HTTP/2 RCE)
+# and CVE-2026-132779. Same digest as nginx/Dockerfile.
+FROM nginx:1.30.8-alpine@sha256:6437a63b5c529f0e06162b3f593c0154cff6fa2ea0f94fd7c27928cb399e022d
 
 # Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
